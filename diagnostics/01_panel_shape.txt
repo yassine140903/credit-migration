@@ -1,0 +1,331 @@
+==============================================================================
+01_panel_shape - Freddie Mac monthly performance panel shape
+==============================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns read: 0 loan_sequence_number, 1 monthly_reporting_period
+files found : 8
+    data\historical_data_2006\historical_data_2006Q1\perf_2006Q1.txt    2.14 GB
+    data\historical_data_2006\historical_data_2006Q2\perf_2006Q2.txt    1.99 GB
+    data\historical_data_2006\historical_data_2006Q3\perf_2006Q3.txt    1.77 GB
+    data\historical_data_2006\historical_data_2006Q4\perf_2006Q4.txt    2.04 GB
+    data\historical_data_2007\historical_data_2007Q1\perf_2007Q1.txt    2.02 GB
+    data\historical_data_2007\historical_data_2007Q2\perf_2007Q2.txt    2.31 GB
+    data\historical_data_2007\historical_data_2007Q3\perf_2007Q3.txt    1.64 GB
+    data\historical_data_2007\historical_data_2007Q4\perf_2007Q4.txt    1.75 GB
+
+==============================================================================
+SCOPE: perf_2006Q1.txt   (32.6s)
+==============================================================================
+rows                                       20,622,024
+distinct loans                                298,574
+rows with unparseable period                        0
+min monthly_reporting_period                   200512
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    69.07
+std                     50.82
+min                         1
+p1                        4.0
+p10  (d1)                17.0
+p20  (d2)                29.0
+p30  (d3)                39.0
+p40  (d4)                47.0
+p50  (d5)                57.0
+p60  (d6)                69.0
+p70  (d7)                80.0
+p80  (d8)                96.0
+p90  (d9)               140.0
+p99                     241.0
+max                       243
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                  298,400
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                       174
+
+==============================================================================
+SCOPE: perf_2006Q2.txt   (31.9s)
+==============================================================================
+rows                                       19,214,632
+distinct loans                                308,208
+rows with unparseable period                        0
+min monthly_reporting_period                   200603
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    62.34
+std                     48.84
+min                         1
+p1                        4.0
+p10  (d1)                15.0
+p20  (d2)                24.0
+p30  (d3)                34.0
+p40  (d4)                39.0
+p50  (d5)                49.0
+p60  (d6)                60.0
+p70  (d7)                73.0
+p80  (d8)                87.0
+p90  (d9)               128.0
+p99                     238.0
+max                       240
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                  308,025
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                       183
+
+==============================================================================
+SCOPE: perf_2006Q3.txt   (28.6s)
+==============================================================================
+rows                                       17,073,842
+distinct loans                                283,975
+rows with unparseable period                        0
+min monthly_reporting_period                   200606
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    60.12
+std                     48.77
+min                         1
+p1                        4.0
+p10  (d1)                15.0
+p20  (d2)                22.0
+p30  (d3)                31.0
+p40  (d4)                36.0
+p50  (d5)                46.0
+p60  (d6)                57.0
+p70  (d7)                71.0
+p80  (d8)                85.0
+p90  (d9)               126.0
+p99                     235.0
+max                       237
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                  283,815
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                       160
+
+==============================================================================
+SCOPE: perf_2006Q4.txt   (32.2s)
+==============================================================================
+rows                                       19,578,264
+distinct loans                                302,787
+rows with unparseable period                        0
+min monthly_reporting_period                   200609
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    64.66
+std                     49.17
+min                         1
+p1                        4.0
+p10  (d1)                17.0
+p20  (d2)                28.0
+p30  (d3)                33.0
+p40  (d4)                43.0
+p50  (d5)                51.0
+p60  (d6)                64.0
+p70  (d7)                74.0
+p80  (d8)                91.0
+p90  (d9)               133.0
+p99                     232.0
+max                       234
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                  302,592
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                       195
+
+==============================================================================
+SCOPE: perf_2007Q1.txt   (32.1s)
+==============================================================================
+rows                                       19,432,995
+distinct loans                                302,331
+rows with unparseable period                        0
+min monthly_reporting_period                   200612
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    64.28
+std                     48.67
+min                         1
+p1                        5.0
+p10  (d1)                17.0
+p20  (d2)                26.0
+p30  (d3)                34.0
+p40  (d4)                43.0
+p50  (d5)                52.0
+p60  (d6)                63.0
+p70  (d7)                73.0
+p80  (d8)                90.0
+p90  (d9)               132.0
+p99                     229.0
+max                       231
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                  302,133
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                       198
+
+==============================================================================
+SCOPE: perf_2007Q2.txt   (36.5s)
+==============================================================================
+rows                                       22,286,961
+distinct loans                                354,055
+rows with unparseable period                        0
+min monthly_reporting_period                   200703
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    62.95
+std                     48.68
+min                         1
+p1                        5.0
+p10  (d1)                18.0
+p20  (d2)                24.0
+p30  (d3)                32.0
+p40  (d4)                41.0
+p50  (d5)                51.0
+p60  (d6)                61.0
+p70  (d7)                71.0
+p80  (d8)                89.0
+p90  (d9)               131.0
+p99                     226.0
+max                       228
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                  353,798
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                       257
+
+==============================================================================
+SCOPE: perf_2007Q3.txt   (26.1s)
+==============================================================================
+rows                                       15,827,144
+distinct loans                                284,980
+rows with unparseable period                        0
+min monthly_reporting_period                   200706
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    55.54
+std                     48.18
+min                         1
+p1                        4.0
+p10  (d1)                10.0
+p20  (d2)                19.0
+p30  (d3)                24.0
+p40  (d4)                33.0
+p50  (d5)                41.0
+p60  (d6)                54.0
+p70  (d7)                65.0
+p80  (d8)                80.0
+p90  (d9)               122.0
+p99                     223.0
+max                       225
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                  284,799
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                       181
+
+==============================================================================
+SCOPE: perf_2007Q4.txt   (27.6s)
+==============================================================================
+rows                                       16,931,624
+distinct loans                                296,826
+rows with unparseable period                        0
+min monthly_reporting_period                   200709
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    57.04
+std                     48.03
+min                         1
+p1                        3.0
+p10  (d1)                14.0
+p20  (d2)                19.0
+p30  (d3)                27.0
+p40  (d4)                35.0
+p50  (d5)                44.0
+p60  (d6)                55.0
+p70  (d7)                64.0
+p80  (d8)                81.0
+p90  (d9)               124.0
+p99                     220.0
+max                       222
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                  296,631
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                       195
+
+==============================================================================
+SCOPE: POOLED (all 8 files)
+==============================================================================
+rows                                      150,967,486
+distinct loans                              2,431,736
+rows with unparseable period                        0
+min monthly_reporting_period                   200512
+max monthly_reporting_period                   202603
+
+MONTHS TRACKED PER LOAN   (unit: months of observation for one loan)
+------------------------------------------------------------------------------
+statistic              months
+mean                    62.08
+std                     49.07
+min                         1
+p1                        4.0
+p10  (d1)                15.0
+p20  (d2)                24.0
+p30  (d3)                32.0
+p40  (d4)                40.0
+p50  (d5)                49.0
+p60  (d6)                60.0
+p70  (d7)                72.0
+p80  (d8)                88.0
+p90  (d9)               130.0
+p99                     231.0
+max                       243
+
+PANEL INTEGRITY   (unit: loans)
+------------------------------------------------------------------------------
+rows == span implied by min/max period                2,430,193
+rows >  span  (duplicate months present)                      0
+rows <  span  (interior gaps present)                     1,543
+
+CROSS-FILE LOAN OVERLAP   (unit: loans)
+------------------------------------------------------------------------------
+sum of per-file distinct loans                        2,431,736
+pooled distinct loans                                 2,431,736
+implied loans appearing in >1 file                            0
+
+==============================================================================
+runtime: 249.3 s  (4.15 min)
+==============================================================================

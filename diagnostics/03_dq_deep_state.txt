@@ -1,0 +1,229 @@
+==============================================================================
+03_dq_deep_state - loans ever reaching delinquency status >= 6
+==============================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns     : 0 loan, 1 period, 3 dq_status, 7 modification_flag, 8 zero_balance_code
+files found : 8
+    data\historical_data_2006\historical_data_2006Q1\perf_2006Q1.txt    2.14 GB
+    data\historical_data_2006\historical_data_2006Q2\perf_2006Q2.txt    1.99 GB
+    data\historical_data_2006\historical_data_2006Q3\perf_2006Q3.txt    1.77 GB
+    data\historical_data_2006\historical_data_2006Q4\perf_2006Q4.txt    2.04 GB
+    data\historical_data_2007\historical_data_2007Q1\perf_2007Q1.txt    2.02 GB
+    data\historical_data_2007\historical_data_2007Q2\perf_2007Q2.txt    2.31 GB
+    data\historical_data_2007\historical_data_2007Q3\perf_2007Q3.txt    1.64 GB
+    data\historical_data_2007\historical_data_2007Q4\perf_2007Q4.txt    1.75 GB
+
+PASS 1/3 - loan universe and DQ>=6 loan set
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                rows    20,622,024  loans     298,574  DQ>=6 loans     33,789  (24.8s)
+    perf_2006Q2.txt                rows    19,214,632  loans     308,208  DQ>=6 loans     32,872  (27.7s)
+    perf_2006Q3.txt                rows    17,073,842  loans     283,975  DQ>=6 loans     31,302  (31.1s)
+    perf_2006Q4.txt                rows    19,578,264  loans     302,787  DQ>=6 loans     37,297  (35.0s)
+    perf_2007Q1.txt                rows    19,432,995  loans     302,331  DQ>=6 loans     37,645  (34.6s)
+    perf_2007Q2.txt                rows    22,286,961  loans     354,055  DQ>=6 loans     46,762  (39.8s)
+    perf_2007Q3.txt                rows    15,827,144  loans     284,980  DQ>=6 loans     37,659  (27.9s)
+    perf_2007Q4.txt                rows    16,931,624  loans     296,826  DQ>=6 loans     40,641  (29.9s)
+
+PASS 2/3 - per-loan state restricted to the DQ>=6 set
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                rows kept     3,510,546   (35.8s)
+    perf_2006Q2.txt                rows kept     3,280,809   (30.0s)
+    perf_2006Q3.txt                rows kept     3,058,427   (26.9s)
+    perf_2006Q4.txt                rows kept     3,582,409   (30.8s)
+    perf_2007Q1.txt                rows kept     3,509,605   (30.9s)
+    perf_2007Q2.txt                rows kept     4,260,058   (35.8s)
+    perf_2007Q3.txt                rows kept     3,274,407   (25.2s)
+    perf_2007Q4.txt                rows kept     3,461,505   (27.5s)
+
+PASS 3/3 - first return to '00' after first touch
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                scanned   (30.5s)
+    perf_2006Q2.txt                scanned   (28.0s)
+    perf_2006Q3.txt                scanned   (24.9s)
+    perf_2006Q4.txt                scanned   (28.4s)
+    perf_2007Q1.txt                scanned   (28.4s)
+    perf_2007Q2.txt                scanned   (32.8s)
+    perf_2007Q3.txt                scanned   (23.1s)
+    perf_2007Q4.txt                scanned   (25.1s)
+
+==============================================================================
+(a) DEEP-DELINQUENCY INCIDENCE   (unit: loans)
+==============================================================================
+quantity                                                      loans      share
+------------------------------------------------------------------------------
+all distinct loans in panel                               2,431,736  100.0000%
+ever reach status >= 6                                      297,967   12.2533%
+never reach status >= 6                                   2,133,769   87.7467%
+
+total panel rows (loan-months)                          150,967,486
+
+non-numeric delinquency status codes seen (excluded from >=6 by the
+.str.isdigit() guard)   (unit: loan-months)
+------------------------------------------------------------------------------
+    RA                  969,765
+
+==============================================================================
+(b) FIRST TOUCH OF DQ>=6, BY CALENDAR YEAR   (unit: loans)
+==============================================================================
+year              loans      share cumulative
+------------------------------------------------------------------------------
+2006                133    0.0446%    0.0446%
+2007              3,362    1.1283%    1.1729%
+2008             21,824    7.3243%    8.4972%
+2009             69,445   23.3063%   31.8035%
+2010             70,507   23.6627%   55.4662%
+2011             45,018   15.1084%   70.5746%
+2012             32,842   11.0220%   81.5966%
+2013             18,105    6.0762%   87.6728%
+2014              9,862    3.3098%   90.9826%
+2015              6,373    2.1388%   93.1214%
+2016              4,457    1.4958%   94.6172%
+2017              3,310    1.1109%   95.7281%
+2018              2,746    0.9216%   96.6496%
+2019              1,852    0.6215%   97.2712%
+2020              4,460    1.4968%   98.7680%
+2021              1,693    0.5682%   99.3362%
+2022                727    0.2440%   99.5802%
+2023                465    0.1561%   99.7362%
+2024                384    0.1289%   99.8651%
+2025                316    0.1061%   99.9711%
+2026                 86    0.0289%  100.0000%
+------------------------------------------------------------------------------
+TOTAL           297,967  100.0000%
+
+earliest first touch: 200608     latest first touch: 202603
+
+==============================================================================
+(c) CURE - ever report '00' at a month AFTER first touch   (unit: loans)
+==============================================================================
+quantity                                                      loans share of DQ>=6
+------------------------------------------------------------------------------
+loans ever at DQ>=6                                         297,967  100.0000%
+of these, later report status '00' (cured)                  113,720   38.1653%
+never return to '00'                                        184,247   61.8347%
+
+==============================================================================
+(d) MONTHS FROM FIRST DQ>=6 TO FIRST SUBSEQUENT '00'   (unit: months)
+==============================================================================
+Population: the 113,720 cured loans. Read the SHAPE, not just the centre:
+mass concentrated on one value => administrative re-aging; a long right
+tail => genuine workout.
+------------------------------------------------------------------------------
+statistic                months
+------------------------------------------------------------------------------
+n                       113,720
+mean                     10.993
+std                      13.423
+min                           1
+p1                          1.0
+p10 (d1)                    1.0
+p20 (d2)                    2.0
+p30 (d3)                    4.0
+p40 (d4)                    5.0
+p50 (median)                7.0
+p60 (d6)                    9.0
+p70 (d7)                   11.0
+p80 (d8)                   16.0
+p90 (d9)                   26.0
+p99                        66.0
+max                         197
+
+HISTOGRAM OF MONTHS-TO-CURE   (unit: loans)
+------------------------------------------------------------------------------
+months                loans      share 
+------------------------------------------------------------------------------
+1                    13,966   12.2810% ########################################
+2                    10,444    9.1840% ##############################
+3                     9,387    8.2545% ###########################
+4                     8,319    7.3153% ########################
+5                     7,511    6.6048% ######################
+6                     6,854    6.0271% ####################
+7                     6,031    5.3034% #################
+8                     5,018    4.4126% ##############
+9                     4,676    4.1119% #############
+10                    4,090    3.5966% ############
+11                    3,559    3.1296% ##########
+12                    3,347    2.9432% ##########
+13-18                12,355   10.8644%
+19-24                 6,059    5.3280%
+25-36                 5,751    5.0572%
+37-60                 4,655    4.0934%
+61-120                1,643    1.4448%
+121+                     55    0.0484%
+------------------------------------------------------------------------------
+mode                      1   12.2810%
+
+MODIFICATION FLAG (column 7, present in layout)   (unit: loans)
+------------------------------------------------------------------------------
+cured loans with modification_flag 'Y' ever                  92,720   81.5336%
+cured loans with modification_flag 'P' ever                  92,636   81.4597%
+all DQ>=6 loans with flag 'Y' ever                          101,589   34.0940%
+
+'Y' and 'P' are reported separately and not summed: the brief asks for 'Y',
+and 'P' is a distinct value in this column.
+
+==============================================================================
+(e) TERMINAL OUTCOME OF DQ>=6 LOANS   (unit: loans)
+==============================================================================
+outcome                                  codes               loans share of DQ>=6
+------------------------------------------------------------------------------
+credit event                             02/03/09          182,319       61.1876%
+prepaid / matured                        01                 42,409       14.2328%
+administrative exit (censored)           06/15/16           48,339       16.2229%
+other / unclassified code                -                  13,599        4.5639%
+still open (censored at cutoff)          -                  11,301        3.7927%
+------------------------------------------------------------------------------
+TOTAL                                                      297,967      100.0000%
+
+Eventual default probability conditional on ever reaching DQ>=6
+  unadjusted (all DQ>=6 as denominator)        : 61.1876%
+  excluding censored (admin exits + still open): 81.1287%
+  denominator for the second figure: 224,728 resolved loans
+
+==============================================================================
+(f) DWELL TIME AND IMPLIED MONTHLY HAZARD
+==============================================================================
+The two quantities below are different units and are not interchangeable.
+------------------------------------------------------------------------------
+loans ever at status >= 6                [loans]                    297,967
+observations at status >= 6        [loan-months]                  4,572,505
+mean deep-delinquent months per such loan                            15.346
+credit-event terminations among them      [loans]                   182,319
+
+DEEP-DELINQUENT MONTHS PER LOAN   (unit: months, over the 297,967 DQ>=6 loans)
+------------------------------------------------------------------------------
+statistic                months
+------------------------------------------------------------------------------
+n                       297,967
+mean                     15.346
+std                      16.692
+min                           1
+p1                          1.0
+p10 (d1)                    2.0
+p20 (d2)                    4.0
+p30 (d3)                    5.0
+p40 (d4)                    7.0
+p50 (median)               10.0
+p60 (d6)                   13.0
+p70 (d7)                   17.0
+p80 (d8)                   24.0
+p90 (d9)                   36.0
+p99                        78.0
+max                         211
+
+IMPLIED PER-MONTH HAZARD
+------------------------------------------------------------------------------
+  credit events [loans] / deep-delinquent exposure [loan-months]
+  = 182,319 / 4,572,505
+  = 0.039873 per loan-month  (3.9873% per month)
+
+Caveat: the numerator counts loans (each terminates at most once) while the
+denominator counts loan-months of exposure. This is an exposure-weighted
+average hazard over the whole deep-delinquent spell, not a per-month
+transition rate from a duration-specific model; it is not a life-table
+hazard and should not be annualised by multiplying by 12.
+
+==============================================================================
+runtime: 716.8 s  (11.95 min)
+==============================================================================

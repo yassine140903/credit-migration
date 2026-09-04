@@ -1,0 +1,94 @@
+==============================================================================
+02_terminations - zero-balance / termination accounting (pooled)
+==============================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns read: 0 loan_sequence_number, 8 zero_balance_code
+files found : 8
+    data\historical_data_2006\historical_data_2006Q1\perf_2006Q1.txt    2.14 GB
+    data\historical_data_2006\historical_data_2006Q2\perf_2006Q2.txt    1.99 GB
+    data\historical_data_2006\historical_data_2006Q3\perf_2006Q3.txt    1.77 GB
+    data\historical_data_2006\historical_data_2006Q4\perf_2006Q4.txt    2.04 GB
+    data\historical_data_2007\historical_data_2007Q1\perf_2007Q1.txt    2.02 GB
+    data\historical_data_2007\historical_data_2007Q2\perf_2007Q2.txt    2.31 GB
+    data\historical_data_2007\historical_data_2007Q3\perf_2007Q3.txt    1.64 GB
+    data\historical_data_2007\historical_data_2007Q4\perf_2007Q4.txt    1.75 GB
+
+PASS 1/2 - loan universe
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                  rows     20,622,024   distinct loans      298,574   (19.0s)
+    perf_2006Q2.txt                  rows     19,214,632   distinct loans      308,208   (18.8s)
+    perf_2006Q3.txt                  rows     17,073,842   distinct loans      283,975   (16.4s)
+    perf_2006Q4.txt                  rows     19,578,264   distinct loans      302,787   (18.8s)
+    perf_2007Q1.txt                  rows     19,432,995   distinct loans      302,331   (18.8s)
+    perf_2007Q2.txt                  rows     22,286,961   distinct loans      354,055   (21.5s)
+    perf_2007Q3.txt                  rows     15,827,144   distinct loans      284,980   (15.2s)
+    perf_2007Q4.txt                  rows     16,931,624   distinct loans      296,826   (16.1s)
+
+PASS 2/2 - termination records
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                  zero_balance rows      291,922   (21.4s)
+    perf_2006Q2.txt                  zero_balance rows      302,240   (19.5s)
+    perf_2006Q3.txt                  zero_balance rows      278,186   (17.4s)
+    perf_2006Q4.txt                  zero_balance rows      295,454   (19.9s)
+    perf_2007Q1.txt                  zero_balance rows      294,764   (19.7s)
+    perf_2007Q2.txt                  zero_balance rows      344,675   (22.4s)
+    perf_2007Q3.txt                  zero_balance rows      278,224   (16.0s)
+    perf_2007Q4.txt                  zero_balance rows      289,274   (17.1s)
+
+==============================================================================
+TERMINATED vs CENSORED   (unit: loans)
+==============================================================================
+quantity                                                      loans      share
+------------------------------------------------------------------------------
+all distinct loans in panel                               2,431,736  100.0000%
+terminated (any zero_balance_code)                        2,374,739   97.6561%
+never terminated (censored at cutoff)                        56,997    2.3439%
+
+total panel rows                                        150,967,486
+rows carrying a zero_balance_code                         2,374,739
+loans with >1 zero_balance row                                    0
+loans with conflicting distinct codes                             0
+
+==============================================================================
+ZERO_BALANCE_CODE FREQUENCY TABLE (full, every code observed)
+==============================================================================
+code   label                                                rows        loans
+------------------------------------------------------------------------------
+01     prepaid or matured (voluntary payoff)           2,096,296    2,096,296
+02     third-party sale                                   27,801       27,801
+03     short sale or charge-off                           52,972       52,972
+09     REO disposition                                   117,077      117,077
+15     note sale                                          10,498       10,498
+16     reperforming loan sale                             51,469       51,469
+96     NOT IN BRIEF'S CODE LIST - unclassified            18,626       18,626
+------------------------------------------------------------------------------
+       TOTAL                                           2,374,739    2,374,739
+
+'rows' counts zero-balance rows; 'loans' counts distinct loans by their
+first observed code. The two differ only where a loan carries repeats.
+
+==============================================================================
+GROUPED OUTCOMES   (unit: loans; share is of all 2,431,736 loans in panel)
+==============================================================================
+group                  codes                 loans      share  interpretation
+------------------------------------------------------------------------------
+prepayment             01                2,096,296   86.2057%  terminal, non-credit
+credit event           02/03/09            197,850    8.1362%  terminal, credit loss
+administrative exit    06/15/16             61,967    2.5483%  CENSORED - neither category
+UNCLASSIFIED           96                   18,626    0.7660%  code(s) absent from brief - NOT grouped
+------------------------------------------------------------------------------
+all terminated                           2,374,739   97.6561%
+still open (censored)                       56,997    2.3439%
+
+NOTE: zero_balance_code(s) 96 appear in the data but are not in the
+      brief's mapping. They are reported separately above and are not
+      assigned to prepayment, credit event, or administrative exit.
+
+Censoring note: administrative exits (06/15/16) remove a loan from observation
+without resolving whether it would have prepaid or defaulted; together with
+the never-terminated loans they form the censored portion of the panel.
+
+==============================================================================
+runtime: 301.7 s  (5.03 min)
+==============================================================================

@@ -1,0 +1,178 @@
+==============================================================================
+04_ra_vs_zb - overlap of the RA status marker and credit-event zero-balance codes
+==============================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns     : 0 loan, 1 period, 3 dq_status, 8 zero_balance_code
+files found : 8
+    data\historical_data_2006\historical_data_2006Q1\perf_2006Q1.txt    2.14 GB
+    data\historical_data_2006\historical_data_2006Q2\perf_2006Q2.txt    1.99 GB
+    data\historical_data_2006\historical_data_2006Q3\perf_2006Q3.txt    1.77 GB
+    data\historical_data_2006\historical_data_2006Q4\perf_2006Q4.txt    2.04 GB
+    data\historical_data_2007\historical_data_2007Q1\perf_2007Q1.txt    2.02 GB
+    data\historical_data_2007\historical_data_2007Q2\perf_2007Q2.txt    2.31 GB
+    data\historical_data_2007\historical_data_2007Q3\perf_2007Q3.txt    1.64 GB
+    data\historical_data_2007\historical_data_2007Q4\perf_2007Q4.txt    1.75 GB
+
+PASS 1/3 - loan universe and ever-RA set
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                rows    20,622,024  loans     298,574  ever-RA     13,166  (25.8s)
+    perf_2006Q2.txt                rows    19,214,632  loans     308,208  ever-RA     13,250  (25.0s)
+    perf_2006Q3.txt                rows    17,073,842  loans     283,975  ever-RA     12,779  (20.7s)
+    perf_2006Q4.txt                rows    19,578,264  loans     302,787  ever-RA     14,603  (23.9s)
+    perf_2007Q1.txt                rows    19,432,995  loans     302,331  ever-RA     14,519  (23.7s)
+    perf_2007Q2.txt                rows    22,286,961  loans     354,055  ever-RA     18,318  (26.9s)
+    perf_2007Q3.txt                rows    15,827,144  loans     284,980  ever-RA     15,424  (19.4s)
+    perf_2007Q4.txt                rows    16,931,624  loans     296,826  ever-RA     15,967  (20.4s)
+
+PASS 2/3 - terminal zero-balance code and first RA month
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                zero-balance rows    291,922   (33.8s)
+    perf_2006Q2.txt                zero-balance rows    302,240   (38.8s)
+    perf_2006Q3.txt                zero-balance rows    278,186   (34.9s)
+    perf_2006Q4.txt                zero-balance rows    295,454   (42.1s)
+    perf_2007Q1.txt                zero-balance rows    294,764   (39.9s)
+    perf_2007Q2.txt                zero-balance rows    344,675   (45.4s)
+    perf_2007Q3.txt                zero-balance rows    278,224   (32.2s)
+    perf_2007Q4.txt                zero-balance rows    289,274   (34.3s)
+
+PASS 3/3 - pre-RA deep delinquency and post-RA statuses
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                scanned   (26.1s)
+    perf_2006Q2.txt                scanned   (22.4s)
+    perf_2006Q3.txt                scanned   (20.1s)
+    perf_2006Q4.txt                scanned   (22.6s)
+    perf_2007Q1.txt                scanned   (22.4s)
+    perf_2007Q2.txt                scanned   (26.0s)
+    perf_2007Q3.txt                scanned   (18.4s)
+    perf_2007Q4.txt                scanned   (19.7s)
+
+==============================================================================
+(a) THE RA MARKER
+==============================================================================
+quantity                                                        count      share
+------------------------------------------------------------------------------
+all distinct loans in panel   [loans]                       2,431,736  100.0000%
+loans ever showing 'RA'       [loans]                         118,026    4.8536%
+RA observations         [loan-months]                         969,765
+total panel rows        [loan-months]                     150,967,486
+mean RA months per ever-RA loan                                 8.217
+
+cross-check against 03_dq_deep_state (same glob)
+------------------------------------------------------------------------------
+expected RA loan-months                                       969,765
+observed RA loan-months                                       969,765
+status                                                          MATCH
+
+==============================================================================
+(b) EVER-RA x TERMINAL ZERO_BALANCE_CODE   (unit: loans, codes raw/ungrouped)
+==============================================================================
+code   label                                          ever-RA    never-RA       total
+------------------------------------------------------------------------------
+01     prepaid or matured (voluntary payoff)                0   2,096,296   2,096,296
+02     third-party sale                                     0      27,801      27,801
+03     short sale or charge-off                             3      52,969      52,972
+09     REO disposition                                117,074           3     117,077
+15     note sale                                            0      10,498      10,498
+16     reperforming loan sale                               0      51,469      51,469
+96     not in the documented code list                    879      17,747      18,626
+-      never terminated / censored at cutoff               70      56,927      56,997
+------------------------------------------------------------------------------
+       TOTAL                                          118,026   2,313,710   2,431,736
+
+==============================================================================
+(c) THE OVERLAP, STATED   (unit: loans)
+==============================================================================
+quantity                                                      loans      share
+------------------------------------------------------------------------------
+ever-RA, terminate 09 (REO disposition)                     117,074   99.1934%
+ever-RA, terminate 02 or 03                                       3    0.0025%
+ever-RA, terminate 01 (prepaid/matured)                           0    0.0000%
+ever-RA, terminate 15/16/96                                     879    0.7448%
+ever-RA, never terminated                                        70    0.0593%
+(shares above are of the 118,026 ever-RA loans)
+------------------------------------------------------------------------------
+terminate 02/03/09 but NEVER show RA                         80,773   40.8254%
+(share is of the 197,850 loans terminating 02/03/09)
+
+==============================================================================
+(d) REO HOLDING PERIOD: FIRST RA MONTH -> TERMINATION MONTH (code 09)
+==============================================================================
+Population: the 117,074 ever-RA loans terminating 09.   (unit: months)
+------------------------------------------------------------------------------
+statistic                months
+------------------------------------------------------------------------------
+n                       117,074
+mean                      7.205
+std                       4.966
+min                           0
+p1                          1.0
+p10 (d1)                    3.0
+p20 (d2)                    4.0
+p30 (d3)                    4.0
+p40 (d4)                    5.0
+p50 (median)                6.0
+p60 (d6)                    7.0
+p70 (d7)                    8.0
+p80 (d8)                   10.0
+p90 (d9)                   13.0
+p99                        24.0
+max                         164
+
+holding period == 0 months (RA in final month)                   63
+holding period <  0 months (RA after zero-balance)                0
+
+==============================================================================
+(e) NUMERIC DQ >= 6 STRICTLY BEFORE THE FIRST RA MONTH   (unit: loans)
+==============================================================================
+quantity                                                      loans      share
+------------------------------------------------------------------------------
+ever-RA loans                                               118,026  100.0000%
+of these, numeric DQ>=6 before first RA                     110,226   93.3913%
+of these, reach RA with NO prior numeric DQ>=6                7,800    6.6087%
+
+The second figure is the state-labelling edge case: a loan entering RA
+without a numeric deep-delinquency observation preceding it.
+
+==============================================================================
+(f) MOVEMENT OUT OF RA: STATUSES STRICTLY AFTER THE FIRST RA MONTH
+==============================================================================
+quantity  (unit: loans)                                       loans      share
+------------------------------------------------------------------------------
+ever-RA loans                                               118,026  100.0000%
+return to ANY numeric status after first RA                       2    0.0017%
+return to '00' (Current) after first RA                           0    0.0000%
+
+DISTRIBUTION OF POST-RA STATUS VALUES
+------------------------------------------------------------------------------
+status     kind                                loan-months        loans
+------------------------------------------------------------------------------
+RA         RA (still in REO)                       851,739      117,909
+19         numeric, delinquent                           1            1
+20         numeric, delinquent                           1            1
+21         numeric, delinquent                           1            1
+22         numeric, delinquent                           1            1
+23         numeric, delinquent                           1            1
+14         numeric, delinquent                           1            1
+15         numeric, delinquent                           1            1
+------------------------------------------------------------------------------
+TOTAL                                              851,746
+
+'loan-months' sums observations; 'loans' counts distinct loans showing
+that status at least once after first RA. Loans appear under every
+status they show, so the loans column does not sum to the loan total.
+
+A non-zero return-to-numeric count means RA is not absorbing in the data.
+
+==============================================================================
+(g) ZERO_BALANCE_CODE 96 AND RA   (unit: loans)
+==============================================================================
+quantity                                                      loans      share
+------------------------------------------------------------------------------
+loans terminating with code 96                               18,626  100.0000%
+of these, ever show RA                                          879    4.7192%
+of these, never show RA                                      17,747   95.2808%
+
+==============================================================================
+runtime: 675.6 s  (11.26 min)
+==============================================================================

@@ -1,0 +1,163 @@
+==============================================================================
+07_99_to_current_mod - modification flags on the 99 -> 00 transitions
+==============================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns     : 0 loan, 1 period, 3 dq_status, 7 modification_flag
+files found : 8
+
+PASS 1/2 - loans ever reporting status 99
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                99-loans       76   (12.6s)
+    perf_2006Q2.txt                99-loans       69   (11.3s)
+    perf_2006Q3.txt                99-loans       68   (10.3s)
+    perf_2006Q4.txt                99-loans       66   (11.8s)
+    perf_2007Q1.txt                99-loans       58   (11.6s)
+    perf_2007Q2.txt                99-loans       87   (13.5s)
+    perf_2007Q3.txt                99-loans       65   (9.6s)
+    perf_2007Q4.txt                99-loans       80   (10.1s)
+
+loans ever reporting 99                                         569
+expected (diagnostic 06)                                        569
+status                                                        MATCH
+
+PASS 2/2 - full history of those loans
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                rows kept      13,126   (13.9s)
+    perf_2006Q2.txt                rows kept      12,381   (17.8s)
+    perf_2006Q3.txt                rows kept      12,077   (19.0s)
+    perf_2006Q4.txt                rows kept      11,000   (21.3s)
+    perf_2007Q1.txt                rows kept       9,712   (21.3s)
+    perf_2007Q2.txt                rows kept      14,384   (24.7s)
+    perf_2007Q3.txt                rows kept      10,432   (17.2s)
+    perf_2007Q4.txt                rows kept      13,217   (18.8s)
+
+==============================================================================
+THE 99 -> 00 TRANSITIONS
+==============================================================================
+transitions found        [loan-months]                          110
+expected (diagnostic 06) [loan-months]                          110
+status                                                        MATCH
+------------------------------------------------------------------------------
+distinct loans contributing them  [loans]                       110
+transitions per such loan                                     1.000
+
+The 110 headline from diagnostic 06 counts LOAN-MONTHS. The loan count
+above is the distinct-mortgage figure and is the smaller of the two.
+
+==============================================================================
+MODIFICATION FLAG ON THE TRANSITION ROWS   (unit: loan-months)
+==============================================================================
+On the 99 row itself (the month before the cure)
+------------------------------------------------------------------------------
+modification_flag    loan-months        share
+------------------------------------------------------------------------------
+(blank)                      89     80.9091%
+P                            21     19.0909%
+------------------------------------------------------------------------------
+TOTAL                       110    100.0000%
+
+On the 00 row itself (the cure month)
+------------------------------------------------------------------------------
+modification_flag    loan-months        share
+------------------------------------------------------------------------------
+(blank)                      74     67.2727%
+Y                            20     18.1818%
+P                            16     14.5455%
+------------------------------------------------------------------------------
+TOTAL                       110    100.0000%
+
+JOINT: FLAG AT 99 x FLAG AT 00   (unit: loan-months)
+------------------------------------------------------------------------------
+at 99 \ at 00         (blank)            P            Y
+------------------------------------------------------------------------------
+(blank)                    74            0           15
+P                           0           16            5
+------------------------------------------------------------------------------
+TOTAL                      74           16           20
+
+==============================================================================
+MODIFICATION FLAG ANYWHERE IN THESE LOANS' HISTORY   (unit: loans)
+==============================================================================
+quantity                                                      loans      share
+------------------------------------------------------------------------------
+loans with a 99 -> 00 transition                                110  100.0000%
+  ever flagged 'Y'                                               57   51.8182%
+  ever flagged 'P'                                               57   51.8182%
+  never flagged either                                           53   48.1818%
+
+'Y' and 'P' are counted separately and never summed; a loan showing both
+appears in both rows.
+
+BASELINE - 99-reporting loans WITHOUT a 99 -> 00 transition (unit: loans)
+------------------------------------------------------------------------------
+such loans                                                      459  100.0000%
+  ever flagged 'Y'                                              114   24.8366%
+  ever flagged 'P'                                              115   25.0545%
+
+Comparing this against the block above shows whether modification is
+specific to the loans that jump 99 -> 00 or common to all 99 loans.
+
+==============================================================================
+TIMING: MONTHS FROM FIRST 'Y' TO THE 99 ROW OF THE FIRST TRANSITION
+==============================================================================
+Positive = the 'Y' precedes the transition.   (unit: months)
+------------------------------------------------------------------------------
+loans measured                   57
+mean                          45.95
+min                           -22.0
+p10                            -2.4
+p25                            -2.0
+p50 (median)                   -1.0
+p75                           121.0
+p90                           149.0
+max                           194.0
+
+'Y' strictly BEFORE the 99 row                                   21   36.8421%
+'Y' in the same month as the 99 row                               0    0.0000%
+'Y' only AFTER the 99 row                                        36   63.1579%
+
+==============================================================================
+SAMPLE SEQUENCES AROUND THE TRANSITION (up to 8 loans)
+==============================================================================
+Each row shows month:status/flag for the 6 months either side of the
+first 99 -> 00 transition. '>' marks the 99 row, '<' the 00 row.
+
+loan F06Q10006936   transition at 202001 -> 202002
+     201907:99/-   201908:99/-   201909:99/-   201910:99/-   201911:99/-
+     201912:99/-  >202001:99/-  <202002:00/Y   202003:00/P   202004:00/P
+     202005:00/P   202006:00/P   202007:00/P   202008:00/P
+
+loan F06Q10010092   transition at 202010 -> 202011
+     202004:99/-   202005:99/-   202006:99/-   202007:99/-   202008:99/-
+     202009:99/-  >202010:99/-  <202011:00/Y   202012:00/P   202101:00/P
+     202102:00/P   202103:00/P   202104:00/P   202105:00/P
+
+loan F06Q10036336   transition at 202204 -> 202205
+     202110:99/P   202111:99/P   202112:99/P   202201:99/P   202202:99/P
+     202203:99/P  >202204:99/P  <202205:00/Y   202206:00/P   202207:00/P
+     202208:01/P   202209:02/P   202210:03/P
+
+loan F06Q10045094   transition at 202310 -> 202311
+     202304:99/-   202305:99/-   202306:99/-   202307:99/-   202308:99/-
+     202309:99/-  >202310:99/-  <202311:00/-
+
+loan F06Q10056113   transition at 201908 -> 201909
+     201902:99/-   201903:99/-   201904:99/-   201905:99/-   201906:99/-
+     201907:99/-  >201908:99/-  <201909:00/-
+
+loan F06Q10081316   transition at 201906 -> 201907
+     201812:99/-   201901:99/-   201902:99/-   201903:99/-   201904:99/-
+     201905:99/-  >201906:99/-  <201907:00/-
+
+loan F06Q10149480   transition at 202001 -> 202002
+     201907:99/-   201908:99/-   201909:99/-   201910:99/-   201911:99/-
+     201912:99/-  >202001:99/-  <202002:00/-
+
+loan F06Q10184741   transition at 202207 -> 202208
+     202201:99/-   202202:99/-   202203:99/-   202204:99/-   202205:99/-
+     202206:99/-  >202207:99/-  <202208:00/-
+
+==============================================================================
+runtime: 245.4 s  (4.09 min)
+==============================================================================

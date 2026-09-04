@@ -1,0 +1,298 @@
+==============================================================================
+06_status_99 - is delinquency status 99 a cap, a sentinel, or terminal?
+==============================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns     : 0 loan, 1 period, 3 dq_status, 8 zero_balance_code
+files found : 8
+    data\historical_data_2006\historical_data_2006Q1\perf_2006Q1.txt    2.14 GB
+    data\historical_data_2006\historical_data_2006Q2\perf_2006Q2.txt    1.99 GB
+    data\historical_data_2006\historical_data_2006Q3\perf_2006Q3.txt    1.77 GB
+    data\historical_data_2006\historical_data_2006Q4\perf_2006Q4.txt    2.04 GB
+    data\historical_data_2007\historical_data_2007Q1\perf_2007Q1.txt    2.02 GB
+    data\historical_data_2007\historical_data_2007Q2\perf_2007Q2.txt    2.31 GB
+    data\historical_data_2007\historical_data_2007Q3\perf_2007Q3.txt    1.64 GB
+    data\historical_data_2007\historical_data_2007Q4\perf_2007Q4.txt    1.75 GB
+
+PASS 1/2 - prevalence and the set of loans ever reporting 99
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                rows    20,622,024  loans     298,574  99-loans       76  (23.2s)
+    perf_2006Q2.txt                rows    19,214,632  loans     308,208  99-loans       69  (21.4s)
+    perf_2006Q3.txt                rows    17,073,842  loans     283,975  99-loans       68  (19.1s)
+    perf_2006Q4.txt                rows    19,578,264  loans     302,787  99-loans       66  (33.8s)
+    perf_2007Q1.txt                rows    19,432,995  loans     302,331  99-loans       58  (37.9s)
+    perf_2007Q2.txt                rows    22,286,961  loans     354,055  99-loans       87  (41.2s)
+    perf_2007Q3.txt                rows    15,827,144  loans     284,980  99-loans       65  (28.9s)
+    perf_2007Q4.txt                rows    16,931,624  loans     296,826  99-loans       80  (19.9s)
+
+PASS 2/2 - full row history of those 569 loans
+------------------------------------------------------------------------------
+    perf_2006Q1.txt                rows kept      13,126   (14.0s)
+    perf_2006Q2.txt                rows kept      12,381   (16.7s)
+    perf_2006Q3.txt                rows kept      12,077   (11.9s)
+    perf_2006Q4.txt                rows kept      11,000   (13.3s)
+    perf_2007Q1.txt                rows kept       9,712   (13.3s)
+    perf_2007Q2.txt                rows kept      14,384   (15.3s)
+    perf_2007Q3.txt                rows kept      10,432   (11.1s)
+    perf_2007Q4.txt                rows kept      13,217   (11.8s)
+
+==============================================================================
+1. PREVALENCE OF STATUS 99
+==============================================================================
+quantity                                                        count      share
+------------------------------------------------------------------------------
+loan-months at status 99      [loan-months]                    13,836    0.0092%
+all panel loan-months         [loan-months]               150,967,486
+loans ever reporting 99             [loans]                       569    0.0234%
+all distinct loans in panel         [loans]                 2,431,736
+rows gathered in pass 2       [loan-months]                    96,329
+
+dataset reporting period: 200512 to 202603
+
+STATUS 90-99 SIDE BY SIDE   (unit: loan-months)
+------------------------------------------------------------------------------
+status          loan-months    vs previous
+------------------------------------------------------------------------------
+90                    1,029              -
+91                      941          x0.91
+92                      865          x0.92
+93                      817          x0.94
+94                      751          x0.92
+95                      699          x0.93
+96                      661          x0.95
+97                      624          x0.94
+98                      586          x0.94
+99                   13,836         x23.61
+
+A smooth continuation of the decay would keep the ratio near the values
+seen across 90-98; a spike shows as a large jump in the final row.
+
+==============================================================================
+2. PREDECESSOR - STATUS IN THE IMMEDIATELY PRECEDING CALENDAR MONTH
+==============================================================================
+Every 99 loan-month, by what preceded it   (unit: loan-months)
+------------------------------------------------------------------------------
+A non-adjacent earlier row is NEVER used as the predecessor.
+------------------------------------------------------------------------------
+status                    loan-months        share   cumulative
+------------------------------------------------------------------------------
+99                             13,258     95.8225%     95.8225%
+98                                540      3.9029%     99.7254%
+00                                  4      0.0289%     99.7543%
+02                                  4      0.0289%     99.7832%
+03                                  3      0.0217%     99.8049%
+06                                  2      0.0145%     99.8193%
+17                                  2      0.0145%     99.8338%
+12                                  2      0.0145%     99.8482%
+07                                  1      0.0072%     99.8554%
+10                                  1      0.0072%     99.8627%
+01                                  1      0.0072%     99.8699%
+22                                  1      0.0072%     99.8771%
+05                                  1      0.0072%     99.8844%
+39                                  1      0.0072%     99.8916%
+04                                  1      0.0072%     99.8988%
+16                                  1      0.0072%     99.9060%
+08                                  1      0.0072%     99.9133%
+21                                  1      0.0072%     99.9205%
+97                                  1      0.0072%     99.9277%
+15                                  1      0.0072%     99.9350%
+09                                  1      0.0072%     99.9422%
+gap (no row at month - 1)              8      0.0578%    100.0000%
+no prior row (99 is loan's first row)              0      0.0000%    100.0000%
+------------------------------------------------------------------------------
+TOTAL 99 loan-months           13,836    100.0000%
+
+HEADLINE  (denominator: the 13,828 99 loan-months WITH an adjacent predecessor)
+------------------------------------------------------------------------------
+arriving from 98 or 99                                       13,798   99.7830%
+arriving from anything else                                      30    0.2170%
+arriving from 00 (Current)                                        4    0.0289%
+
+Under the CAP reading, 'arriving from 98 or 99' should be ~100%: a loan
+cannot reach 99 months of arrears except through 98.
+
+==============================================================================
+3. SUCCESSOR - STATUS IN THE IMMEDIATELY FOLLOWING CALENDAR MONTH
+==============================================================================
+Every 99 loan-month, by what followed it   (unit: loan-months)
+------------------------------------------------------------------------------
+A non-adjacent later row is NEVER used as the successor.
+------------------------------------------------------------------------------
+status                    loan-months        share   cumulative
+------------------------------------------------------------------------------
+99                             13,258     95.8225%     95.8225%
+RA                                156      1.1275%     96.9500%
+00                                110      0.7950%     97.7450%
+54                                  8      0.0578%     97.8028%
+66                                  4      0.0289%     97.8317%
+03                                  4      0.0289%     97.8607%
+02                                  3      0.0217%     97.8823%
+01                                  3      0.0217%     97.9040%
+05                                  2      0.0145%     97.9185%
+04                                  2      0.0145%     97.9329%
+98                                  2      0.0145%     97.9474%
+55                                  2      0.0145%     97.9618%
+57                                  2      0.0145%     97.9763%
+09                                  2      0.0145%     97.9907%
+18                                  2      0.0145%     98.0052%
+56                                  2      0.0145%     98.0197%
+07                                  1      0.0072%     98.0269%
+12                                  1      0.0072%     98.0341%
+19                                  1      0.0072%     98.0413%
+10                                  1      0.0072%     98.0486%
+21                                  1      0.0072%     98.0558%
+08                                  1      0.0072%     98.0630%
+97                                  1      0.0072%     98.0703%
+70                                  1      0.0072%     98.0775%
+67                                  1      0.0072%     98.0847%
+92                                  1      0.0072%     98.0919%
+26                                  1      0.0072%     98.0992%
+69                                  1      0.0072%     98.1064%
+33                                  1      0.0072%     98.1136%
+29                                  1      0.0072%     98.1208%
+14                                  1      0.0072%     98.1281%
+23                                  1      0.0072%     98.1353%
+88                                  1      0.0072%     98.1425%
+85                                  1      0.0072%     98.1498%
+15                                  1      0.0072%     98.1570%
+78                                  1      0.0072%     98.1642%
+gap (no row at month + 1)              2      0.0145%     98.1787%
+no next row (99 is loan's final row)            252      1.8213%    100.0000%
+------------------------------------------------------------------------------
+TOTAL 99 loan-months           13,836    100.0000%
+
+HEADLINE  (denominator: the 13,582 99 loan-months WITH an adjacent successor)
+------------------------------------------------------------------------------
+returning to 00 (Current)                                       110    0.8099%
+going to 98 or 99                                            13,260   97.6292%
+
+Under the CAP reading a return to 00 in the next month is impossible;
+under the SENTINEL reading it is expected whenever reporting resumes.
+
+==============================================================================
+4. CONSECUTIVE-99 RUN LENGTHS
+==============================================================================
+A run is a maximal block of consecutive calendar months at status 99
+within one loan. Contiguity is on the month index, so a reporting gap
+ends a run.
+------------------------------------------------------------------------------
+runs identified                        [runs]                   578
+loans contributing them               [loans]                   569
+99 observations total           [loan-months]                13,836
+
+statistic                months
+------------------------------------------------------------------------------
+n                           578
+mean                     23.938
+std                      24.272
+min                           1
+p1                          1.0
+p10 (d1)                    2.0
+p20 (d2)                    4.0
+p30 (d3)                    7.0
+p40 (d4)                   11.0
+p50 (median)               15.0
+p60 (d6)                   21.2
+p70 (d7)                   30.0
+p80 (d8)                   41.6
+p90 (d9)                   60.0
+p99                       100.9
+max                         114
+
+RUN LENGTH FREQUENCY   (unit: runs)
+------------------------------------------------------------------------------
+length                   runs        share   cumulative
+------------------------------------------------------------------------------
+1                          57      9.8616%      9.8616%
+2                          33      5.7093%     15.5709%
+3                          20      3.4602%     19.0311%
+4                          24      4.1522%     23.1834%
+5                          13      2.2491%     25.4325%
+6                          21      3.6332%     29.0657%
+7                          12      2.0761%     31.1419%
+8                          16      2.7682%     33.9100%
+9                          16      2.7682%     36.6782%
+10                         17      2.9412%     39.6194%
+11                         18      3.1142%     42.7336%
+12                         14      2.4221%     45.1557%
+13                         12      2.0761%     47.2318%
+14                         10      1.7301%     48.9619%
+15                         14      2.4221%     51.3841%
+16                         10      1.7301%     53.1142%
+17                         11      1.9031%     55.0173%
+18                          9      1.5571%     56.5744%
+19                          5      0.8651%     57.4394%
+20                          9      1.5571%     58.9965%
+21                          6      1.0381%     60.0346%
+22                          7      1.2111%     61.2457%
+23                          7      1.2111%     62.4567%
+24                          8      1.3841%     63.8408%
+25+                       209     36.1592%    100.0000%
+
+Short runs point to reporting outages (SENTINEL); long unbroken runs
+point to a censored ladder value (CAP).
+
+==============================================================================
+5. TERMINALITY AND EXIT CODES   (unit: loans)
+==============================================================================
+loans ever reporting 99                                         569  100.0000%
+of these, 99 is the FINAL observed row                          252   44.2882%
+of these, 99 is not the final row                               317   55.7118%
+
+Under the TERMINAL reading the first figure would be ~100%.
+
+ZERO_BALANCE_CODE ON THAT FINAL 99 ROW   (unit: loans, n = 252)
+------------------------------------------------------------------------------
+outcome                                               loans      share    RA ever
+------------------------------------------------------------------------------
+01        prepaid / matured                               9    3.5714%    0.0000%
+02/03/09  credit events                                 100   39.6825%    0.0000%
+06/15/16  administrative exits                          100   39.6825%    0.0000%
+96        other / unclassified                            4    1.5873%    0.0000%
+(none)    still open when the dataset ends / censored           39   15.4762%    0.0000%
+------------------------------------------------------------------------------
+TOTAL                                                   252  100.0000%
+
+The no-code group is reported separately and is NOT merged into any
+other category. 'RA ever' is the share of that row's loans showing RA
+anywhere in their history.
+
+A material share terminating with 01 would contradict the CAP reading:
+a voluntary prepayment cannot follow eight years of arrears.
+
+FINAL-ROW MONTH OF THE NO-CODE (CENSORED) GROUP   (unit: loans)
+------------------------------------------------------------------------------
+dataset reporting period: 200512 to 202603
+------------------------------------------------------------------------------
+month                   loans        share   cumulative
+------------------------------------------------------------------------------
+202603 *                   39    100.0000%    100.0000%
+------------------------------------------------------------------------------
+final row IS the dataset's last month                            39  100.0000%
+final row is an EARLIER month                                     0    0.0000%
+distinct final months represented                                 1
+('*' marks the dataset's last reporting month.)
+
+If censoring explains this group, its loans cluster on the dataset's
+final month. Scatter across many months means something else ends
+these records.
+
+==============================================================================
+6. NON-NUMERIC NEIGHBOURS OF A 99 ROW   (unit: loan-months)
+==============================================================================
+                                            before a 99        share   after a 99
+------------------------------------------------------------------------------
+status RA                                             0      0.0000%          156
+status XX                                             0      0.0000%            0
+------------------------------------------------------------------------------
+either RA or XX                                       0      0.0000%          156
+adjacent rows examined                           13,828                    13,582
+
+Shares are of the adjacent-predecessor denominator; the 'after' column
+has its own denominator of 13,582.
+
+non-numeric codes present anywhere in these loans' history: RA
+
+==============================================================================
+runtime: 333.6 s  (5.56 min)
+==============================================================================

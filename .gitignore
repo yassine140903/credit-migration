@@ -1,0 +1,22 @@
+# Freddie Mac loan-level data — not committed (tens of GB, licence-restricted)
+data/
+historical_data_*/
+historical_data_*.zip
+*.txt.gz
+
+# Diagnostic outputs are committed deliberately (see diagnostics/*.txt);
+# nothing else generated is.
+checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
