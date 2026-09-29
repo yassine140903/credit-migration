@@ -1,0 +1,279 @@
+=========================================================================================================================
+17_censor_semantics - is the status on a censoring row a real reading,
+                      plus three checks on the built panel
+=========================================================================================================================
+performance : data/historical_data_200[67]/*/perf_*.txt
+origination : data/historical_data_200[67]/*/orig_*.txt
+panel       : data\panel\panel_*.parquet
+chunksize   : 2,000,000
+
+RESOLVED COLUMN INDICES   (0-based index = published position - 1)
+-------------------------------------------------------------------------------------------------------------------------
+file            role              position   index   attribute name
+-------------------------------------------------------------------------------------------------------------------------
+performance     loan                     1       0   Loan Identifier
+performance     period                   2       1   Period
+performance     status                   4       3   Current Loan Delinquency Status
+performance     zero_balance             9       8   Zero Balance Code
+origination     loan                    20      19   Loan Identifier
+origination     first_payment            2       1   First Payment Date
+-------------------------------------------------------------------------------------------------------------------------
+sheets: xl/worksheets/sheet2.xml / xl/worksheets/sheet1.xml
+indices 0, 1 and 3 asserted against the values the project already uses.
+
+population  : loans whose LAST observed row carries 15, 16 or 96
+comparison  : loans whose last observed row carries NO code
+'row before': the immediately preceding row, and only when it is
+              strictly the previous calendar month
+states      : 0 Current, 1 DQ30, 2 DQ60, >=3 DQ90+, RA as its own
+              column (NOT folded into Default, unlike src/panel.py)
+
+PASS 1/1 - performance files
+-------------------------------------------------------------------------------------------------------------------------
+    perf_2006Q1.txt    loans   298,574   ( 50.2s)
+    perf_2006Q2.txt    loans   308,208   ( 47.1s)
+    perf_2006Q3.txt    loans   283,975   ( 42.2s)
+    perf_2006Q4.txt    loans   302,787   ( 47.9s)
+    perf_2007Q1.txt    loans   302,331   ( 47.9s)
+    perf_2007Q2.txt    loans   354,055   ( 55.2s)
+    perf_2007Q3.txt    loans   284,980   ( 38.4s)
+    perf_2007Q4.txt    loans   296,826   ( 41.6s)
+    pooled rows 150,967,486   loans 2,431,736
+
+=========================================================================================================================
+PART A - CENSORING-ROW SEMANTICS
+=========================================================================================================================
+group                                  loans   of all loans
+-------------------------------------------------------------------------------------------------------------------------
+code 15                               10,498        0.4317%
+code 16                               51,469        2.1166%
+code 96                               18,626        0.7660%
+no code                               56,997        2.3439%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL in scope                       137,590        5.6581%
+excluded: terminal 01/02/03/09       2,294,146       94.3419%
+loans                              2,431,736
+
+=========================================================================================================================
+A.1  STATUS ON THE CODE ROW vs THE ROW IMMEDIATELY BEFORE IT
+=========================================================================================================================
+Unit: loans. Comparison is on the RAW field-4 status, so 'identical'
+includes RA followed by RA. A group that is almost entirely 'identical'
+is carrying the previous month's value forward.
+
+                                            code 15              code 16              code 96              no code
+comparison                           count    share       count    share       count    share       count    share
+-------------------------------------------------------------------------------------------------------------------------
+identical                              339     3.2%      40,720    79.1%       8,243    44.3%      54,105    94.9%
+changed by exactly 1 rung           10,129    96.5%      10,586    20.6%      10,222    54.9%       2,676     4.7%
+changed by 2+ rungs                     30     0.3%         163     0.3%          67     0.4%         210     0.4%
+changed, non-numeric end                 0     0.0%           0     0.0%          46     0.2%           6     0.0%
+previous row missing                     0     0.0%           0     0.0%          48     0.3%           0     0.0%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                               10,498   100.0%      51,469   100.0%      18,626   100.0%      56,997   100.0%
+
+=========================================================================================================================
+A.2  MAPPED STATE ON THE CODE ROW, AND ON THE ROW BEFORE
+=========================================================================================================================
+Unit: loans. The second table covers only loans that have a strictly
+preceding month; the excluded count is given under it.
+
+A.2a  STATE ON THE CODE ROW (or last row, for 'no code')
+-------------------------------------------------------------------------------------------------------------------------
+group                    loans      Current         DQ30         DQ60        DQ90+           RA        other
+-------------------------------------------------------------------------------------------------------------------------
+code 15                 10,498           34            6           30       10,428            0            0
+code 16                 51,469       38,945        6,884        4,506        1,134            0            0
+code 96                 18,626        7,224          217          841        9,465          879            0
+no code                 56,997       53,710        1,798          464          957           68            0
+-------------------------------------------------------------------------------------------------------------------------
+code 15 %              100.00%        0.32%        0.06%        0.29%       99.33%        0.00%        0.00%
+code 16 %              100.00%       75.67%       13.38%        8.75%        2.20%        0.00%        0.00%
+code 96 %              100.00%       38.78%        1.17%        4.52%       50.82%        4.72%        0.00%
+no code %              100.00%       94.23%        3.15%        0.81%        1.68%        0.12%        0.00%
+
+A.2b  STATE ON THE ROW BEFORE IT
+-------------------------------------------------------------------------------------------------------------------------
+group                    loans      Current         DQ30         DQ60        DQ90+           RA        other
+-------------------------------------------------------------------------------------------------------------------------
+code 15                 10,498           27           26           27       10,418            0            0
+code 16                 51,469       43,367        6,156        1,521          425            0            0
+code 96                 18,578        7,219          908          478        9,140          833            0
+no code                 56,997       53,415        2,047          505          968           62            0
+-------------------------------------------------------------------------------------------------------------------------
+code 15 %              100.00%        0.26%        0.25%        0.26%       99.24%        0.00%        0.00%
+code 16 %              100.00%       84.26%       11.96%        2.96%        0.83%        0.00%        0.00%
+code 96 %              100.00%       38.86%        4.89%        2.57%       49.20%        4.48%        0.00%
+no code %              100.00%       93.72%        3.59%        0.89%        1.70%        0.11%        0.00%
+-------------------------------------------------------------------------------------------------------------------------
+    code 15                  previous row missing: 0 of 10,498 (0.0000%)
+    code 16                  previous row missing: 0 of 51,469 (0.0000%)
+    code 96                  previous row missing: 48 of 18,626 (0.2577%)
+    no code                  previous row missing: 0 of 56,997 (0.0000%)
+
+=========================================================================================================================
+A.3  THE TRANSITION src/panel.py EMITS FOR THESE LOANS
+=========================================================================================================================
+Unit: loans with a strictly preceding month. Origin is the mapped state
+on the row before, next is the mapped state on the code row. This is
+exactly the last pair the panel carries for each of these loans.
+
+src/panel.py maps RA to Default and suppresses any pair whose origin is
+absorbing, so every cell in the RA origin row below is NOT emitted; the
+count is stated under each table.
+
+A.3.1  code 15   (loans with a preceding month: 10,498)
+-------------------------------------------------------------------------------------------------------------------------
+origin \ next            loans      Current         DQ30         DQ60        DQ90+           RA        other
+-------------------------------------------------------------------------------------------------------------------------
+Current                     27           25            2            0            0            0            0
+DQ30                        26            2            2           22            0            0            0
+DQ60                        27            0            1            3           23            0            0
+DQ90+                   10,418            7            1            5       10,405            0            0
+RA                           0            0            0            0            0            0            0
+other                        0            0            0            0            0            0            0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL into              10,498           34            6           30       10,428            0            0
+    unchanged across the pair (diagonal): 10,435 of 10,498 (99.3999%)
+    FLAGGED  DQ90+ -> Current : 7 of 10,498 (0.0667%)
+    FLAGGED  DQ90+ -> DQ30    : 1 of 10,498 (0.0095%)
+    suppressed by R1 (RA origin, not in the panel): 0 of 10,498 (0.0000%)
+
+A.3.2  code 16   (loans with a preceding month: 51,469)
+-------------------------------------------------------------------------------------------------------------------------
+origin \ next            loans      Current         DQ30         DQ60        DQ90+           RA        other
+-------------------------------------------------------------------------------------------------------------------------
+Current                 43,367       38,359        4,984           21            3            0            0
+DQ30                     6,156          480        1,747        3,921            8            0            0
+DQ60                     1,521           74          136          546          765            0            0
+DQ90+                      425           32           17           18          358            0            0
+RA                           0            0            0            0            0            0            0
+other                        0            0            0            0            0            0            0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL into              51,469       38,945        6,884        4,506        1,134            0            0
+    unchanged across the pair (diagonal): 41,010 of 51,469 (79.6790%)
+    FLAGGED  DQ90+ -> Current : 32 of 51,469 (0.0622%)
+    FLAGGED  DQ90+ -> DQ30    : 17 of 51,469 (0.0330%)
+    suppressed by R1 (RA origin, not in the panel): 0 of 51,469 (0.0000%)
+
+A.3.3  code 96   (loans with a preceding month: 18,578)
+-------------------------------------------------------------------------------------------------------------------------
+origin \ next            loans      Current         DQ30         DQ60        DQ90+           RA        other
+-------------------------------------------------------------------------------------------------------------------------
+Current                  7,219        7,141           73            4            1            0            0
+DQ30                       908            0          129          778            1            0            0
+DQ60                       478            0           12           53          413            0            0
+DQ90+                    9,140           41            3            6        9,044           46            0
+RA                         833            0            0            0            0          833            0
+other                        0            0            0            0            0            0            0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL into              18,578        7,182          217          841        9,459          879            0
+    unchanged across the pair (diagonal): 17,200 of 18,578 (92.5826%)
+    FLAGGED  DQ90+ -> Current : 41 of 18,578 (0.2207%)
+    FLAGGED  DQ90+ -> DQ30    : 3 of 18,578 (0.0161%)
+    suppressed by R1 (RA origin, not in the panel): 833 of 18,578 (4.4838%)
+
+A.3.4  no code   (loans with a preceding month: 56,997)
+-------------------------------------------------------------------------------------------------------------------------
+origin \ next            loans      Current         DQ30         DQ60        DQ90+           RA        other
+-------------------------------------------------------------------------------------------------------------------------
+Current                 53,415       52,719          691            5            0            0            0
+DQ30                     2,047          828          965          253            1            0            0
+DQ60                       505           98          122          175          110            0            0
+DQ90+                      968           65           20           31          846            6            0
+RA                          62            0            0            0            0           62            0
+other                        0            0            0            0            0            0            0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL into              56,997       53,710        1,798          464          957           68            0
+    unchanged across the pair (diagonal): 54,767 of 56,997 (96.0875%)
+    FLAGGED  DQ90+ -> Current : 65 of 56,997 (0.1140%)
+    FLAGGED  DQ90+ -> DQ30    : 20 of 56,997 (0.0351%)
+    suppressed by R1 (RA origin, not in the panel): 62 of 56,997 (0.1088%)
+
+=========================================================================================================================
+A.4  RUN LENGTH ON THE MAPPED STATE AS OF THE ROW BEFORE THE CODE ROW
+=========================================================================================================================
+Unit: loans with a strictly preceding month. Consecutive months the loan
+had held that mapped state, counting that row as 1; a state change or a
+hole ends a run.
+
+                                            code 15              code 16              code 96              no code
+run length (months)                  count    share       count    share       count    share       count    share
+-------------------------------------------------------------------------------------------------------------------------
+1                                       79     0.8%       6,191    12.0%       2,609    14.0%       2,235     3.9%
+2-3                                     36     0.3%       3,562     6.9%       1,781     9.6%       1,857     3.3%
+4-6                                     41     0.4%       3,235     6.3%       2,255    12.1%       1,306     2.3%
+7-12                                   339     3.2%       5,312    10.3%       4,419    23.8%       2,008     3.5%
+13+                                 10,003    95.3%      33,169    64.4%       7,514    40.4%      49,591    87.0%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                               10,498   100.0%      51,469   100.0%      18,578   100.0%      56,997   100.0%
+
+=========================================================================================================================
+PART B - CHECKS ON THE BUILT PANEL
+=========================================================================================================================
+
+B.1  LOAN-TO-FILE CONTAINMENT
+-------------------------------------------------------------------------------------------------------------------------
+parquet file                              rows    distinct loans
+-------------------------------------------------------------------------------------------------------------------------
+panel_2006Q1.parquet                11,060,262           297,746
+panel_2006Q2.parquet                10,313,292           307,492
+panel_2006Q3.parquet                 8,815,850           283,121
+panel_2006Q4.parquet                 9,294,015           302,110
+panel_2007Q1.parquet                 8,590,686           301,754
+panel_2007Q2.parquet                 9,289,459           353,254
+panel_2007Q3.parquet                 6,393,320           284,168
+panel_2007Q4.parquet                 6,170,693           295,850
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                               69,927,577         2,425,495
+
+sum of per-file distinct loans                                 2,425,495
+distinct loans across all files                                2,425,495
+loans appearing in more than one file                                  0
+
+B.2  GAP-ONLY LOANS
+-------------------------------------------------------------------------------------------------------------------------
+Loans with more than one observed row and NO strictly consecutive pair
+anywhere: every candidate pair they have spans a hole, so the gap rule
+alone leaves them with no panel row. Counted from the performance files,
+independently of src/panel.py.
+
+quantity                                                               loans    of loans
+-------------------------------------------------------------------------------------------------------------------------
+loans with more than one observed row                              2,429,707    99.9166%
+of those, zero strictly consecutive pairs (gap-only)                       0     0.0000%
+of those, every consecutive pair has an RA origin                          0     0.0000%
+-------------------------------------------------------------------------------------------------------------------------
+diagnostic 16 reports 0 loans losing every pair to R3 or R1.
+
+B.3  FIRST-PAYMENT-DATE OFFSET
+-------------------------------------------------------------------------------------------------------------------------
+offset = first payment month - first observed reporting period, in whole
+months, over 200 loans sampled without replacement from 2,431,736 origination
+records with numpy default_rng(seed=17).
+src/panel.py takes the origination month to be first payment minus 1.
+
+offset (months)                        loans          share
+-------------------------------------------------------------------------------------------------------------------------
+-30                                        1        0.5000%
+-24                                        1        0.5000%
+-23                                        2        1.0000%
+-21                                        1        0.5000%
+-16                                        2        1.0000%
+-9                                         3        1.5000%
+-7                                         1        0.5000%
+-5                                         1        0.5000%
+-1                                         2        1.0000%
+0                                         15        7.5000%
+1                                        171       85.5000%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                                    200      100.0000%
+
+modal offset (months)                    1
+loans at the modal offset                171 of 200 (85.5000%)
+min / max offset                         -30 / 1
+sampled loans with no match              0
+
+=========================================================================================================================
+runtime: 382.8 s  (6.38 min)
+=========================================================================================================================

@@ -1,0 +1,257 @@
+=========================================================================================================================
+13_reporting_gaps - interior holes in each loan's monthly reporting history
+=========================================================================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns read: 0 loan_id, 1 reporting_period, 3 dq_status
+gap         : (next period - previous period) - 1, in whole calendar months,
+              over one loan's periods sorted ascending; 0 = strictly consecutive
+boundaries  : a loan's first and last observed periods are spell edges, not gaps
+states      : 0 Current, 1 DQ30, 2 DQ60, >=3 DQ90+ (98/99 inside DQ90+);
+              'RA' and non-numeric codes carried as their own columns, never dropped
+files found : 8
+    data\historical_data_2006\historical_data_2006Q1\perf_2006Q1.txt   2.14 GB
+    data\historical_data_2006\historical_data_2006Q2\perf_2006Q2.txt   1.99 GB
+    data\historical_data_2006\historical_data_2006Q3\perf_2006Q3.txt   1.77 GB
+    data\historical_data_2006\historical_data_2006Q4\perf_2006Q4.txt   2.04 GB
+    data\historical_data_2007\historical_data_2007Q1\perf_2007Q1.txt   2.02 GB
+    data\historical_data_2007\historical_data_2007Q2\perf_2007Q2.txt   2.31 GB
+    data\historical_data_2007\historical_data_2007Q3\perf_2007Q3.txt   1.64 GB
+    data\historical_data_2007\historical_data_2007Q4\perf_2007Q4.txt   1.75 GB
+
+PASS 1/2 - per-loan period moments over every row
+-------------------------------------------------------------------------------------------------------------------------
+    perf_2006Q1.txt    rows   20,622,024   loans   298,574   flagged    174   ( 49.6s)
+    perf_2006Q2.txt    rows   19,214,632   loans   308,208   flagged    183   ( 47.0s)
+    perf_2006Q3.txt    rows   17,073,842   loans   283,975   flagged    160   ( 41.9s)
+    perf_2006Q4.txt    rows   19,578,264   loans   302,787   flagged    195   ( 48.2s)
+    perf_2007Q1.txt    rows   19,432,995   loans   302,331   flagged    198   ( 47.3s)
+    perf_2007Q2.txt    rows   22,286,961   loans   354,055   flagged    257   ( 54.9s)
+    perf_2007Q3.txt    rows   15,827,144   loans   284,980   flagged    181   ( 38.8s)
+    perf_2007Q4.txt    rows   16,931,624   loans   296,826   flagged    195   ( 41.5s)
+    pooled rows 150,967,486   pooled distinct loans 2,431,736   flagged loans 1,543
+    rows with unparseable reporting period: 0
+    cross-file loan overlap: 0 loan(s) appear in more than one file
+
+PASS 2/2 - every row of the flagged loans, walked pair by pair
+-------------------------------------------------------------------------------------------------------------------------
+    perf_2006Q1.txt    rows   20,622,024   flagged rows kept   17,388   flagged loans    174   ( 49.5s)
+    perf_2006Q2.txt    rows   19,214,632   flagged rows kept   17,242   flagged loans    183   ( 45.7s)
+    perf_2006Q3.txt    rows   17,073,842   flagged rows kept   13,490   flagged loans    160   ( 40.6s)
+    perf_2006Q4.txt    rows   19,578,264   flagged rows kept   18,556   flagged loans    195   ( 46.9s)
+    perf_2007Q1.txt    rows   19,432,995   flagged rows kept   17,790   flagged loans    198   ( 46.7s)
+    perf_2007Q2.txt    rows   22,286,961   flagged rows kept   22,987   flagged loans    257   ( 53.8s)
+    perf_2007Q3.txt    rows   15,827,144   flagged rows kept   15,167   flagged loans    181   ( 38.0s)
+    perf_2007Q4.txt    rows   16,931,624   flagged rows kept   16,436   flagged loans    195   ( 40.5s)
+    flagged rows held in memory: 139,056
+    flagged loans found in more than one file: 0
+
+=========================================================================================================================
+A. HEADLINE
+=========================================================================================================================
+Two units appear below and are never mixed: LOANS (one mortgage) and
+LOAN-MONTHS (one observed (loan, month) row).
+
+quantity                                                                count        share
+-------------------------------------------------------------------------------------------------------------------------
+loans in panel                                                      2,431,736    100.0000%
+loans flagged by the moment screen                                      1,543      0.0635%
+loans with >= 1 interior gap (confirmed by walk)                        1,543      0.0635%
+loans strictly consecutive throughout                               2,430,193     99.9365%
+-------------------------------------------------------------------------------------------------------------------------
+loan-months in panel                                              150,967,486    100.0000%
+interior gap events (holes, not months)                                 1,566      0.0010%
+loan-months sitting immediately after a gap                             1,566      0.0010%
+missing loan-months implied by the gaps                                10,173      0.0067%
+-------------------------------------------------------------------------------------------------------------------------
+duplicate (loan, period) pairs found                                        0
+rows with unparseable reporting period                                      0
+flagged loans with no interior gap                                          0
+
+The row-after-a-gap count equals the gap-event count by construction: each
+interior gap has exactly one row on its far side.
+
+=========================================================================================================================
+B. GAP-SIZE DISTRIBUTION   (unit: gap events)
+=========================================================================================================================
+Gap size is the number of CONSECUTIVE MONTHS MISSING between the two
+observed rows. A gap of 1 means one month absent, so the pair spans two
+calendar months rather than one.
+
+gap size (months)           gap events       share   loan-months missing
+-------------------------------------------------------------------------------------------------------------------------
+1                                  315    20.1149%                   315
+2                                  237    15.1341%                   474
+3                                  186    11.8774%                   558
+4                                  204    13.0268%                   816
+5                                  124     7.9183%                   620
+6-11                               316    20.1788%                 2,498
+12-23                              119     7.5990%                 1,860
+24+                                 65     4.1507%                 3,032
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                            1,566   100.0000%                10,173
+
+min observed gap (months)              1
+max observed gap (months)              162
+mean gap (months)                      6.50
+median gap (months)                    4.0
+
+=========================================================================================================================
+C. INTERIOR GAPS PER LOAN   (unit: loans with >= 1 interior gap)
+=========================================================================================================================
+Whether a hole is an isolated incident or a recurring property of a loan's
+servicing record.
+
+gaps in the loan                 loans   share of gapped    share of all loans
+-------------------------------------------------------------------------------------------------------------------------
+exactly 1                        1,521          98.5742%               0.0625%
+exactly 2                           21           1.3610%               0.0009%
+exactly 3                            1           0.0648%               0.0000%
+4 or more                            0           0.0000%               0.0000%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                            1,543         100.0000%               0.0635%
+
+max interior gaps in one loan          3
+mean interior gaps per gapped loan     1.01
+
+=========================================================================================================================
+D. STATE OF THE ROW IMMEDIATELY BEFORE THE GAP, BY GAP SIZE
+=========================================================================================================================
+Unit: gap events, one per hole, filed under the delinquency state recorded
+in the last month observed BEFORE the hole. The baseline row is the state
+distribution over every loan-month in the panel - what the rows before gaps
+would look like if holes fell at random with respect to delinquency.
+
+D.1  COUNTS   (unit: gap events; the BASELINE row is loan-months)
+-------------------------------------------------------------------------------------------------------------------------
+gap size (months)             rows       Current          DQ30          DQ60         DQ90+            RA         other
+-------------------------------------------------------------------------------------------------------------------------
+1                              315            15             0             0           300             0             0
+2                              237            11             0             0           226             0             0
+3                              186             6             0             0           179             1             0
+4                              204             2             0             0           202             0             0
+5                              124             0             0             0           123             1             0
+6-11                           316            11             0             0           305             0             0
+12-23                          119             7             0             0           112             0             0
+24+                             65            26             0             0            39             0             0
+-------------------------------------------------------------------------------------------------------------------------
+ALL GAPS                     1,566            78             0             0         1,486             2             0
+BASELINE loan-months   150,967,486   137,552,268     4,403,234     1,578,886     6,463,333       969,765             0
+
+D.2  ROW SHARES of that same table - every percentage has its exact count
+     in the corresponding cell of D.1 directly above.
+-------------------------------------------------------------------------------------------------------------------------
+gap size (months)             rows   Current      DQ30      DQ60     DQ90+        RA     other
+-------------------------------------------------------------------------------------------------------------------------
+1                              315     4.76%     0.00%     0.00%    95.24%     0.00%     0.00%
+2                              237     4.64%     0.00%     0.00%    95.36%     0.00%     0.00%
+3                              186     3.23%     0.00%     0.00%    96.24%     0.54%     0.00%
+4                              204     0.98%     0.00%     0.00%    99.02%     0.00%     0.00%
+5                              124     0.00%     0.00%     0.00%    99.19%     0.81%     0.00%
+6-11                           316     3.48%     0.00%     0.00%    96.52%     0.00%     0.00%
+12-23                          119     5.88%     0.00%     0.00%    94.12%     0.00%     0.00%
+24+                             65    40.00%     0.00%     0.00%    60.00%     0.00%     0.00%
+-------------------------------------------------------------------------------------------------------------------------
+ALL GAPS                     1,566     4.98%     0.00%     0.00%    94.89%     0.13%     0.00%
+BASELINE loan-months   150,967,486    91.11%     2.92%     1.05%     4.28%     0.64%     0.00%
+
+=========================================================================================================================
+E. STATE BEFORE THE GAP vs STATE AFTER THE GAP
+=========================================================================================================================
+Unit: gap events. Rows are the state in the last month before the hole,
+columns the state in the first month after it. The diagonal is where a naive
+pair-across would report no transition; everything off it is movement the
+panel never observed month by month.
+
+E.1  gap = 1   (gap events: 315, 20.1149% of all gaps)
+-------------------------------------------------------------------------------------------------------------------------
+before \ after                rows       Current          DQ30          DQ60         DQ90+            RA         other
+-------------------------------------------------------------------------------------------------------------------------
+Current                         15             7             3             0             5             0             0
+DQ30                             0             0             0             0             0             0             0
+DQ60                             0             0             0             0             0             0             0
+DQ90+                          300            15             0             1           273            11             0
+RA                               0             0             0             0             0             0             0
+other                            0             0             0             0             0             0             0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL after                    315            22             3             1           278            11             0
+    unchanged across the gap (diagonal): 280 of 315 (88.8889%)
+
+E.2  gap = 2   (gap events: 237, 15.1341% of all gaps)
+-------------------------------------------------------------------------------------------------------------------------
+before \ after                rows       Current          DQ30          DQ60         DQ90+            RA         other
+-------------------------------------------------------------------------------------------------------------------------
+Current                         11             5             1             0             5             0             0
+DQ30                             0             0             0             0             0             0             0
+DQ60                             0             0             0             0             0             0             0
+DQ90+                          226            11             1             0           209             5             0
+RA                               0             0             0             0             0             0             0
+other                            0             0             0             0             0             0             0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL after                    237            16             2             0           214             5             0
+    unchanged across the gap (diagonal): 214 of 237 (90.2954%)
+
+E.3  gap = 3   (gap events: 186, 11.8774% of all gaps)
+-------------------------------------------------------------------------------------------------------------------------
+before \ after                rows       Current          DQ30          DQ60         DQ90+            RA         other
+-------------------------------------------------------------------------------------------------------------------------
+Current                          6             3             0             0             3             0             0
+DQ30                             0             0             0             0             0             0             0
+DQ60                             0             0             0             0             0             0             0
+DQ90+                          179             8             2             0           163             6             0
+RA                               1             0             0             0             0             1             0
+other                            0             0             0             0             0             0             0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL after                    186            11             2             0           166             7             0
+    unchanged across the gap (diagonal): 167 of 186 (89.7849%)
+
+E.4  gap >= 4   (gap events: 828, 52.8736% of all gaps)
+-------------------------------------------------------------------------------------------------------------------------
+before \ after                rows       Current          DQ30          DQ60         DQ90+            RA         other
+-------------------------------------------------------------------------------------------------------------------------
+Current                         46            17             2             1            23             3             0
+DQ30                             0             0             0             0             0             0             0
+DQ60                             0             0             0             0             0             0             0
+DQ90+                          781            45             1             3           709            23             0
+RA                               1             0             0             0             0             1             0
+other                            0             0             0             0             0             0             0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL after                    828            62             3             4           732            27             0
+    unchanged across the gap (diagonal): 727 of 828 (87.8019%)
+
+=========================================================================================================================
+F. CALENDAR CONCENTRATION   (unit: gap events)
+=========================================================================================================================
+Filed under the YEAR of the reporting period immediately BEFORE the hole -
+the last month observed before reporting stops.
+
+year before gap             gap events       share      cumulative
+-------------------------------------------------------------------------------------------------------------------------
+2006                                 1     0.0639%         0.0639%
+2007                                12     0.7663%         0.8301%
+2008                                82     5.2363%         6.0664%
+2009                               173    11.0473%        17.1137%
+2010                               445    28.4163%        45.5300%
+2011                               317    20.2427%        65.7727%
+2012                               175    11.1750%        76.9476%
+2013                               154     9.8340%        86.7816%
+2014                                87     5.5556%        92.3372%
+2015                                36     2.2989%        94.6360%
+2016                                23     1.4687%        96.1047%
+2017                                17     1.0856%        97.1903%
+2018                                18     1.1494%        98.3397%
+2019                                14     0.8940%        99.2337%
+2020                                 4     0.2554%        99.4891%
+2022                                 3     0.1916%        99.6807%
+2023                                 4     0.2554%        99.9361%
+2024                                 1     0.0639%       100.0000%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                            1,566   100.0000%       100.0000%
+
+earliest month before a gap                  2006-12
+latest month before a gap                    2024-09
+pre-gap month before 2009-01                 95 of 1,566 (6.0664%)
+
+=========================================================================================================================
+runtime: 732.1 s  (12.20 min)
+=========================================================================================================================

@@ -1,0 +1,182 @@
+=========================================================================================================================
+19_entry_age_groups - early- versus late-entering loans, and the
+                      entry-age anomalies of diagnostic 18
+=========================================================================================================================
+panel       : data\panel\panel_*.parquet
+performance : data/historical_data_200[67]/*/perf_*.txt
+origination : data/historical_data_200[67]/*/orig_*.txt
+groups      : early = entry age 0-2, late = entry age 3+
+
+RESOLVED COLUMN INDICES   (0-based index = published position - 1)
+-------------------------------------------------------------------------------------------------------------------------
+file            role              position   index   attribute name
+-------------------------------------------------------------------------------------------------------------------------
+performance     loan                     1       0   Loan Identifier
+performance     period                   2       1   Period
+performance     loan_age                 5       4   Loan Age
+origination     loan                    20      19   Loan Identifier
+origination     channel                 14      13   Channel
+origination     seller                  24      23   Seller Name
+-------------------------------------------------------------------------------------------------------------------------
+performance sheet: xl/worksheets/sheet2.xml      origination sheet: xl/worksheets/sheet1.xml
+
+=========================================================================================================================
+GROUPS   (unit: loans)
+=========================================================================================================================
+group                                                loans       share
+-------------------------------------------------------------------------------------------------------------------------
+early (entry age 0-2)                            2,290,179    94.4211%
+late (entry age 3+)                                135,316     5.5789%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                                            2,425,495   100.0000%
+ties to diagnostic 18: 2,290,179 at entry age 0-2 of 2,425,495 loans.
+
+=========================================================================================================================
+PART 1 - CONTINUOUS CHARACTERISTICS   (unit: loans, first panel row)
+=========================================================================================================================
+feature       group         non-null    of group        mean        median        null
+-------------------------------------------------------------------------------------------------------------------------
+FICO          early        2,288,282      99.92%     723.826       730.000       1,897
+              late           135,206      99.92%     733.640       743.000         110
+-------------------------------------------------------------------------------------------------------------------------
+original LTV  early        2,289,982      99.99%      70.744        77.000         197
+              late           135,294      99.98%      70.438        78.000          22
+-------------------------------------------------------------------------------------------------------------------------
+DTI           early        2,237,948      97.72%      36.628        37.000      52,231
+              late           133,290      98.50%      35.427        36.000       2,026
+-------------------------------------------------------------------------------------------------------------------------
+rate spread   early        2,290,178     100.00%       0.030         0.010           1
+              late           135,316     100.00%      -0.113        -0.137           0
+-------------------------------------------------------------------------------------------------------------------------
+
+feature                     mean: late - early  median: late - early
+-------------------------------------------------------------------------------------------------------------------------
+FICO                                     9.814                13.000
+original LTV                            -0.306                 1.000
+DTI                                     -1.201                -1.000
+rate spread                             -0.143                -0.147
+-------------------------------------------------------------------------------------------------------------------------
+Units as stored in the panel: FICO points, LTV and DTI in percent,
+rate spread in percentage points. Means and medians over non-null values.
+
+=========================================================================================================================
+PART 2 - CHANNEL AND SELLER   (unit: loans, joined on loan_id)
+=========================================================================================================================
+origination records read (all files, full)                          2,431,736
+panel loans                                                         2,425,495
+panel loans matched to an origination record                        2,425,495
+panel loans with no match, early                                            0
+panel loans with no match, late                                             0
+
+CHANNEL   (raw code as it appears in the origination file)
+-------------------------------------------------------------------------------------------------------------------------
+channel                    early       share              late       share    late - early
+-------------------------------------------------------------------------------------------------------------------------
+T                      1,303,301    56.9083%            60,527    44.7301%       -12.1781%
+R                        986,113    43.0583%            73,901    54.6136%        11.5553%
+C                            362     0.0158%               496     0.3665%         0.3507%
+B                            395     0.0172%               392     0.2897%         0.2724%
+9                              8     0.0003%                 0     0.0000%        -0.0003%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                  2,290,179   100.0000%           135,316   100.0000%
+late - early is the difference in share, percentage points.
+
+SELLER   (top 10 by loan count within each group)
+-------------------------------------------------------------------------------------------------------------------------
+rank  early - seller name                                                    loans       share
+-------------------------------------------------------------------------------------------------------------------------
+1     WELLS FARGO BANK, N.A.                                               590,355    25.7777%
+2     OTHER                                                                334,159    14.5910%
+3     COUNTRYWIDE HOME LOANS, INC.                                         288,158    12.5823%
+4     CHASE HOME FINANCE LLC                                               186,709     8.1526%
+5     WASHINGTON MUTUAL BANK                                               148,630     6.4899%
+6     ABN AMRO MORTGAGE GROUP, INC.                                        105,145     4.5911%
+7     TAYLOR, BEAN & WHITAKER MORTGAGE CORP.                               101,021     4.4111%
+8     U.S. BANK N.A.                                                        90,900     3.9691%
+9     BANK OF AMERICA, N.A.                                                 86,065     3.7580%
+10    CITIMORTGAGE, INC.                                                    79,293     3.4623%
+-------------------------------------------------------------------------------------------------------------------------
+top 10 combined                                                          2,010,435    87.7851%
+distinct seller names in group                                                  22
+
+-------------------------------------------------------------------------------------------------------------------------
+rank  late - seller name                                                     loans       share
+-------------------------------------------------------------------------------------------------------------------------
+1     BANK OF AMERICA, N.A.                                                 66,113    48.8582%
+2     ABN AMRO MORTGAGE GROUP, INC.                                         20,143    14.8859%
+3     OTHER                                                                 20,068    14.8305%
+4     WELLS FARGO BANK, N.A.                                                10,403     7.6879%
+5     CHASE HOME FINANCE LLC                                                 6,887     5.0896%
+6     COUNTRYWIDE HOME LOANS, INC.                                           2,007     1.4832%
+7     WASHINGTON MUTUAL BANK                                                 1,927     1.4241%
+8     FIFTH THIRD BANK                                                       1,846     1.3642%
+9     CITIMORTGAGE, INC.                                                     1,786     1.3199%
+10    PROVIDENT FUNDING ASSOCIATES, L.P.                                       740     0.5469%
+-------------------------------------------------------------------------------------------------------------------------
+top 10 combined                                                            131,920    97.4903%
+distinct seller names in group                                                  22
+
+CONCENTRATION
+-------------------------------------------------------------------------------------------------------------------------
+early: share held by the top 10 sellers                              87.7851%
+late: share held by the top 10 sellers                               97.4903%
+
+=========================================================================================================================
+PART 3 - LOANS WHOSE FIRST-ROW loan_age IS NOT THEIR MINIMUM
+=========================================================================================================================
+anomaly loans (diagnostic 18 found 2,048)                                       2,048
+    of which early / late                                                 1,853 / 195
+panel rows of those loans                                                     251,900
+
+A. PANEL, rows in stored order
+-------------------------------------------------------------------------------------------------------------------------
+panel: within-loan consecutive steps                                          249,852
+    steps where period does NOT increase                                            0
+    loans with any such step                                                        0
+    steps where loan_age goes backwards                                         2,499
+    loans with at least one backward step                                       2,048    100.0000%
+    loans whose loan_age is non-decreasing throughout                               0
+    largest backward step (months of loan_age)                                    229
+    backward steps with period advancing by exactly 1                           2,351
+
+B. SOURCE PERFORMANCE FILES, rows in the order stored in the file
+-------------------------------------------------------------------------------------------------------------------------
+source rows of the anomaly loans                                              267,472
+anomaly loans found in the source files                                         2,048
+source, file order: within-loan consecutive steps                             265,424
+    steps where period does NOT increase                                            0
+    loans with any such step                                                        0
+    steps where loan_age goes backwards                                         2,589
+    loans with at least one backward step                                       2,048    100.0000%
+    loans whose loan_age is non-decreasing throughout                               0
+    largest backward step (months of loan_age)                                    229
+    backward steps with period advancing by exactly 1                           2,585
+
+C. SOURCE PERFORMANCE FILES, rows re-ordered by period
+-------------------------------------------------------------------------------------------------------------------------
+source, period order: within-loan consecutive steps                           265,424
+    steps where period does NOT increase                                            0
+    loans with any such step                                                        0
+    steps where loan_age goes backwards                                         2,589
+    loans with at least one backward step                                       2,048    100.0000%
+    loans whose loan_age is non-decreasing throughout                               0
+    largest backward step (months of loan_age)                                    229
+    backward steps with period advancing by exactly 1                           2,585
+
+Backward steps by size, source rows in period order:
+-------------------------------------------------------------------------------------------------------------------------
+loan_age drop (months)                     steps       share
+-------------------------------------------------------------------------------------------------------------------------
+1                                              0     0.0000%
+2                                              1     0.0386%
+3-5                                            4     0.1545%
+6-12                                          54     2.0857%
+13-24                                        344    13.2870%
+25-60                                      1,212    46.8134%
+61+                                          974    37.6207%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                                      2,589
+
+=========================================================================================================================
+runtime: 121.1 s  (2.02 min)
+=========================================================================================================================

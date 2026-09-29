@@ -1,0 +1,251 @@
+=========================================================================================================================
+09_dq90_duration_hazard - exit hazards from DQ90+ by time already spent in DQ90+
+=========================================================================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns     : 0 loan, 1 period, 3 dq_status, 8 zero_balance_code
+files found : 8
+    data\historical_data_2006\historical_data_2006Q1\perf_2006Q1.txt   2.14 GB
+    data\historical_data_2006\historical_data_2006Q2\perf_2006Q2.txt   1.99 GB
+    data\historical_data_2006\historical_data_2006Q3\perf_2006Q3.txt   1.77 GB
+    data\historical_data_2006\historical_data_2006Q4\perf_2006Q4.txt   2.04 GB
+    data\historical_data_2007\historical_data_2007Q1\perf_2007Q1.txt   2.02 GB
+    data\historical_data_2007\historical_data_2007Q2\perf_2007Q2.txt   2.31 GB
+    data\historical_data_2007\historical_data_2007Q3\perf_2007Q3.txt   1.64 GB
+    data\historical_data_2007\historical_data_2007Q4\perf_2007Q4.txt   1.75 GB
+
+=========================================================================================================================
+PART A - is foreclosure status observable separately from field 4?
+=========================================================================================================================
+sources : docs/general_user_guide_july_2026.pdf
+          docs/file_layout_july_2026.xlsx
+
+A.1  FINDING
+-------------------------------------------------------------------------------------------------------------------------
+    No foreclosure-status field exists in the monthly performance file. Foreclosure progression is not observable as
+    distinct from the delinquency counter at field 4 (index 3). Confirmed against the General User Guide and File Layout,
+    July 2026, in docs/.
+
+    Field number: none. Index: none. Enumeration: none. There is nothing to report
+    on population during the delinquency period, because no such field exists.
+
+A.2  FIELDS THAT TOUCH FORECLOSURE OR WORKOUT, AND WHY NONE OF THEM IS THAT FIELD
+-------------------------------------------------------------------------------------------------------------------------
+    field  4 (index  3)  Current Loan Delinquency Status
+        carries 'RA' = REO Acquisition. RA is the completion of foreclosure (title taken), not a process stage, and it
+        is this same field rather than a distinct one.
+
+    field  7 (index  6)  Underwriting Defect and Major Servicing Defect Settlement Date
+        a repurchase / make-whole settlement date. Unrelated to foreclosure process, and populated at settlement only.
+
+    field  9 (index  8)  Zero Balance Code
+        02 / 03 / 09 identify a foreclosure-related TERMINATION after the fact. Blank until the terminating event, so
+        it carries no in-process signal.
+
+    field 10 (index  9)  Zero Balance Effective Date
+        the period of the terminating event. Terminal only.
+
+    field 25 (index 24)  Payment Deferral Flag
+        a workout instrument, and the opposite of foreclosure.
+
+    field 29 (index 28)  Delinquency Due to Disaster
+        hardship / forbearance flag. Guide: 'Only populated for January 2014 and following periods.'
+
+    field 30 (index 29)  Borrower Assistance Plan
+        F = Forbearance, R = Repayment, T = Trial Period. The closest thing in the file to a during-delinquency process
+        marker, but it is a RETENTION workout, not foreclosure, and the Guide states 'Only populated for January 2014
+        and following periods' - i.e. null across the entire 2007-2011 window these vintages exist to observe.
+
+A.3  CONSEQUENCE FOR PART B
+-------------------------------------------------------------------------------------------------------------------------
+    Foreclosure timing is not separately observable during the delinquency period. Between entry into DQ90+ and the
+    terminal event, field 4 is the only state signal the file carries, so 'months in DQ90+' is simultaneously arrears
+    depth and elapsed foreclosure clock, and the two cannot be separated in this data. The process is observed only at
+    its endpoint: 'RA' in field 4 at REO acquisition, or a zero-balance code at termination. A run-length of k months in
+    DQ90+ therefore cannot be read as 'k months since foreclosure referral'.
+
+A.4  FIELD 4 (INDEX 3) - THE GUIDE'S EXACT WORDS, INCLUDING CAP BEHAVIOUR
+-------------------------------------------------------------------------------------------------------------------------
+    Current Loan Delinquency Status
+    
+      Description
+        "A value corresponding to the number of days the borrower is delinquent,
+         based on the Due Date of Last Paid Installment ("DDLPI") reported by
+         servicers to Freddie Mac.
+    
+         If a loan is acquired through REO, then the Current Loan Delinquency
+         Status will reflect "RA" for REO Acquisition (instead of the value
+         corresponding to the number of days the borrower is delinquent).
+    
+         This value for any given month will be capped at 99.
+    
+         Note: For periods on or before September 2025, 00 could mean either
+         Current or Cycle before first payment date."
+    
+      Enumerations
+        "00 = Current, or less than 30 days delinquent
+         01 = 30-59 days delinquent
+         02 = 60 - 89 days delinquent
+         03 = 90 - 119 days delinquent etc.
+         RA = REO Acquisition
+    
+         XX = Not Available"
+
+    The cap sentence, quoted alone, since the DQ90+ definition in Part B rests on it:
+
+        "This value for any given month will be capped at 99."
+
+    Read with the enumeration ('03 = 90 - 119 days delinquent etc.'), 99 is the top rung of the same ladder - 99 or more
+    months delinquent - and not a missing-value sentinel; the Guide supplies 'XX = Not Available' for that purpose. The
+    Guide says nothing special about 98 at all, which is itself the point: 98 is simply the ordinary rung below the cap.
+    Both therefore fold into DQ90+ with every other status >= 3, matching decision D12 and diagnostic 06.
+
+    The cap has moved historically: the release notes record 'Remove the Delinquency Status cap of D180', so the 99 cap
+    quoted above is the current regime, which is the one these files are published under.
+
+A.5  COLUMN POSITIONS USED BY PART B, RE-CONFIRMED AGAINST THE LAYOUT WORKBOOK
+-------------------------------------------------------------------------------------------------------------------------
+    layout lists 35 field positions for the monthly performance file.
+      index 0  ->  Loan Identifier                        OK
+      index 1  ->  Period                                 OK
+      index 3  ->  Current Loan Delinquency Status        OK
+      index 8  ->  Zero Balance Code                      OK
+    all four positions confirmed.
+
+=========================================================================================================================
+PART B - exit hazard by duration in DQ90+
+=========================================================================================================================
+DQ90+      : field-4 numeric status >= 3, 98 and 99 included (D12: 99 is the cap)
+run length : consecutive months in DQ90+; a reporting gap restarts the counter at 1
+outcome    : state at the next observed row, with a terminal zero-balance code on that
+             row taking precedence over its field 4
+Cure       : next status 0 / 1 / 2
+Stay       : next status >= 3
+Default    : zero-balance 02 / 03 / 09, or status RA, per D7; also 96 with a prior RA
+Prepaid    : zero-balance 01
+Censored   : zero-balance 15 / 16, 96 without a prior RA, or no next observation
+
+PROGRESS
+-------------------------------------------------------------------------------------------------------------------------
+    perf_2006Q1.txt    pass 1  rows   20,622,024   DQ90+ loans    42,598            ( 32.2s)
+    perf_2006Q1.txt    pass 2  rows kept 4,560,861                                    ( 31.8s)
+    perf_2006Q1.txt    walk    DQ90+ months 740,911  contributing loans   42,598  (  1.1s)
+
+    perf_2006Q2.txt    pass 1  rows   19,214,632   DQ90+ loans    41,545            ( 30.6s)
+    perf_2006Q2.txt    pass 2  rows kept 4,280,271                                    ( 29.9s)
+    perf_2006Q2.txt    walk    DQ90+ months 716,934  contributing loans   41,545  (  1.1s)
+
+    perf_2006Q3.txt    pass 1  rows   17,073,842   DQ90+ loans    39,544            ( 26.8s)
+    perf_2006Q3.txt    pass 2  rows kept 3,985,730                                    ( 26.4s)
+    perf_2006Q3.txt    walk    DQ90+ months 688,364  contributing loans   39,544  (  0.9s)
+
+    perf_2006Q4.txt    pass 1  rows   19,578,264   DQ90+ loans    47,014            ( 31.0s)
+    perf_2006Q4.txt    pass 2  rows kept 4,707,031                                    ( 30.7s)
+    perf_2006Q4.txt    walk    DQ90+ months 807,121  contributing loans   47,014  (  1.2s)
+
+    perf_2007Q1.txt    pass 1  rows   19,432,995   DQ90+ loans    47,186            ( 30.8s)
+    perf_2007Q1.txt    pass 2  rows kept 4,576,242                                    ( 30.2s)
+    perf_2007Q1.txt    walk    DQ90+ months 808,904  contributing loans   47,186  (  1.1s)
+
+    perf_2007Q2.txt    pass 1  rows   22,286,961   DQ90+ loans    58,356            ( 35.2s)
+    perf_2007Q2.txt    pass 2  rows kept 5,542,066                                    ( 34.6s)
+    perf_2007Q2.txt    walk    DQ90+ months 1,017,953  contributing loans   58,356  (  1.6s)
+
+    perf_2007Q3.txt    pass 1  rows   15,827,144   DQ90+ loans    46,776            ( 24.7s)
+    perf_2007Q3.txt    pass 2  rows kept 4,239,903                                    ( 24.6s)
+    perf_2007Q3.txt    walk    DQ90+ months 809,257  contributing loans   46,776  (  1.1s)
+
+    perf_2007Q4.txt    pass 1  rows   16,931,624   DQ90+ loans    50,527            ( 26.9s)
+    perf_2007Q4.txt    pass 2  rows kept 4,507,470                                    ( 27.5s)
+    perf_2007Q4.txt    walk    DQ90+ months 873,889  contributing loans   50,527  (  1.2s)
+
+=========================================================================================================================
+B.1  SLICE SIZE
+=========================================================================================================================
+panel rows scanned (loan-months)                                  150,967,486
+total DQ90+ loan-months                                             6,463,333
+distinct loans contributing >= 1 DQ90+ month                          373,546
+DQ90+ share of all panel loan-months                                  4.2813%
+reporting periods observed                                    200512 - 202603
+rows dropped for an unparseable period                                      0
+
+Loan identifiers do not straddle files. Vintage prefix observed per file:
+    perf_2006Q1.txt    F06Q1 (20,622,024 rows)
+    perf_2006Q2.txt    F06Q2 (19,214,632 rows)
+    perf_2006Q3.txt    F06Q3 (17,073,842 rows)
+    perf_2006Q4.txt    F06Q4 (19,578,264 rows)
+    perf_2007Q1.txt    F07Q1 (19,432,995 rows)
+    perf_2007Q2.txt    F07Q2 (22,286,961 rows)
+    perf_2007Q3.txt    F07Q3 (15,827,144 rows)
+    perf_2007Q4.txt    F07Q4 (16,931,624 rows)
+
+=========================================================================================================================
+B.2  EXIT HAZARD FROM DQ90+ BY RUN LENGTH
+=========================================================================================================================
+Unit: loan-months. One row per (loan, month) observed in DQ90+, filed under the number
+of months that loan had then been continuously in DQ90+. The denominator column is that
+bucket's DQ90+ loan-month count; each rate is that column's count / the denominator.
+
+run                   |       Cure        |       Stay        |     Default       |     Prepaid       |     Censored     
+(months)  denominator |          n   rate |          n   rate |          n   rate |          n   rate |          n   rate
+-------------------------------------------------------------------------------------------------------------------------
+1             605,140 |    105,371 17.41% |    485,119 80.17% |      4,041  0.67% |      8,792  1.45% |      1,817  0.30%
+2             490,139 |     42,707  8.71% |    434,652 88.68% |      7,276  1.48% |      4,663  0.95% |        841  0.17%
+3             439,596 |     30,511  6.94% |    392,705 89.33% |     12,267  2.79% |      3,492  0.79% |        621  0.14%
+4-6         1,082,297 |     66,329  6.13% |    959,640 88.67% |     48,054  4.44% |      6,929  0.64% |      1,345  0.12%
+7-12        1,401,953 |     61,437  4.38% |  1,249,585 89.13% |     79,665  5.68% |      6,319  0.45% |      4,947  0.35%
+13-24       1,314,850 |     37,840  2.88% |  1,185,596 90.17% |     70,784  5.38% |      3,880  0.30% |     16,750  1.27%
+25+         1,129,358 |     18,361  1.63% |  1,042,958 92.35% |     50,542  4.48% |      1,891  0.17% |     15,606  1.38%
+-------------------------------------------------------------------------------------------------------------------------
+all         6,463,333 |    362,556  5.61% |  5,750,255 88.97% |    272,629  4.22% |     35,966  0.56% |     41,927  0.65%
+
+THIN BUCKETS (denominator < 1,000): none - every bucket clears the threshold.
+
+=========================================================================================================================
+B.3  FOOTNOTES - counts behind the construction
+=========================================================================================================================
+(a) Runs broken by a reporting gap
+      1,354 DQ90+ loan-months open a new run because the immediately preceding month was
+      never reported, although the previous observed row for that loan was itself
+      DQ90+. The counter restarts at 1 at each of these, as briefed. Runs broken by an
+      OBSERVED non-DQ90+ month are ordinary restarts and are not counted here.
+      Share of all DQ90+ loan-months: 0.0209%
+
+(b) Outcomes classified across a reporting gap
+      1,486 DQ90+ loan-months have their next OBSERVED row more than one month later, so
+      their 'state next month' is in fact 'state at next observation'. Share of all
+      DQ90+ loan-months: 0.0230%. By outcome:
+        Cure                 87
+        Stay              1,058
+        Default             332
+        Prepaid               3
+        Censored              6
+
+(c) Terminal DQ90+ rows
+      117,581 DQ90+ loan-months are themselves the loan's zero-balance row, and are
+      classified from their own code rather than as censored-at-cutoff. Where the row
+      before one of these is also DQ90+, the same exit is attributed at two adjacent
+      run-lengths. This count is the upper bound on that overlap.
+
+(d) DQ90+ loan-months at or after a first RA
+      7. RA is not a numeric status, so post-RA months cannot be DQ90+; a non-zero
+      value here would mean a loan returned to a numeric status after REO acquisition
+      (D8 records 2 such loans in 118,026 across the panel).
+
+(e) Duplicate (loan, period) rows
+      0, among rows belonging to DQ90+ loans. A repeated period neither continues nor
+      gap-breaks a run.
+
+(f) Zero-balance values outside the documented enumeration
+      0 rows, among rows belonging to DQ90+ loans. Documented enumeration is
+      01 / 02 / 03 / 09 / 15 / 16 / 96, plus blank while the loan is still active.
+
+(g) Unclassified DQ90+ loan-months
+      0. A loan-month lands here only if its successor row carries no zero-balance
+      code and a field 4 that is neither numeric nor RA ('XX = Not Available', or
+      blank).
+      Zero, so the five outcome rates sum to 100% in every bucket.
+
+=========================================================================================================================
+done in 483.1s
+=========================================================================================================================

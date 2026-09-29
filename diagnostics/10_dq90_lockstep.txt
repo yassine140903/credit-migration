@@ -1,0 +1,507 @@
+=========================================================================================================================
+10_dq90_lockstep - does field-4 status move in lockstep with run-length inside DQ90+?
+=========================================================================================================================
+glob        : data/historical_data_200[67]/*/perf_*.txt
+chunksize   : 2,000,000
+columns     : pass 1  0 loan, 1 period, 3 dq_status
+              pass 2  0 loan, 1 period, 3 dq_status, 7 mod_flag, 8 zero_balance_code,
+                      24 payment_deferral_flag, 29 borrower_assistance_plan
+files found : 8
+    data\historical_data_2006\historical_data_2006Q1\perf_2006Q1.txt   2.14 GB
+    data\historical_data_2006\historical_data_2006Q2\perf_2006Q2.txt   1.99 GB
+    data\historical_data_2006\historical_data_2006Q3\perf_2006Q3.txt   1.77 GB
+    data\historical_data_2006\historical_data_2006Q4\perf_2006Q4.txt   2.04 GB
+    data\historical_data_2007\historical_data_2007Q1\perf_2007Q1.txt   2.02 GB
+    data\historical_data_2007\historical_data_2007Q2\perf_2007Q2.txt   2.31 GB
+    data\historical_data_2007\historical_data_2007Q3\perf_2007Q3.txt   1.64 GB
+    data\historical_data_2007\historical_data_2007Q4\perf_2007Q4.txt   1.75 GB
+
+=========================================================================================================================
+PRE-REGISTRATION - recorded before any result below was computed
+=========================================================================================================================
+PRIMARY METRIC
+    Share of DQ90+ loan-months with deviation != 0, using each run's own
+    entry_status, on the same slice as diagnostic 09.
+
+PREDICTIONS, RECORDED BEFORE THE DATA WAS READ
+    Yassine : under 5%
+    Claude  : 20-50%, point estimate ~30%
+
+=========================================================================================================================
+PART A - conventions reused, and the documentation behind the three workout flags
+=========================================================================================================================
+A.1  CONVENTIONS REUSED FROM 09_dq90_duration_hazard.py
+-------------------------------------------------------------------------------------------------------------------------
+    DQ90+ loan-month             
+        numeric field-4 status >= 3. 98 and 99 are inside it (D12: 99 is the documented cap, not a sentinel). RA packs
+        to -1 and any other non-numeric value to -2, so the test 'status >= 3' can never catch RA or XX.
+    run start / end              
+        a run continues only across an OBSERVED, immediately preceding DQ90+ month of the same loan. Every other row
+        opens a new run. Run-length is the distance from the run's opening row, 1-based.
+    gap handling                 
+        a hole in the reporting periods breaks the run and the counter restarts at 1. A repeated (loan, period) is not
+        adjacent either, so it restarts a run too; the count is reported.
+    run-length buckets           
+        1, 2, 3, 4-6, 7-12, 13-24, 25+ - exactly 09's.
+    terminal zero-balance row    
+        a DQ90+ month that is itself the loan's last observed row and carries a terminating zero-balance code
+        (01/02/03/09/15/16/96). 09 keeps these inside the slice. T1 primary keeps them; T1 sensitivity removes them.
+    chunk-boundary carry-over    
+        none is needed. Pass 1 finds the loans that ever reach DQ90+ in the file; pass 2 keeps every row of exactly
+        those loans as packed integer arrays; the arrays are lexsorted by (loan, period) after the whole file is read.
+        A loan straddling a chunk boundary is reassembled by that sort, not by boundary state. This is 09's mechanism
+        unchanged.
+    loans do not straddle files  
+        the identifier carries its own vintage prefix. The prefix seen in each file is reported below so the assumption
+        is checked rather than assumed.
+
+    Departure from 09: pass 1 reads three columns (0, 1, 3) instead of four - it has no use for the zero-balance code -
+    and pass 2 reads seven (0, 1, 3, 7, 8, 24, 29) instead of four. This is a read-width change only. No definition above
+    is affected, and the slice totals are re-checked against 09's published figures in B.1.
+
+A.2  COLUMN POSITIONS, CONFIRMED AGAINST THE LAYOUT WORKBOOK
+-------------------------------------------------------------------------------------------------------------------------
+    source : docs\file_layout_july_2026.xlsx, sheet 'Monthly Performance Data File'
+    layout lists 35 field positions for the monthly performance file.
+
+    index  field  attribute name in layout                   check
+    0      1      Loan Identifier                            OK
+    1      2      Period                                     OK
+    3      4      Current Loan Delinquency Status            OK
+    7      8      Modification Flag                          OK
+    8      9      Zero Balance Code                          OK
+    24     25     Payment Deferral Flag                      OK
+    29     30     Borrower Assistance Plan                   OK
+
+    The brief expected the three workout flags at indices 7, 24 and 29:
+      brief index 7   -> Modification Flag          CONFIRMED by the layout
+      brief index 24  -> Payment Deferral Flag      CONFIRMED by the layout
+      brief index 29  -> Borrower Assistance Plan   CONFIRMED by the layout
+    All seven positions confirmed. The brief's expectation holds; nothing moved.
+
+A.3  ARE THE THREE FLAGS CURRENT-MONTH OR PERSISTENT? THE GUIDE'S OWN WORDS
+-------------------------------------------------------------------------------------------------------------------------
+    source : docs/general_user_guide_july_2026.pdf, Monthly Performance Data File
+
+    field  8 (index  7)  Modification Flag
+    .................................................................................................................
+      Description
+        "A flag indicating if the loan has been modified in the current period or a
+         prior period.
+    
+         Note: Due to the various loan modification programs available to borrowers,
+         a loan could have been modified more than once. In these cases, the
+         modification flag will be set to "Y" in more than one monthly reporting
+         period."
+    
+      Enumerations
+        "Y = Current Period Modification
+         P = Prior Period Modification
+    
+         Null = Not Modified"
+
+      CLASSIFICATION: PERSISTENT
+        'or a prior period', and the separate enumeration P = Prior Period Modification, make this an EVER flag: once a
+        modification happens the field stays populated. Onset is therefore Y, not 'non-null'.
+        Activity test used in T7: flag value == 'Y' (onset).
+
+    field 25 (index 24)  Payment Deferral Flag
+    .................................................................................................................
+      Description
+        "A flag indicating a loan has been granted a Payment Deferral in the current
+         or prior period."
+    
+      Enumerations
+        "C = Current Period
+         P = Prior Period"
+
+      CLASSIFICATION: PERSISTENT
+        'in the current or prior period', with P = Prior Period, makes this an EVER flag on the same pattern. Onset is
+        C.
+        Activity test used in T7: flag value == 'C' (onset).
+
+    field 30 (index 29)  Borrower Assistance Plan
+    .................................................................................................................
+      Description
+        "Regardless of delinquency status, the type of assistance plan that the
+         borrower is enrolled in that provides temporary mortgage payment relief or
+         an opportunity to cure a mortgage delinquency over a defined period.
+    
+         Note: Only populated for January 2014 and following periods."
+    
+      Enumerations
+        "F = Forbearance
+         R = Repayment
+         T = Trial Period
+    
+         Null = No workout plan or not applicable"
+
+      CLASSIFICATION: CURRENT-MONTH
+        the enumeration carries no prior-period value and the description is in the present tense - the plan the
+        borrower 'is enrolled in'. This is a CURRENT-MONTH indicator, so the flag VALUE is used, not an onset. The
+        January 2014 restriction bites hard on these vintages: the 2007-2011 window this cohort exists to observe is
+        entirely before it.
+        Activity test used in T7: flag value is non-null (F, R or T).
+
+A.4  CONSEQUENCE FOR T7
+-------------------------------------------------------------------------------------------------------------------------
+    Because Modification Flag and Payment Deferral Flag are EVER flags, testing them for 'non-null' at a departure month
+    would mark every month after the first modification, not the month the modification happened. T7 therefore tests
+    ONSET for those two - Y and C respectively - and the VALUE for Borrower Assistance Plan, which carries no
+    prior-period code. A departure is credited to a flag if the onset or value appears at the departure month itself or
+    at the immediately preceding observed month, where that preceding month exists and is exactly one period earlier.
+
+=========================================================================================================================
+PART B - lockstep measurement
+=========================================================================================================================
+entry_status    : numeric field-4 status in the run's first month
+k               : run-month, 1-based
+expected_status : min(entry_status + (k - 1), 99)
+deviation       : observed_status - expected_status
+on_step         : deviation == 0
+off_below       : deviation < 0
+off_above       : deviation > 0   - should not occur; reported as an anomaly
+cap_row         : observed == 99 AND entry_status + (k - 1) > 99
+                  on_step by construction, so it is a SUBSET of the on_step column
+                  and is reported beside it, never added to it
+
+Denominator for every share in T1, T2 and T8 is on_step + off_below + off_above,
+i.e. all DQ90+ loan-months in that slice. cap_row shares use the same denominator.
+
+THIN-CELL THRESHOLDS: 500 loan-months, 100 loans. Every cell below either threshold is
+marked '<< THIN' in place and listed again at the end.
+
+PROGRESS
+-------------------------------------------------------------------------------------------------------------------------
+    perf_2006Q1.txt    pass 1  rows   20,622,024   DQ90+ loans    42,598            ( 51.1s)
+    perf_2006Q1.txt    pass 2  rows kept 4,560,861                                    ( 64.5s)
+    perf_2006Q1.txt    walk    DQ90+ months 740,911  runs     69,267          (  2.6s)
+
+    perf_2006Q2.txt    pass 1  rows   19,214,632   DQ90+ loans    41,545            ( 49.5s)
+    perf_2006Q2.txt    pass 2  rows kept 4,280,271                                    ( 60.3s)
+    perf_2006Q2.txt    walk    DQ90+ months 716,934  runs     68,446          (  1.9s)
+
+    perf_2006Q3.txt    pass 1  rows   17,073,842   DQ90+ loans    39,544            ( 43.4s)
+    perf_2006Q3.txt    pass 2  rows kept 3,985,730                                    ( 53.1s)
+    perf_2006Q3.txt    walk    DQ90+ months 688,364  runs     64,846          (  2.0s)
+
+    perf_2006Q4.txt    pass 1  rows   19,578,264   DQ90+ loans    47,014            ( 50.2s)
+    perf_2006Q4.txt    pass 2  rows kept 4,707,031                                    ( 61.7s)
+    perf_2006Q4.txt    walk    DQ90+ months 807,121  runs     76,066          (  2.5s)
+
+    perf_2007Q1.txt    pass 1  rows   19,432,995   DQ90+ loans    47,186            ( 58.7s)
+    perf_2007Q1.txt    pass 2  rows kept 4,576,242                                    ( 73.5s)
+    perf_2007Q1.txt    walk    DQ90+ months 808,904  runs     75,902          (  2.5s)
+
+    perf_2007Q2.txt    pass 1  rows   22,286,961   DQ90+ loans    58,356            ( 58.3s)
+    perf_2007Q2.txt    pass 2  rows kept 5,542,066                                    ( 71.4s)
+    perf_2007Q2.txt    walk    DQ90+ months 1,017,953  runs     94,561          (  3.1s)
+
+    perf_2007Q3.txt    pass 1  rows   15,827,144   DQ90+ loans    46,776            ( 41.8s)
+    perf_2007Q3.txt    pass 2  rows kept 4,239,903                                    ( 49.6s)
+    perf_2007Q3.txt    walk    DQ90+ months 809,257  runs     75,704          (  1.9s)
+
+    perf_2007Q4.txt    pass 1  rows   16,931,624   DQ90+ loans    50,527            ( 41.9s)
+    perf_2007Q4.txt    pass 2  rows kept 4,507,470                                    ( 51.1s)
+    perf_2007Q4.txt    walk    DQ90+ months 873,889  runs     80,348          (  1.9s)
+
+=========================================================================================================================
+B.1  SLICE SIZE, AND AGREEMENT WITH DIAGNOSTIC 09
+=========================================================================================================================
+panel rows scanned (loan-months)                                  150,967,486
+total DQ90+ loan-months                                             6,463,333
+distinct loans contributing >= 1 DQ90+ month                          373,546
+distinct DQ90+ runs                                                   605,140
+DQ90+ share of all panel loan-months                                  4.2813%
+reporting periods observed                                    200512 - 202603
+rows dropped for an unparseable period                                      0
+
+Cross-check against 09's published slice - the definitions are shared, so these must
+match exactly:
+    panel rows scanned           this run    150,967,486   09    150,967,486   MATCH
+    DQ90+ loan-months            this run      6,463,333   09      6,463,333   MATCH
+    DQ90+ loans                  this run        373,546   09        373,546   MATCH
+
+Loan identifiers do not straddle files. Vintage prefix observed per file:
+    perf_2006Q1.txt    F06Q1 (20,622,024 rows)
+    perf_2006Q2.txt    F06Q2 (19,214,632 rows)
+    perf_2006Q3.txt    F06Q3 (17,073,842 rows)
+    perf_2006Q4.txt    F06Q4 (19,578,264 rows)
+    perf_2007Q1.txt    F07Q1 (19,432,995 rows)
+    perf_2007Q2.txt    F07Q2 (22,286,961 rows)
+    perf_2007Q3.txt    F07Q3 (15,827,144 rows)
+    perf_2007Q4.txt    F07Q4 (16,931,624 rows)
+
+=========================================================================================================================
+B.2  SORT-ORDER VERIFICATION (checked, not assumed)
+=========================================================================================================================
+    Each file is scanned in physical order and every row compared with the row before it, with the last (loan, period)
+    carried across chunk boundaries so a violation sitting on a boundary is caught like any other. A 'loan out of order'
+    is a row whose loan identifier is strictly less than the previous row's; a 'period out of order' is a row with the
+    same loan as the row before but a strictly earlier period. Nothing in this script depends on the answer - the arrays
+    are lexsorted by (loan, period) before use, as in 09 - so this is an audit of the files, not a precondition.
+
+    file                    loan out of order    period out of order
+-------------------------------------------------------------------------------------------------------------------------
+    perf_2006Q1.txt                         0                      0
+    perf_2006Q2.txt                         0                      0
+    perf_2006Q3.txt                         0                      0
+    perf_2006Q4.txt                         0                      0
+    perf_2007Q1.txt                         0                      0
+    perf_2007Q2.txt                         0                      0
+    perf_2007Q3.txt                         0                      0
+    perf_2007Q4.txt                         0                      0
+-------------------------------------------------------------------------------------------------------------------------
+    all files                               0                      0
+
+    No violations. Every file is sorted by loan identifier, then by period.
+
+=========================================================================================================================
+T1  OVERALL - on_step, off_below, off_above, cap_row
+=========================================================================================================================
+Unit: DQ90+ loan-months. 'primary' is 09's slice exactly. 'ex-terminal ZB' removes
+loan-months that are themselves the loan's last observed row carrying a terminating
+zero-balance code (01/02/03/09/15/16/96).
+
+slice                                    |       on_step         |      off_below        |      off_above        |       cap_row        
+                             loan-months |            n    share |            n    share |            n    share |            n    share
+-------------------------------------------------------------------------------------------------------------------------
+primary                        6,463,333 |    4,280,428   66.23% |    2,175,612   33.66% |        7,293    0.11% |       13,462    0.21%
+ex-terminal ZB                 6,345,752 |    4,183,370   65.92% |    2,155,195   33.96% |        7,187    0.11% |       13,261    0.21%
+-------------------------------------------------------------------------------------------------------------------------
+
+PRIMARY METRIC - share of DQ90+ loan-months with deviation != 0, own entry_status:
+    primary slice             2,182,905 /      6,463,333  =  33.774%
+    ex-terminal ZB slice      2,162,382 /      6,345,752  =  34.076%
+
+    Pre-registered: Yassine under 5%; Claude 20-50%, point ~30%.
+    Recorded for the register; no reading of the result is offered here.
+
+    cap_row is a subset of on_step: 13,462 of 4,280,428 on_step loan-months (0.315%) sit at the 99
+    cap, where the uncapped ladder had already passed 99.
+
+=========================================================================================================================
+T2  BY RUN-LENGTH BUCKET (09's buckets)
+=========================================================================================================================
+T2a  primary slice
+-------------------------------------------------------------------------------------------------------------------------
+run (months)                             |       on_step         |      off_below        |      off_above        |       cap_row        
+                             loan-months |            n    share |            n    share |            n    share |            n    share
+-------------------------------------------------------------------------------------------------------------------------
+1                                605,140 |      605,140  100.00% |            0    0.00% |            0    0.00% |            0    0.00%
+2                                490,139 |      400,013   81.61% |       89,328   18.23% |          798    0.16% |            8    0.00%
+3                                439,596 |      330,432   75.17% |      108,447   24.67% |          717    0.16% |            5    0.00%
+4-6                            1,082,297 |      747,920   69.10% |      332,726   30.74% |        1,651    0.15% |           14    0.00%
+7-12                           1,401,953 |      891,096   63.56% |      509,107   36.31% |        1,750    0.12% |           19    0.00%
+13-24                          1,314,850 |      744,328   56.61% |      569,125   43.28% |        1,397    0.11% |           37    0.00%
+25+                            1,129,358 |      561,499   49.72% |      566,879   50.19% |          980    0.09% |       13,379    1.18%
+-------------------------------------------------------------------------------------------------------------------------
+all                            6,463,333 |    4,280,428   66.23% |    2,175,612   33.66% |        7,293    0.11% |       13,462    0.21%
+
+T2b  ex-terminal ZB slice
+-------------------------------------------------------------------------------------------------------------------------
+run (months)                             |       on_step         |      off_below        |      off_above        |       cap_row        
+                             loan-months |            n    share |            n    share |            n    share |            n    share
+-------------------------------------------------------------------------------------------------------------------------
+1                                596,555 |      596,555  100.00% |            0    0.00% |            0    0.00% |            0    0.00%
+2                                485,118 |      395,026   81.43% |       89,294   18.41% |          798    0.16% |            8    0.00%
+3                                434,651 |      325,734   74.94% |      108,202   24.89% |          715    0.16% |            5    0.00%
+4-6                            1,065,186 |      731,741   68.70% |      331,813   31.15% |        1,632    0.15% |           14    0.00%
+7-12                           1,373,535 |      865,252   62.99% |      506,559   36.88% |        1,724    0.13% |           19    0.00%
+13-24                          1,284,528 |      721,405   56.16% |      561,768   43.73% |        1,355    0.11% |           36    0.00%
+25+                            1,106,179 |      547,657   49.51% |      557,559   50.40% |          963    0.09% |       13,179    1.19%
+-------------------------------------------------------------------------------------------------------------------------
+all                            6,345,752 |    4,183,370   65.92% |    2,155,195   33.96% |        7,187    0.11% |       13,261    0.21%
+
+=========================================================================================================================
+T3  DISTRIBUTION OF entry_status
+=========================================================================================================================
+entry_status is the numeric field-4 status in the first month of a run. Three counts,
+on three different units - read the column headings, they do not agree by design:
+    runs              every DQ90+ run, counted once. Partitions the run set.
+    loans, first run  each loan filed under the entry_status of its EARLIEST run.
+                      Partitions the loan set.
+    loans, any run    each loan counted under every entry_status it ever enters at.
+                      Does NOT partition - a loan with two runs at different entry
+                      statuses appears twice, so this column over-sums.
+
+entry_status   |           runs    share | loans, 1st run    share | loans, any run    share
+-------------------------------------------------------------------------------------------------------------------------
+3              |        586,926   96.99% |        370,001   99.05% |        371,346   99.41%
+4              |          6,350    1.05% |          2,534    0.68% |          6,082    1.63%
+5              |          2,171    0.36% |            308    0.08% |          2,143    0.57%
+6+             |          9,693    1.60% |            703    0.19% |          9,126    2.44%
+-------------------------------------------------------------------------------------------------------------------------
+all            |        605,140  100.00% |        373,546  100.00% |        388,697         
+
+    'loans, first run' sums to 373,546, the distinct DQ90+ loan count in B.1 (373,546).
+    'loans, any run' sums to 388,697; the excess over 373,546 is loans entering DQ90+ at more
+    than one distinct entry_status across separate runs.
+
+=========================================================================================================================
+T4  OBSERVED STATUS x RUN LENGTH - loan-month counts
+=========================================================================================================================
+Rows: run length in months. Columns: observed field-4 status. Cell = DQ90+ loan-months,
+with the share of that ROW (that run-length bucket) beneath it. If status and run
+length were locked together the mass would sit on the diagonal.
+
+run (months)     row total |     status 3     |    status 4-6    |   status 7-12    |   status 13-24   |   status 25-98   |    status 99    
+-------------------------------------------------------------------------------------------------------------------------
+1                  605,140 |   586,926  97.0% |    10,028   1.7% |     4,749   0.8% |     2,376   0.4% |     1,044   0.2% |        17   0.0%
+2                  490,139 |    87,077  17.8% |   398,057  81.2% |     2,739   0.6% |     1,457   0.3% |       798   0.2% |        11   0.0%
+3                  439,596 |    40,011   9.1% |   394,876  89.8% |     2,803   0.6% |     1,178   0.3% |       722   0.2% |         6   0.0%
+4-6              1,082,297 |    41,259   3.8% |   531,699  49.1% |   504,012  46.6% |     3,259   0.3% |     2,049   0.2% |        19   0.0%
+7-12             1,401,953 |    20,060   1.4% |   118,251   8.4% | 1,003,368  71.6% |   256,525  18.3% |     3,723   0.3% |        26   0.0%
+13-24            1,314,850 |    10,077   0.8% |    40,263   3.1% |   145,710  11.1% | 1,029,303  78.3% |    89,450   6.8% |        47   0.0%
+25+              1,129,358 |     9,600   0.9% |    33,182   2.9% |    49,562   4.4% |   110,193   9.8% |   913,111  80.9% |    13,710   1.2%
+-------------------------------------------------------------------------------------------------------------------------
+all              6,463,333 |   795,010  12.3% | 1,526,356  23.6% | 1,712,943  26.5% | 1,404,291  21.7% | 1,010,897  15.6% |    13,836   0.2%
+
+=========================================================================================================================
+T5  DEVIATION SIZE AMONG off_below
+=========================================================================================================================
+Unit: DQ90+ loan-months with deviation < 0, primary slice. Denominator is the
+off_below count, not the whole slice.
+
+deviation             loan-months      share     share of slice
+-------------------------------------------------------------------------------------------------------------------------
+-1                        581,481     26.73%             8.997%
+-2                        400,224     18.40%             6.192%
+-3 to -5                  565,606     26.00%             8.751%
+-6 or lower               628,301     28.88%             9.721%
+-------------------------------------------------------------------------------------------------------------------------
+all off_below           2,175,612    100.00%            33.661%
+
+    Reconciles with T1 off_below (2,175,612): yes
+
+=========================================================================================================================
+T6  STICKINESS - is an off-step month the run's first departure, or downstream of one?
+=========================================================================================================================
+    Within a run, departures are counted from the run's opening row forward. A loan-month is the FIRST departure when it
+    is the earliest off-step month of its own run; it is DOWNSTREAM when an earlier month of the same run was already
+    off-step. Once field 4 falls behind the ladder it cannot rejoin it, because the ladder keeps advancing by one a month
+    and field 4 can advance by at most one a month - so a high downstream share is arithmetic, and the first-departure
+    count is the number of distinct departure EVENTS.
+
+                                        loan-months        share       share of slice
+-------------------------------------------------------------------------------------------------------------------------
+first departure of its run                  224,651       10.29%               3.476%
+downstream of an earlier one              1,958,254       89.71%              30.298%
+-------------------------------------------------------------------------------------------------------------------------
+all off-step loan-months                  2,182,905      100.00%              33.774%
+
+    Reconciles with T1 off_below + off_above (2,182,905): yes
+    Distinct departure events per DQ90+ run: 224,651 first departures / 605,140 runs = 0.371
+
+=========================================================================================================================
+T7  FIRST DEPARTURES - when they happen, and what is flagged at the time
+=========================================================================================================================
+Unit: first-departure loan-months (T6 row 1), filed under the run-month at which the
+departure occurs. A departure is credited to a flag if the flag fires at the departure
+month itself OR at the immediately preceding observed month, one period earlier:
+    modification   flag value 'Y'  (ONSET - the field is persistent, A.3)
+    deferral       flag value 'C'  (ONSET - the field is persistent, A.3)
+    assistance     flag value F/R/T (VALUE - the field is current-month, A.3)
+The three are not exclusive, so mod + defer + assist may exceed 'any of the three'.
+'no prior month' counts departures whose preceding observed row is absent or is not
+exactly one period earlier; for those, only the departure month itself was testable.
+The run-month 1 row is empty by construction, not for want of data: at k = 1 the
+expected status IS the entry status, so deviation is 0 and no run can first depart there.
+
+run-month      first dep. |   modification   |     deferral     |    assistance    |   any of three   |  none of three   | no prior mo.
+-------------------------------------------------------------------------------------------------------------------------
+1                       0 |         0    n/a |         0    n/a |         0    n/a |         0    n/a |         0    n/a |            0  << THIN
+2                  90,126 |     1,249   1.4% |        27   0.0% |     7,281   8.1% |     8,475   9.4% |    81,651  90.6% |            0
+3                  36,759 |         2   0.0% |         5   0.0% |     6,695  18.2% |     6,699  18.2% |    30,060  81.8% |            0
+4-6                47,571 |         3   0.0% |         4   0.0% |    11,435  24.0% |    11,439  24.0% |    36,132  76.0% |            0
+7-12               30,885 |         6   0.0% |        17   0.1% |     5,195  16.8% |     5,208  16.9% |    25,677  83.1% |            0
+13-24              14,401 |         1   0.0% |        13   0.1% |     2,841  19.7% |     2,848  19.8% |    11,553  80.2% |            0
+25+                 4,909 |         3   0.1% |         4   0.1% |     1,459  29.7% |     1,465  29.8% |     3,444  70.2% |            0
+-------------------------------------------------------------------------------------------------------------------------
+all               224,651 |     1,264   0.6% |        70   0.0% |    34,906  15.5% |    36,134  16.1% |   188,517  83.9% |            0
+
+    'none of the three' overall: 188,517 of 224,651 first departures (83.92%).
+    Borrower Assistance Plan is null before January 2014 by the Guide's own note, so
+    its column is structurally empty for departures before that date (A.3).
+
+=========================================================================================================================
+T8  PRIMARY METRIC WITH THE SECONDARY REFERENCE - entry_status fixed at 3
+=========================================================================================================================
+Identical arithmetic to T1, except expected_status = min(3 + (k - 1), 99) for every
+run regardless of the status it actually entered at. For comparison only.
+
+slice                                    |       on_step         |      off_below        |      off_above        |       cap_row        
+                             loan-months |            n    share |            n    share |            n    share |            n    share
+-------------------------------------------------------------------------------------------------------------------------
+primary                        6,463,333 |    4,203,780   65.04% |    2,149,949   33.26% |      109,604    1.70% |       13,053    0.20%
+ex-terminal ZB                 6,345,752 |    4,108,190   64.74% |    2,129,857   33.56% |      107,705    1.70% |       12,857    0.20%
+-------------------------------------------------------------------------------------------------------------------------
+
+SECONDARY METRIC - share with deviation != 0, entry fixed at 3:
+    primary slice             2,259,553 /      6,463,333  =  34.960%
+    same slice, own entry_status (T1) :  33.774%
+
+=========================================================================================================================
+THIN CELLS (< 500 loan-months, or < 100 loans)
+=========================================================================================================================
+    table    cell                                                        n      threshold
+-------------------------------------------------------------------------------------------------------------------------
+    T4       run 1 x status 99                                          17 500 loan-months
+    T4       run 2 x status 99                                          11 500 loan-months
+    T4       run 3 x status 99                                           6 500 loan-months
+    T4       run 4-6 x status 99                                        19 500 loan-months
+    T4       run 7-12 x status 99                                       26 500 loan-months
+    T4       run 13-24 x status 99                                      47 500 loan-months
+    T7       run-month 1                                                 0 500 loan-months
+
+=========================================================================================================================
+ANOMALIES AND CONSTRUCTION COUNTS
+=========================================================================================================================
+(a) off_above - observed status ABOVE the ladder
+      7,293 loan-months, 0.11284% of the primary slice.
+      Field 4 counts months owed from DDLPI, so it can rise by at most one per calendar month, while the ladder rises
+      by exactly one. Inside an unbroken run the deviation is therefore non-increasing and starts at zero, which
+      makes off_above impossible unless a row's status jumps by more than one month in one month.
+      First 10 examples:
+        loan id          period   observed    entry      k   expected      dev
+        F06Q10001108     201301         12        3      9         11        1
+        F06Q10001515     201004         15        3      2          4       11
+        F06Q10001515     201005         16        3      3          5       11
+        F06Q10001515     201006         17        3      4          6       11
+        F06Q10001515     201007         18        3      5          7       11
+        F06Q10001515     201008         19        3      6          8       11
+        F06Q10004239     200905         11        3      6          8        3
+        F06Q10004239     200906         10        3      7          9        1
+        F06Q10011059     201008          8        3      3          5        3
+        F06Q10011059     201009          9        3      4          6        3
+
+(b) Runs broken by a reporting gap
+      1,354 DQ90+ loan-months open a new run because the immediately preceding month was
+      never reported although the previous observed row was itself DQ90+. Share of all
+      DQ90+ loan-months: 0.0209%. Each of these resets k to 1, which also resets
+      entry_status to that row's status - so a gap manufactures an on_step row.
+
+(c) Duplicate (loan, period) rows
+      0, among rows belonging to DQ90+ loans. A repeated period is not adjacent, so
+      it restarts a run exactly as 09 has it.
+
+(d) Terminal DQ90+ rows
+      117,581 DQ90+ loan-months are themselves the loan's last observed row with a
+      terminating zero-balance code. These are the rows removed in the ex-terminal
+      slice of T1, T2b and T8.
+
+(e) First departures with no testable prior month
+      0 of 224,651 first departures. Their preceding observed row is absent or is not
+      exactly one period earlier, so only the departure month itself was tested in T7.
+
+(f) Values outside the documented enumerations, among rows of DQ90+ loans
+      zero-balance code                    0
+      modification flag                    0
+      payment deferral flag                0
+      borrower assistance plan             0
+      Documented: ZB 01/02/03/09/15/16/96 or blank; mod Y/P or blank; deferral C/P or
+      blank; assistance F/R/T or blank.
+
+=========================================================================================================================
+done in 898.5s
+=========================================================================================================================
