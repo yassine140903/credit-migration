@@ -4,10 +4,6 @@ historical_data_*/
 historical_data_*.zip
 *.txt.gz
 
-# Diagnostic outputs are committed deliberately (see diagnostics/*.txt);
-# nothing else generated is.
-checkpoints/
-
 # Python
 __pycache__/
 *.py[cod]
