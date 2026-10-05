@@ -22,6 +22,16 @@ MODEL C  ORACLE MARGINAL - ORACLE (not achievable)
     to every loan in it. It does not chain and ignores the state at the cut.
     Unlike the marginal null (one fit-window distribution for all horizons and
     cohorts), it differs per horizon and per cohort.
+
+MODEL D  ORACLE BY START STATE - ORACLE BY START STATE (not achievable)
+    Model C conditioned on the state at the cut as well. For each (cohort,
+    start state, horizon) cell, the realised state distribution across that
+    cell, assigned identically to every loan in it - the same
+    oracle_distribution as model C, over the cell instead of the cohort. Each
+    cell's own empirical distribution is Brier-optimal on that cell, so no
+    model that is constant within a cell can score below it there. It is a
+    second yardstick beside model C, not a replacement: model C minus model D
+    is what the start state alone buys.
 """
 
 import numpy as np
@@ -79,18 +89,19 @@ ORACLE_LABEL = "ORACLE (not achievable)"
 CENSORED = hz.CENSORED
 
 
-def oracle_distribution(realised, member, n_states=hz.N_STATES):
+def oracle_distribution(realised, member, n_states=hz.N_STATES,
+                        label=ORACLE_LABEL):
     """(distribution, counts) of realised states across one cohort."""
     r = np.asarray(realised, dtype=np.int64)[np.asarray(member, dtype=bool)]
     if len(r) == 0:
-        raise hz.HorizonError("%s: empty cohort" % ORACLE_LABEL)
+        raise hz.HorizonError("%s: empty cohort" % label)
     if np.any(r == CENSORED):
-        raise hz.HorizonError("%s: censored loans in the cohort" % ORACLE_LABEL)
+        raise hz.HorizonError("%s: censored loans in the cohort" % label)
     counts = np.bincount(r, minlength=n_states)
     dist = counts / counts.sum()
     if abs(dist.sum() - 1.0) > TOL:
         raise hz.HorizonError("%s distribution sums to %.17g, not 1"
-                              % (ORACLE_LABEL, dist.sum()))
+                              % (label, dist.sum()))
     return dist, counts
 
 
@@ -102,4 +113,31 @@ def oracle_predictions(real, masks):
         dist, counts = oracle_distribution(real[h], mask)
         dists[h, c] = (dist, counts)
         out[h, c] = np.tile(dist, (len(mask), 1))
+    return out, dists
+
+
+# ==========================================================================
+# ORACLE BY START STATE (not achievable) - the oracle, per start state
+# ==========================================================================
+ORACLE_BY_START = "oracle_by_start"
+ORACLE_BY_START_LABEL = "ORACLE BY START STATE (not achievable)"
+
+
+def oracle_by_start_predictions(real, masks, start_states):
+    """{(h, cohort): (n_loans, 6)} - one realised distribution per (cohort,
+    start state, horizon) cell, given to every loan with that start state (the
+    scorer reads only the cohort's rows). dists is keyed (h, cohort, state)."""
+    start_states = np.asarray(start_states, dtype=np.int64)
+    out, dists = {}, {}
+    for (h, c), mask in masks.items():
+        pred = np.full((len(mask), hz.N_STATES), np.nan)
+        for s in np.unique(start_states):
+            at_s = start_states == s
+            dist, counts = oracle_distribution(real[h], mask & at_s,
+                                               label="%s, %s h=%d %s"
+                                               % (ORACLE_BY_START_LABEL, c, h,
+                                                  hz.STATES[s]))
+            dists[h, c, hz.STATES[s]] = (dist, counts)
+            pred[at_s] = dist
+        out[h, c] = pred
     return out, dists

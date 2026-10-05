@@ -13,6 +13,11 @@ METRICS
                   sum_k (p_k - 1[realised == k])^2; 0 is perfect, 2 the maximum
     calibration   per state k: loans binned on p_k; per bin the loan count,
                   mean p_k, and the count and share realised in state k
+
+STRATIFIED
+    stratify      the same score() on each stratum of a cohort (e.g. start
+                  state); pooled_brier is the mass-weighted mean of the strata's
+                  Brier scores, which must reproduce the cohort's own Brier
 """
 
 import numpy as np
@@ -86,6 +91,22 @@ def score(pred, realised, member, edges=CAL_EDGES):
             "realised": agg["realised"], "brier": brier(p, r),
             "calibration": [calibration(p, r, k, edges)
                             for k in range(p.shape[1])]}
+
+
+def stratify(pred, realised, member, strata, labels, edges=CAL_EDGES):
+    """{label: score()} over member & (strata == code), for each (code, label)
+    in labels - the cohort split into disjoint strata, each scored unchanged."""
+    strata = np.asarray(strata)
+    member = np.asarray(member, dtype=bool)
+    return {lab: score(pred, realised, member & (strata == code), edges)
+            for code, lab in labels}
+
+
+def pooled_brier(parts):
+    """Mass-weighted mean of per-stratum Brier scores: sum n_s B_s / sum n_s.
+    Over strata that partition a cohort it reproduces the cohort's Brier."""
+    n = sum(p["n"] for p in parts)
+    return sum(p["n"] * p["brier"] for p in parts if p["n"]) / n
 
 
 # ==========================================================================
