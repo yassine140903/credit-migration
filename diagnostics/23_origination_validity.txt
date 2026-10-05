@@ -1,0 +1,251 @@
+=========================================================================================================================
+ORIGINATION-RECORD VALIDITY AND TERRITORY COVERAGE   (diagnostic 23; read-only)
+=========================================================================================================================
+panel build  : 2026-10-05T10:54:52.953781  (69,927,577 rows, 8 partitions; validated against its manifest)
+origination  : 8 files, 2,431,736 loans
+panel loans  : 2,425,495 loans have at least one panel row; 6,241 origination loans have none
+unit         : loans (one origination record each); panel rows where stated
+sources      : docs/general_user_guide_july_2026.pdf, Origination Data File table
+
+=========================================================================================================================
+PART 1. TERRITORY COVERAGE   (GU, PR, VI; a state-level HPI covers states and DC only)
+=========================================================================================================================
+A loan sits in one partition and one state, so loans and rows are exact counts.
+By role: ROWS are rows with that role. LOANS are loans with at least one row in that
+role; a test-split loan has condition and evaluate rows, a train-split loan has fit
+rows only, so role loan counts do not sum to the loan total.
+-------------------------------------------------------------------------------------------------------------------------
+                 loans    of loans    panel rows       of rows    role fit   condition    evaluate
+-------------------------------------------------------------------------------------------------------------------------
+GU                 726     0.0299%        25,040       0.0358%      12,569       2,391      10,080   rows
+                                                                       604         122         106   loans in role
+PR               9,137     0.3767%       367,907       0.5261%     156,572      38,674     172,661   rows
+                                                                     7,310       1,813       1,678   loans in role
+VI                 210     0.0087%         7,142       0.0102%       3,319         851       2,972   rows
+                                                                       167          43          31   loans in role
+GU+PR+VI        10,073     0.4153%       400,089       0.5721%     172,460      41,916     185,713   rows
+                                                                     8,081       1,978       1,815   loans in role
+-------------------------------------------------------------------------------------------------------------------------
+by origination quarter (loans):
+-------------------------------------------------------------------------------------------------------------------------
+                2006Q1      2006Q2      2006Q3      2006Q4      2007Q1      2007Q2      2007Q3      2007Q4         total
+-------------------------------------------------------------------------------------------------------------------------
+GU                  68          65          79         105          87         118         107          97           726
+PR               1,012       1,014         944       1,084       1,327       1,555       1,169       1,032         9,137
+VI                  18           8          19          23          43          62          26          11           210
+GU+PR+VI         1,098       1,087       1,042       1,212       1,457       1,735       1,302       1,140        10,073
+ALL            297,746     307,492     283,121     302,110     301,754     353,254     284,168     295,850     2,425,495
+-------------------------------------------------------------------------------------------------------------------------
+by origination quarter (panel rows):
+-------------------------------------------------------------------------------------------------------------------------
+                2006Q1      2006Q2      2006Q3      2006Q4      2007Q1      2007Q2      2007Q3      2007Q4         total
+-------------------------------------------------------------------------------------------------------------------------
+GU               2,542       2,392       2,472       4,114       2,945       4,558       3,380       2,637        25,040
+PR              48,734      48,569      40,673      46,187      49,535      57,000      38,921      38,288       367,907
+VI                 763         405         737         862       1,601       2,067         579         128         7,142
+GU+PR+VI        52,039      51,366      43,882      51,163      54,081      63,625      42,880      41,053       400,089
+ALL         11,060,262  10,313,292   8,815,850   9,294,015   8,590,686   9,289,459   6,393,320   6,170,693    69,927,577
+-------------------------------------------------------------------------------------------------------------------------
+
+In the horizon harness (eligible test-split loans at the 2008-12 cut, n = 407,555):
+-------------------------------------------------------------------------------------------------------------------------
+                  eligible       share    fixed cohort       share
+GU                     106     0.0260%             106     0.0262%
+PR                   1,672     0.4103%           1,641     0.4057%
+VI                      32     0.0079%              32     0.0079%
+GU+PR+VI             1,810     0.4441%           1,779     0.4398%
+-------------------------------------------------------------------------------------------------------------------------
+
+=========================================================================================================================
+PART 2. ORIGINATION-RECORD VALIDITY   (unit: loans; 2,431,736 origination records)
+=========================================================================================================================
+Each value is in exactly one bucket. Plausible ranges marked (script) are this
+script's own definition - the guide documents no range for them.
+-------------------------------------------------------------------------------------------------------------------------
+field           plausible range         sentinel (guide)           VALID      SENTINEL     MALFORMED MALF. share
+-------------------------------------------------------------------------------------------------------------------------
+fico            300-850                 9999                   2,429,726         2,010             0     0.0000%
+first_payment   YYYYMM, 1999-2021       none documented        2,431,736             0             0     0.0000%
+dti             0-65                    999                    2,377,077        54,659             0     0.0000%
+ltv             6-105                   999                    2,431,514           222             0     0.0000%
+orig_rate       0 < r <= 25 (script)    none documented        2,431,734             0             2     0.0001%
+loan            [FA]YYQnNNNNNNN         none documented        2,431,736             0             0     0.0000%
+property_state  56 USPS codes           none documented        2,431,735             0             1     0.0000%
+msa             5 digits                blank (null)           1,951,258       480,478             0     0.0000%
+postal_code     3 digits                000                    2,431,728             8             0     0.0000%
+units           1-4                     99                     2,431,726            10             0     0.0000%
+-------------------------------------------------------------------------------------------------------------------------
+Sentinels not documented in the guide: first_payment, orig_rate, loan, property_state.
+(Number of Units: the guide documents 99 = Not Available.)
+
+Raw values outside VALID, per field (most frequent first, up to 8):
+-------------------------------------------------------------------------------------------------------------------------
+fico            SENTINEL   '9999' x 2,010
+dti             SENTINEL   '999' x 54,659
+ltv             SENTINEL   '999' x 222
+orig_rate       MALFORMED  '.' x 1   '0' x 1
+property_state  MALFORMED  '<blank>' x 1
+msa             SENTINEL   '<blank>' x 480,478
+postal_code     SENTINEL   '000' x 8
+units           SENTINEL   '99' x 10
+-------------------------------------------------------------------------------------------------------------------------
+
+a) LOANS WITH AT LEAST ONE MALFORMED FIELD
+-------------------------------------------------------------------------------------------------------------------------
+2 of 2,431,736 origination loans (0.0001%).
+For reference, loans with at least one SENTINEL value: 526,605 (21.6555%).
+quarter            loans   malformed
+2006Q1           298,574           0
+2006Q2           308,208           0
+2006Q3           283,975           1
+2006Q4           302,787           0
+2007Q1           302,331           0
+2007Q2           354,055           0
+2007Q3           284,980           0
+2007Q4           296,826           1
+-------------------------------------------------------------------------------------------------------------------------
+
+b) OVERLAP - number of MALFORMED fields per loan, and pairs of fields
+-------------------------------------------------------------------------------------------------------------------------
+0 malformed field(s): 2,431,734 loans
+1 malformed field(s): 1 loans
+2 malformed field(s): 1 loans
+malformed in MORE THAN ONE field: 1 loans
+
+loans malformed in both fields (diagonal = the field alone):
+                     fico first_pa      dti      ltv orig_rat     loan property      msa postal_c    units
+fico                    .        .        .        .        .        .        .        .        .        .
+first_payment           .        .        .        .        .        .        .        .        .        .
+dti                     .        .        .        .        .        .        .        .        .        .
+ltv                     .        .        .        .        .        .        .        .        .        .
+orig_rate               .        .        .        .        2        .        1        .        .        .
+loan                    .        .        .        .        .        .        .        .        .        .
+property_state          .        .        .        .        1        .        1        .        .        .
+msa                     .        .        .        .        .        .        .        .        .        .
+postal_code             .        .        .        .        .        .        .        .        .        .
+units                   .        .        .        .        .        .        .        .        .        .
+-------------------------------------------------------------------------------------------------------------------------
+
+c) EXAMPLES - up to 20 MALFORMED loans (most malformed fields first, then loan id);
+raw values of the malformed fields only
+-------------------------------------------------------------------------------------------------------------------------
+F06Q30148547  orig_rate='.'   property_state=''
+F07Q40059296  orig_rate='0'
+-------------------------------------------------------------------------------------------------------------------------
+
+d) F06Q30148547 (the loan found with a blank property state)
+-------------------------------------------------------------------------------------------------------------------------
+present. Every field, raw value and bucket:
+    fico            '774'      VALID
+    first_payment   '200609'   VALID
+    dti             '45'       VALID
+    ltv             '100'      VALID
+    orig_rate       '.'        MALFORMED
+    loan            'F06Q30148547' VALID
+    property_state  ''         MALFORMED
+    msa             ''         SENTINEL
+    postal_code     '441'      VALID
+    units           '99'       SENTINEL
+MALFORMED in: orig_rate, property_state   |   SENTINEL in: msa, units
+1 of the 2 loans with any MALFORMED field has 2 or more; the other has 1.
+-------------------------------------------------------------------------------------------------------------------------
+
+=========================================================================================================================
+PART 3. HOW THE PANEL HOLDS THESE VALUES   (unit: loans with a panel row; panel rows)
+=========================================================================================================================
+held = what data/panel stores, read from the parquet. Classes, in this order:
+    null        the stored value is null
+    sentinel    the stored number equals the raw sentinel (9999 / 999)
+    raw value   the stored number equals the raw value, parsed (float32): a value that
+                is NOT valid and was passed through unchanged
+    other       anything else (a zero, a parse artefact, a derived number)
+The VALID rows are the control: every one should be 'raw value'.
+Each loan's features are constants of the loan; 0 rows differed from their loan's first
+row across fico, ltv, dti, rate_spread, property_state.
+-------------------------------------------------------------------------------------------------------------------------
+panel column <- source field    bucket            loans    panel rows        null    sentinel   raw value       other
+-------------------------------------------------------------------------------------------------------------------------
+fico <- fico                    VALID         2,423,488    69,870,671           0           0   2,423,488           0
+fico <- fico                    SENTINEL          2,007        56,906       2,007           0           0           0
+fico <- fico                    MALFORMED             0   (no loan in this bucket)
+-------------------------------------------------------------------------------------------------------------------------
+ltv <- ltv                      VALID         2,425,276    69,920,802           0           0   2,425,276           0
+ltv <- ltv                      SENTINEL            219         6,775         219           0           0           0
+ltv <- ltv                      MALFORMED             0   (no loan in this bucket)
+-------------------------------------------------------------------------------------------------------------------------
+dti <- dti                      VALID         2,371,238    68,391,952           0           0   2,371,238           0
+dti <- dti                      SENTINEL         54,257     1,535,625      54,257           0           0           0
+dti <- dti                      MALFORMED             0   (no loan in this bucket)
+-------------------------------------------------------------------------------------------------------------------------
+rate_spread <- orig_rate        VALID         2,425,494    69,927,576           0           0   2,425,494           0
+rate_spread <- orig_rate        SENTINEL              0   (no loan in this bucket)
+rate_spread <- orig_rate        MALFORMED             1             1           1           0           0           0
+-------------------------------------------------------------------------------------------------------------------------
+rate_spread <- first_payment    VALID         2,425,495    69,927,577           1           0   2,425,494           0
+rate_spread <- first_payment    SENTINEL              0   (no loan in this bucket)
+rate_spread <- first_payment    MALFORMED             0   (no loan in this bucket)
+-------------------------------------------------------------------------------------------------------------------------
+property_state <- state         VALID         2,425,494    69,927,576           0           0   2,425,494           0
+property_state <- state         SENTINEL              0   (no loan in this bucket)
+property_state <- state         MALFORMED             1             1           1           0           0           0
+-------------------------------------------------------------------------------------------------------------------------
+msa <- msa  (metadata)          VALID         1,946,190    56,688,727           0           0   1,946,190           0
+msa <- msa  (metadata)          SENTINEL        479,305    13,238,850     479,305           0           0           0
+msa <- msa  (metadata)          MALFORMED             0   (no loan in this bucket)
+-------------------------------------------------------------------------------------------------------------------------
+postal_code <- postal (meta)    VALID         2,425,487    69,927,397           0           0   2,425,487           0
+postal_code <- postal (meta)    SENTINEL              8           180           0           0           8           0
+postal_code <- postal (meta)    MALFORMED             0   (no loan in this bucket)
+-------------------------------------------------------------------------------------------------------------------------
+
+Values behind the non-null cells in the SENTINEL / MALFORMED buckets (raw -> held),
+most frequent first, up to 6:
+-------------------------------------------------------------------------------------------------------------------------
+none - no loan outside VALID holds a number in fico, ltv, dti or rate_spread
+-------------------------------------------------------------------------------------------------------------------------
+
+Lines of src/panel.py that produce this behaviour (read from the file as it is now):
+-------------------------------------------------------------------------------------------------------------------------
+src/panel.py:267    FICO_RANGE: what counts as a valid FICO                                        FICO_RANGE = (300, 850)
+src/panel.py:268    the LTV / DTI 'not available' constants                                        DTI_NA = 999
+src/panel.py:543    num(): every numeric field is parsed with errors="coerce"                      def num(label):
+src/panel.py:545      ... so a non-numeric string becomes NaN, silently                            errors="coerce").to_numpy()
+src/panel.py:548    fico: outside 300-850 -> NaN (this also removes the 9999 sentinel)             fico[(fico < FICO_RANGE[0]) | (fico > FICO_RANGE[1])] = np.n
+src/panel.py:550    ltv: only values >= 999 -> NaN; nothing below 999 is range-checked             ltv[ltv >= LTV_NA] = np.nan
+src/panel.py:552    dti: only values >= 999 -> NaN; nothing below 999 is range-checked             dti[dti >= DTI_NA] = np.nan
+src/panel.py:553    rate: parsed with no range check and no sentinel handling                      rate = num("orig_rate").astype(np.float32)
+src/panel.py:559    market: PMMS rate for the first-payment month minus one (NaN if no month)      market = lookup(pmms, orig_month)
+src/panel.py:560    rate_spread = rate - market: inherits any bad rate; NaN if either is NaN       spread = (rate - market).astype(np.float32)
+src/panel.py:517    property_state / msa / postal_code are read as text ...                        def _text(frame, col):
+src/panel.py:520      ... a blank becomes None (null); anything else passes through as-is          s[s == ""] = None
+src/panel.py:566    property_state: coded against the category list                                state_code = pd.Categorical(state, categories=categories).co
+src/panel.py:509      ... the list is every non-blank value in the files, so an invalid code would be ADDED, not rejected seen.discard("")
+-------------------------------------------------------------------------------------------------------------------------
+
+FLAGS - a non-valid value reaching a feature column as a number
+-------------------------------------------------------------------------------------------------------------------------
+none
+
+LATENT - the build has no range check where a documented range exists:
+    ltv   only >= 999 is nulled; a value of 1-5 or 106-998 would be stored as a number.
+          MALFORMED ltv in these files: 0 loans, so nothing is stored wrongly today.
+    dti   only >= 999 is nulled; a value of 66-998 would be stored as a number.
+          MALFORMED dti in these files: 0 loans.
+    rate  no range check and no sentinel handling: a rate of 0 or 99 would flow into
+          rate_spread as a number. MALFORMED orig_rate: 2 loans, '.' (-> NaN, null) and
+          '0'; the '0' loan is not in the panel, so no 0% rate reaches rate_spread.
+    All three are properties of THESE files, not of the code. A different vintage
+    (or the 2018Q2+ LTV range 1-998) would change what the same lines do.
+
+A documented sentinel code reaches fico / ltv / dti / rate_spread as a number: NO
+A documented sentinel code reaches a metadata string column as raw text: YES: postal_code (8 loans)
+-------------------------------------------------------------------------------------------------------------------------
+
+=========================================================================================================================
+CHECKS
+=========================================================================================================================
+data fingerprint: 3b1209189824e42f   required 3b1209189824e42f   saved nulls run 3b1209189824e42f   PASS
+data/macro/MORTGAGE30US.csv unchanged (size, mtime): PASS
+every origination loan classified once per field: PASS (asserted per field)
+runtime: 65.5 s  (1.09 min)
+=========================================================================================================================
