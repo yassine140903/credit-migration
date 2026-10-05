@@ -45,7 +45,9 @@ class ModificationTest(unittest.TestCase):
              "rate_spread": np.zeros(1, np.float32),
              "property_state": np.zeros(1, np.int8),
              "msa": np.array([None], dtype=object),
-             "postal_code": np.array([None], dtype=object)},
+             "postal_code": np.array([None], dtype=object),
+             "status": {f: np.zeros(1, np.int8)
+                        for f in panel.CHECKED + ("postal_code",)}},
             tail)[0]["orig_month"]
         true_age = period - orig
         self.assertEqual(list(true_age), [40, 41, 42, 43])
@@ -86,6 +88,119 @@ class ModificationTest(unittest.TestCase):
         _, months, unflagged = panel.modification_columns(tail, period, age, mod)
         self.assertEqual(list(months), [-1, 0, 1, 2])
         self.assertFalse(unflagged.any())
+
+
+class OriginationChecksTest(unittest.TestCase):
+    """The hard checks on origination values: documented sentinel -> null, valid
+    range -> kept, anything else -> OriginationError. One failing case per check."""
+
+    PREFIX = "F06Q1"
+    GOOD = {"fico": "700", "first_payment": "200603", "dti": "35", "ltv": "80",
+            "orig_rate": "6.5", "property_state": "CA", "msa": "12980",
+            "postal_code": "941"}
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir)
+        self.oidx = panel.resolve()[1]
+
+    def load(self, *loans):
+        """loans: {tail: {field: raw}} overrides of GOOD -> (orig, tails, status)."""
+        lines = []
+        for tail, over in loans:
+            row = dict(self.GOOD, **over)
+            fields = [""] * 31
+            for label, (i, _, _) in self.oidx.items():
+                fields[i] = row.get(label, "")
+            fields[self.oidx["loan"][0]] = "%s%07d" % (self.PREFIX, tail)
+            lines.append("|".join(fields))
+        path = os.path.join(self.dir, "orig.txt")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(os.linesep.join(lines) + os.linesep)
+        orig = panel.load_origination(path, self.oidx, {})
+        tails = np.array([t for t, _ in loans], dtype=np.int64)
+        feats, _ = panel.join_origination(orig, tails)
+        return orig, tails, feats
+
+    def check(self, *loans, reaching=None):
+        orig, tails, feats = self.load(*loans)
+        use = tails if reaching is None else np.array(reaching, dtype=np.int64)
+        f = panel.join_origination(orig, use)[0]
+        panel.check_origination("2006Q1", self.PREFIX, orig, use, f["status"])
+        return feats
+
+    def assertFails(self, field, raw, *fragments):
+        with self.assertRaises(panel.OriginationError) as ctx:
+            self.check((1, {}), (2, {field: raw}))
+        msg = str(ctx.exception)
+        for frag in (field + ":", "1 loans", "F06Q10000002=%r" % raw) + fragments:
+            self.assertIn(frag, msg)
+
+    def test_valid_values_pass_and_are_kept(self):
+        feats = self.check((1, {}), (2, {"ltv": "6", "dti": "0"}),
+                           (3, {"ltv": "105", "dti": "65", "orig_rate": "25"}),
+                           (4, {"orig_rate": "0.01", "property_state": "GU"}))
+        self.assertEqual(list(feats["ltv"]), [80, 6, 105, 80])
+        self.assertEqual(list(feats["dti"]), [35, 0, 65, 35])
+
+    def test_ltv_sentinel_999_is_null(self):
+        feats = self.check((1, {"ltv": "999"}))
+        self.assertTrue(np.isnan(feats["ltv"][0]))
+
+    def test_dti_sentinel_999_is_null(self):
+        feats = self.check((1, {"dti": "999"}))
+        self.assertTrue(np.isnan(feats["dti"][0]))
+
+    def test_ltv_outside_the_documented_range_fails(self):
+        for raw in ("106", "5", "998", "0", "n/a", ""):
+            with self.subTest(raw=raw):
+                self.assertFails("ltv", raw)
+
+    def test_dti_outside_the_documented_range_fails(self):
+        for raw in ("66", "998", "-1", "n/a", ""):
+            with self.subTest(raw=raw):
+                self.assertFails("dti", raw)
+
+    def test_interest_rate_outside_zero_to_25_fails(self):
+        for raw in ("0", "25.01", "99", ".", "", "-3"):
+            with self.subTest(raw=raw):
+                self.assertFails("orig_rate", raw)
+
+    def test_property_state_outside_the_whitelist_fails(self):
+        for raw in ("XX", "ca", "AS", "99", ""):
+            with self.subTest(raw=raw):
+                self.assertFails("property_state", raw)
+
+    def test_property_state_whitelist_is_50_states_dc_and_three_territories(self):
+        self.assertEqual(len(panel.PROPERTY_STATES), 54)
+        for code in ("DC", "GU", "PR", "VI", "CA", "WY"):
+            self.assertIn(code, panel.PROPERTY_STATES)
+        self.assertEqual(panel.PROPERTY_STATES, sorted(panel.PROPERTY_STATES))
+
+    def test_postal_code_000_is_null_and_others_keep_their_zeros(self):
+        feats = self.check((1, {"postal_code": "000"}), (2, {"postal_code": "010"}))
+        self.assertIsNone(feats["postal_code"][0])
+        self.assertEqual(feats["postal_code"][1], "010")
+        self.assertEqual(list(feats["status"]["postal_code"]),
+                         [panel.SENTINEL, panel.VALID])
+
+    def test_a_malformed_loan_that_never_reaches_the_panel_does_not_fail(self):
+        # the F07Q40059296 case: rate 0 in the file, no panel row
+        self.check((1, {}), (9, {"orig_rate": "0"}), reaching=[1])
+        with self.assertRaises(panel.OriginationError):
+            self.check((1, {}), (9, {"orig_rate": "0"}), reaching=[1, 9])
+
+    def test_failure_reports_counts_and_example_loan_ids(self):
+        with self.assertRaises(panel.OriginationError) as ctx:
+            self.check(*[(t, {"ltv": "500"}) for t in range(1, 9)])
+        msg = str(ctx.exception)
+        self.assertIn("8 loans (8 panel rows)", msg)
+        self.assertEqual(msg.count("F06Q1000000"), panel.EXAMPLES)
+
+    def test_explicit_exclusion_list_names_its_loan_and_reason(self):
+        self.assertEqual(list(panel.excluded_tails("F06Q3")), [148547])
+        self.assertEqual(len(panel.excluded_tails("F06Q1")), 0)
+        self.assertTrue(panel.EXCLUDED_LOANS["F06Q30148547"])
 
 
 def make_frame(quarter, n):

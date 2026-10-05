@@ -45,12 +45,13 @@ features                     everything the model is allowed to read
     property_state  category Freddie "Property State", the two-letter code, from
                              the origination file. A parquet dictionary of
                              strings (dictionary<values=string, indices=int8>),
-                             NOT a numeric code: the category list is the union
-                             over every origination file, sorted, so every
-                             partition carries the same dictionary. Null where
-                             the field is blank - never imputed. Added so a
-                             state-level house-price index can be joined later;
-                             no such join exists yet and hpi_feature is untouched.
+                             NOT a numeric code: the category list is the
+                             explicit whitelist PROPERTY_STATES (50 states, DC,
+                             GU, PR, VI), so every partition carries the same
+                             dictionary. A code outside it, or a blank, FAILS the
+                             build; no value is imputed. Added so a state-level
+                             house-price index can be joined later; no such join
+                             exists yet and hpi_feature is untouched.
 
 metadata                     bookkeeping - NEVER a model input
     role            category fit / condition / evaluate (R6)
@@ -59,9 +60,11 @@ metadata                     bookkeeping - NEVER a model input
     is_fall         bool     raw status fell by >= 2 rungs across the pair
     msa             string   Freddie "Metropolitan Statistical Area (MSA) Or
                              Metropolitan Division" code, as text; null where
-                             blank. Parked for finer geography; never imputed.
+                             blank (Freddie's documented "not an MSA, or
+                             unknown"). Parked for finer geography; never imputed.
     postal_code     string   Freddie "Postal Code", the 3-digit prefix, as text
-                             so leading zeros survive; null where blank. Parked
+                             so leading zeros survive; null where blank or where
+                             Freddie's documented "000 = Unknown" appears. Parked
                              like msa.
 
     METADATA IS NEVER A FEATURE. is_skip and is_fall are derived from the raw
@@ -73,6 +76,23 @@ metadata                     bookkeeping - NEVER a model input
     post_gap and role; msa and postal_code are parked here, not offered as
     inputs. Any model code must select the `features` group by name
     and must never select by "all columns except the states".
+
+========================= ORIGINATION VALIDATION =======================
+A loan that reaches the panel has its ltv, dti, interest rate and property state
+checked, and each value is exactly one of
+    VALID      inside the documented range - kept
+    SENTINEL   Freddie's documented "not available" code (ltv and dti: 999) - null
+    MALFORMED  anything else - the build FAILS, naming the count of loans and
+               panel rows and example loan ids with their raw values
+Ranges are the SFLLD User Guide's for the vintages in use (2006-2007 originations,
+the "2018Q1 and prior" rows): LTV 6-105 (p.6), DTI 0-65 (p.5). The guide gives no
+range for the interest rate; 0 < rate <= 25 is this build's own definition. A
+blank property state fails too - the guide documents no code for it. Postal code
+"000" (documented "Unknown") is nulled and not otherwise checked, and fico keeps
+its existing rule (outside 300-850 -> null). The checks apply to loans that reach
+the panel only: a loan whose pairs are all dropped is never checked.
+EXCLUDED_LOANS names loans removed before the checks, each with a reason; the
+rows removed are a named line in the build report's arithmetic identity.
 
 ================================ RULES =================================
 R1  TERMINAL ROW. The row carrying a zero-balance code IS the exit month. The
@@ -267,6 +287,38 @@ ORIG_SHEET = "origination data file"
 FICO_RANGE = (300, 850)
 DTI_NA = 999
 LTV_NA = 999
+
+# ---- origination validation: hard checks ----------------------------------
+# SFLLD User Guide (docs/general_user_guide_july_2026.pdf), Origination Data File,
+# for the vintages in use (2006-2007 originations: the "2018Q1 and prior" rows):
+#   Original LTV   p.6   6% - 105%    999 = Not Available
+#   Original DTI   p.5   0% - 65%     999 = Not Available
+#   Postal Code    p.7   000 = Unknown
+# The guide documents no interest-rate range; 0 < rate <= 25 is this build's own.
+VALID, SENTINEL, MALFORMED = 0, 1, 2
+LTV_VALID = (6, 105)
+DTI_VALID = (0, 65)
+RATE_MAX = 25.0
+POSTAL_UNKNOWN = "000"
+PROPERTY_STATES = sorted(
+    "AK AL AR AZ CA CO CT DE FL GA HI IA ID IL IN KS KY LA MA MD ME MI MN MO MS "
+    "MT NC ND NE NH NJ NM NV NY OH OK OR PA RI SC SD TN TX UT VA VT WA WI WV WY "
+    "DC GU PR VI".split())
+CHECKED = ("ltv", "dti", "orig_rate", "property_state")
+EXAMPLES = 5
+if len(PROPERTY_STATES) != 54 or len(set(PROPERTY_STATES)) != 54 \
+        or len(PROPERTY_STATES) > MAX_CATEGORIES:
+    raise ImportError("PROPERTY_STATES must be 54 distinct codes")
+
+# Loans removed by name, before the checks, each with its reason. The rows this
+# removes are counted as their own line in the arithmetic identity.
+EXCLUDED_LOANS = {
+    "F06Q30148547": "origination record malformed: interest rate '.' (does not "
+                    "parse) and a blank property state. Its one panel row is a "
+                    "train-split fit row (Current -> Current); the loan is not in "
+                    "the test split, so it is outside the horizon universe and the "
+                    "data fingerprint.",
+}
 
 _LINES = []
 
@@ -494,26 +546,6 @@ def split_flags(loan_ids):
 # ==========================================================================
 # origination features
 # ==========================================================================
-def state_categories(orig_paths, oidx):
-    """Sorted union of the Property State values in every origination file.
-
-    Read once, before the first write, so every partition shares one dictionary.
-    Blank is a missing value, not a category.
-    """
-    seen = set()
-    for path in orig_paths:
-        col = pd.read_csv(path, sep="|", header=None, dtype=str,
-                          usecols=[oidx["property_state"][0]], engine="c",
-                          na_filter=False).iloc[:, 0].str.strip()
-        seen.update(col.unique())
-    seen.discard("")
-    cats = sorted(seen)
-    if len(cats) > MAX_CATEGORIES:
-        raise SystemExit("%d distinct Property State values do not fit int8 "
-                         "dictionary indices" % len(cats))
-    return cats
-
-
 def _text(frame, col):
     """Stripped text column as an object array, None where blank."""
     s = frame[col].str.strip().to_numpy(dtype=object)
@@ -521,7 +553,17 @@ def _text(frame, col):
     return s
 
 
-def load_origination(path, oidx, pmms, categories=None):
+def _status_range(x, lo, hi, sentinel):
+    """VALID inside [lo, hi], SENTINEL at `sentinel`, MALFORMED otherwise -
+    which includes anything that did not parse."""
+    st = np.full(len(x), MALFORMED, dtype=np.int8)
+    ok = np.isfinite(x)
+    st[ok & (x >= lo) & (x <= hi)] = VALID
+    st[ok & (x == sentinel)] = SENTINEL
+    return st
+
+
+def load_origination(path, oidx, pmms):
     """Sorted (loan tail, fico, ltv, dti, rate_spread, geography) for a quarter.
 
     The loan sequence number is a per-file constant 5-character prefix plus a
@@ -530,9 +572,12 @@ def load_origination(path, oidx, pmms, categories=None):
     the origination month, which is taken as the first payment month minus one -
     the origination date itself is not carried in the file.
 
-    property_state is returned as int8 codes into `categories` (-1 where blank),
-    which defaults to this file's own sorted values; a non-blank value outside
-    `categories` is an error. msa and postal_code are text, None where blank.
+    ltv and dti are null at their documented sentinel; property_state is an int8
+    code into PROPERTY_STATES (-1 where blank or outside it); msa and postal_code
+    are text, None where blank (postal code also at "000"). Alongside, "status"
+    holds VALID / SENTINEL / MALFORMED per loan for every checked field, and "raw"
+    the stripped text of each, for error messages. Nothing is rejected here: the
+    checks run in check_origination, on the loans that reach the panel.
     """
     cols = sorted(oidx[k][0] for k in oidx)
     frame = pd.read_csv(path, sep="|", header=None, dtype=str, usecols=cols,
@@ -540,17 +585,22 @@ def load_origination(path, oidx, pmms, categories=None):
     loan = frame[oidx["loan"][0]].str.strip()
     tail = pd.to_numeric(loan.str[5:], errors="coerce").fillna(-1).astype(np.int64)
 
+    def text(label):
+        return frame[oidx[label][0]].str.strip()
+
     def num(label):
-        return pd.to_numeric(frame[oidx[label][0]].str.strip(),
-                             errors="coerce").to_numpy()
+        return pd.to_numeric(text(label), errors="coerce").to_numpy()
 
     fico = num("fico").astype(np.float32)
     fico[(fico < FICO_RANGE[0]) | (fico > FICO_RANGE[1])] = np.nan
-    ltv = num("ltv").astype(np.float32)
-    ltv[ltv >= LTV_NA] = np.nan
-    dti = num("dti").astype(np.float32)
-    dti[dti >= DTI_NA] = np.nan
-    rate = num("orig_rate").astype(np.float32)
+    ltv_x, dti_x, rate_x = num("ltv"), num("dti"), num("orig_rate")
+    status = {"ltv": _status_range(ltv_x, *LTV_VALID, LTV_NA),
+              "dti": _status_range(dti_x, *DTI_VALID, DTI_NA)}
+    ltv = np.where(status["ltv"] == VALID, ltv_x, np.nan).astype(np.float32)
+    dti = np.where(status["dti"] == VALID, dti_x, np.nan).astype(np.float32)
+    status["orig_rate"] = np.full(len(rate_x), MALFORMED, dtype=np.int8)
+    status["orig_rate"][np.isfinite(rate_x) & (rate_x > 0) & (rate_x <= RATE_MAX)] = VALID
+    rate = rate_x.astype(np.float32)
 
     fpd = num("first_payment")
     year, month = fpd // 100, fpd % 100
@@ -560,24 +610,24 @@ def load_origination(path, oidx, pmms, categories=None):
     spread = (rate - market).astype(np.float32)
 
     state = _text(frame, oidx["property_state"][0])
-    present = np.array([v is not None for v in state], dtype=bool)
-    if categories is None:
-        categories = sorted(set(state[present]))
-    state_code = pd.Categorical(state, categories=categories).codes
-    unknown = present & (state_code < 0)
-    if unknown.any():
-        raise RuntimeError("%s: Property State value(s) outside the category "
-                           "list: %s" % (path, sorted(set(state[unknown]))))
+    state_code = pd.Categorical(state, categories=PROPERTY_STATES).codes.astype(np.int8)
+    status["property_state"] = np.where(state_code >= 0, VALID, MALFORMED).astype(np.int8)
     msa = _text(frame, oidx["msa"][0])
     postal = _text(frame, oidx["postal_code"][0])
+    status["postal_code"] = np.where(postal == POSTAL_UNKNOWN, SENTINEL,
+                                     VALID).astype(np.int8)
+    postal[postal == POSTAL_UNKNOWN] = None
 
     order = np.argsort(tail.to_numpy(), kind="stable")
+    raw = {f: text(f).to_numpy(dtype=object)[order]
+           for f in ("ltv", "dti", "orig_rate", "property_state")}
     return {"tail": tail.to_numpy()[order], "fico": fico[order],
             "ltv": ltv[order], "dti": dti[order], "rate_spread": spread[order],
             "orig_month": orig_month[order],
-            "property_state": state_code[order].astype(np.int8),
-            "state_categories": list(categories),
+            "property_state": state_code[order],
+            "state_categories": list(PROPERTY_STATES),
             "msa": msa[order], "postal_code": postal[order],
+            "status": {k: v[order] for k, v in status.items()}, "raw": raw,
             "n": len(order), "n_spread": int(np.isfinite(spread).sum())}
 
 
@@ -599,7 +649,58 @@ def join_origination(orig, tails):
         vals = np.full(len(tails), None, dtype=object)
         vals[hit] = orig[col][safe][hit]
         out[col] = vals
+    out["status"] = {}
+    for col in CHECKED + ("postal_code",):
+        st = np.full(len(tails), VALID, dtype=np.int8)         # no record: nothing to check
+        st[hit] = orig["status"][col][safe][hit]
+        out["status"][col] = st
     return out, int(hit.sum())
+
+
+class OriginationError(RuntimeError):
+    """An origination value is neither valid nor a documented sentinel."""
+
+
+def excluded_tails(prefix):
+    """Tails of the EXCLUDED_LOANS that belong to the file with this prefix."""
+    return np.array(sorted(int(i[5:]) for i in EXCLUDED_LOANS if i[:5] == prefix),
+                    dtype=np.int64)
+
+
+def check_origination(quarter, prefix, orig, tails, status):
+    """The hard checks, on the loans that reach the panel.
+
+    `tails` and `status` are per emitted row (join_origination's output). Raises
+    OriginationError naming, per failing field, the loans and panel rows affected
+    and up to EXAMPLES loan ids with their raw values.
+    """
+    problems = []
+    for field in CHECKED:
+        bad = status[field] == MALFORMED
+        if not bad.any():
+            continue
+        loans = np.unique(tails[bad])[:EXAMPLES]
+        pos = np.searchsorted(orig["tail"], loans)
+        eg = ", ".join("%s%07d=%r" % (prefix, t, orig["raw"][field][p])
+                       for t, p in zip(loans, pos))
+        problems.append("%s: %s loans (%s panel rows) are neither valid nor the "
+                        "documented sentinel; e.g. %s"
+                        % (field, fmt(len(np.unique(tails[bad]))), fmt(int(bad.sum())),
+                           eg))
+    if problems:
+        raise OriginationError("%s: origination validation failed:\n    %s"
+                               % (quarter, "\n    ".join(problems)))
+
+
+def tally_validation(rep, tails, status):
+    """Add this quarter's [valid rows, null rows, valid loans, null loans] per
+    check. Called only after check_origination passed, so nothing is malformed."""
+    n_rows, n_loans = len(tails), len(np.unique(tails))
+    for field in CHECKED + ("postal_code",):
+        sent = status[field] == SENTINEL
+        k = len(np.unique(tails[sent]))
+        rep.validation[field] += [n_rows - int(sent.sum()), int(sent.sum()),
+                                  n_loans - k, k]
 
 
 # ==========================================================================
@@ -675,7 +776,9 @@ class Report(object):
         self.censored = np.zeros(len(CENSOR_REASONS), dtype=np.int64)
         self.terminated = 0
         self.nulls = {c: 0 for c in SCHEMA}
-        self.state_categories = None    # Property State dictionary, whole build
+        self.excluded_malformed = 0     # rows of EXCLUDED_LOANS, a named reason
+        self.validation = {f: np.zeros(4, dtype=np.int64)
+                           for f in CHECKED + ("postal_code",)}
         self.zero_row_loans = {}
         self.orig_matched = 0
         self.train_loans = 0
@@ -979,8 +1082,13 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     role[train_of_pair & before_cut] = R_FIT
     role[~train_of_pair & before_cut] = R_CONDITION
     role[~train_of_pair & ~before_cut] = R_EVALUATE
-    keep = role >= 0
-    rep.excluded_train_late += int((~keep).sum())
+    in_role = role >= 0
+    rep.excluded_train_late += int((~in_role).sum())
+    # the explicit exclusion list: a named reason of its own, not a role filter
+    excl = excluded_tails(prefix)
+    dropped = in_role & np.isin(tail[from_idx], excl)
+    rep.excluded_malformed += int(dropped.sum())
+    keep = in_role & ~dropped
 
     candidate_tails = tail[from_idx]        # before the role filter, for the zero-row tally
     to_idx, from_idx = to_idx[keep], from_idx[keep]
@@ -1005,9 +1113,11 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     unemp_chg = lookup(unchg, from_month)
 
     # ---- 6. join origination on loan_id ----------------------------------
-    orig = load_origination(orig_path, oidx, pmms, rep.state_categories)
+    orig = load_origination(orig_path, oidx, pmms)
     feats, matched = join_origination(orig, tail[from_idx])
     rep.orig_matched += matched
+    check_origination(quarter, prefix, orig, tail[from_idx], feats["status"])
+    tally_validation(rep, tail[from_idx], feats["status"])
 
     # loan_age from the origination month, not Freddie's reported age (R7)
     orig_month = feats["orig_month"]
@@ -1092,12 +1202,15 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     silent = ~has_emitted
     single = silent & (rows_per_loan == 1)
     no_candidate = silent & (rows_per_loan > 1) & ~has_candidate
-    role_only = silent & has_candidate
+    excl_loan = silent & np.isin(uniq_tail, excl)
+    role_only = silent & has_candidate & ~excl_loan
     rep.bump_zero("single observation, no pair possible", int(single.sum()))
     rep.bump_zero("every pair dropped by R3 (gap) or R1 (absorbing from-state)",
                   int(no_candidate.sum()))
     rep.bump_zero("all pairs removed by the R6 role filter (train, after cut)",
                   int(role_only.sum()))
+    rep.bump_zero("every pair removed by the explicit exclusion list",
+                  int(excl_loan.sum()))
 
     os.makedirs(PANEL_DIR, exist_ok=True)
     rep.schemas[quarter] = write_partition(
@@ -1215,11 +1328,16 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
     emit("%-58s %18s %12s" % ("excluded: train-split loan, from month after the cut",
                               fmt(rep.excluded_train_late),
                               pct(rep.excluded_train_late, rep.candidates)))
+    emit("%-58s %18s %12s" % ("excluded: malformed origination record (named loan)",
+                              fmt(rep.excluded_malformed),
+                              pct(rep.excluded_malformed, rep.candidates)))
     emit("%-58s %18s %12s" % ("PANEL ROWS WRITTEN", fmt(rep.panel_rows),
                               pct(rep.panel_rows, rep.candidates)))
-    emit("%-58s %18s" % ("candidates - excluded == written",
+    emit("%-58s %18s" % ("candidates - excluded - excluded (named) == written",
                          "yes" if rep.candidates - rep.excluded_train_late
-                         == rep.panel_rows else "NO"))
+                         - rep.excluded_malformed == rep.panel_rows else "NO"))
+    for loan, why in EXCLUDED_LOANS.items():
+        emit("    %s  %s" % (loan, why))
     emit()
 
     # ---- R7 ---------------------------------------------------------------
@@ -1375,6 +1493,28 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
                         fmt(rep.panel_rows - rep.orig_matched)))
     emit()
 
+    # ---- origination validation ---------------------------------------------
+    rule("=")
+    emit("ORIGINATION VALIDATION   (hard checks on loans that reach the panel)")
+    rule("=")
+    emit("Rejected = MALFORMED: a build that finds any stops, so a finished build")
+    emit("always shows 0. Null = the documented sentinel, stored as null.")
+    emit("%-16s%-34s%16s%12s%10s%14s%12s" % ("check", "valid / sentinel", "valid rows",
+                                            "null rows", "rejected", "valid loans",
+                                            "null loans"))
+    rule()
+    rules = {"ltv": "%d-%d / %d" % (LTV_VALID + (LTV_NA,)),
+             "dti": "%d-%d / %d" % (DTI_VALID + (DTI_NA,)),
+             "orig_rate": "0 < r <= %g / none" % RATE_MAX,
+             "property_state": "%d-code whitelist / none" % len(PROPERTY_STATES),
+             "postal_code": "any / %s" % POSTAL_UNKNOWN}
+    for f in CHECKED + ("postal_code",):
+        v = rep.validation[f]
+        emit("%-16s%-34s%16s%12s%10s%14s%12s" % (f, rules[f], fmt(v[0]), fmt(v[1]), "0",
+                                                fmt(v[2]), fmt(v[3])))
+    rule()
+    emit()
+
     # ---- nulls -------------------------------------------------------------
     rule("=")
     emit("NULLS PER COLUMN   (unit: panel rows, of %s)" % fmt(rep.panel_rows))
@@ -1414,7 +1554,6 @@ def build(allow_multi_file_loans=False):
                           for p in perf_paths}
     rep.prefix_collisions = check_prefixes(rep.prefix_by_file,
                                            allow_multi_file_loans)
-    rep.state_categories = state_categories(orig_paths, oidx)
 
     # First write of the build: remove the previous manifest, so a build that
     # stops partway leaves partitions but no manifest vouching for them.

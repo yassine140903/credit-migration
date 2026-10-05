@@ -1,15 +1,15 @@
 =========================================================================================================================
 HORIZON HARNESS - homogeneous baseline, test-split loans
 =========================================================================================================================
-panel        : data/panel/panel_*.parquet via src.panel_io (build 2026-09-29T17:49:57.067113)
-rows read    : role in {condition, evaluate}; columns loan_id, origin_period, origin_state, next_state, role
+panel        : data/panel/panel_*.parquet via src.panel_io (build 2026-10-05T11:50:54.525429)
+rows read    : role in {condition, evaluate}; columns loan_id, from_period, from_state, to_state, role
 model        : pooled matrix from src.baseline.load_baseline() (artifacts/baseline/counts.csv)
 cut          : 2008-12
 horizons     : h=6 -> 2009-06, h=12 -> 2009-12, h=24 -> 2010-12, h=60 -> 2013-12
 state order  : Current, DQ30, DQ60, DQ90+, Prepaid, Default
-A month is observed by a row's origin_state (month t) or next_state
+A month is observed by a row's from_state (month t) or to_state
 (month t+1). The 2008-12 -> 2009-01 transition is a condition row; its
-next_state is read as the first post-cut outcome (see section 2).
+to_state is read as the first post-cut outcome (see section 2).
 
 =========================================================================================================================
 1. ELIGIBILITY AT THE CUT   (unit: test-split loans with a panel row)
@@ -60,7 +60,7 @@ h           observed      absorbed     share       Prepaid     share       Defau
 24           406,162       158,764    39.09%       147,404    36.29%        11,360     2.80%       247,398    60.91%
 60           404,541       302,038    74.66%       271,906    67.21%        30,132     7.45%       102,503    25.34%
 -------------------------------------------------------------------------------------------------------------------------
-eligible loans absorbing in 2009-01 - read from the condition row with origin
+eligible loans absorbing in 2009-01 - read from the condition row with from month
 2008-12, the only row carrying that absorption: 7,440
 
 =========================================================================================================================
@@ -425,7 +425,7 @@ non-empty bins only.
 -------------------------------------------------------------------------------------------------------------------------
 state                      bin         loans  mean predicted      realised n    real share
 -------------------------------------------------------------------------------------------------------------------------
-Current         [0.300, 0.500)         9,363        42.6809%           1,514      16.1700%
+Current         [0.300, 0.500)         9,363        42.6808%           1,514      16.1700%
 Current         [0.500, 0.700)       395,123        57.0769%          84,749      21.4488%
 DQ30            [0.005, 0.010)       404,486         0.8916%           5,376       1.3291%
 DQ60            [0.000, 0.005)       404,486         0.2609%           1,858       0.4593%
@@ -477,6 +477,6 @@ OUTPUTS
     artifacts\horizon_baseline\predicted_by_start.csv
     artifacts\horizon_baseline\scores.csv
     artifacts\horizon_baseline\compounding.csv
-runtime    : 20.9 s  (0.35 min)
-peak memory: 1784 MB  (peak working set (psutil))
+runtime    : 22.6 s  (0.38 min)
+peak memory: 1767 MB  (peak working set (psutil))
 =========================================================================================================================
