@@ -1,0 +1,146 @@
+====================================================================================================
+RUN-LENGTH HAZARD FLATTENING   (diagnostic 24; read-only)
+====================================================================================================
+panel build  : 2026-10-05T11:50:54.525429  (69,927,576 rows, 8 partitions; validated on every load)
+input        : role == 'fit' rows only: 40,385,650 rows, 1,939,309 loans
+
+EXCLUSION 1. Seasoned entrants (first panel month later than first payment month)
+----------------------------------------------------------------------------------------------------
+route taken  : DERIVED. The panel has no left-censoring flag (schema: loan_id, from_period, from_state, to_state, run_length, loan_age, is_modified, months_since_modification, fico, ltv, dti, rate_spread, unemp_level, unemp_chg_12m, hpi_feature, property_state, role, post_gap, is_skip, is_fall, msa, postal_code).
+               Condition = loan_age on the loan's first fit row > 1. loan_age is months from
+               the origination month (first payment month - 1) to month t, so it equals 1
+               exactly when the first panel month is the first payment month.
+               A loan's first FIT row is its first panel row: fit = train-split, from month
+               <= 2008-12, and a loan's rows run in from_period order.
+excluded     : 154,635 loans of 1,939,309 fit loans (7.9737%)   |   2,538,866 of 40,385,650 fit rows (6.2866%)
+cross-check  : derived condition vs first_payment read from the origination files:
+               agree 1,939,309   disagree 0   loan not in origination file 0   first_payment unparsed 0
+note         : a loan whose first pair was dropped by a reporting hole (R3) or whose first
+               month was suppressed (R1) also has a first panel month after its first
+               payment month, so it is excluded by the stated condition, whatever the cause.
+
+EXCLUSION 2. post_gap rows (among the non-seasoned loans): 28 rows
+rows measured: 37,846,756  (= 40,385,650 fit - 2,538,866 seasoned - 28 post_gap; 0 with a non-transient from_state)
+
+Reporting stops at the first rung with fewer than 1,000 rows. Hazard = share of rows with
+to_state != from_state. Change = this rung's hazard minus the previous rung's, in pp.
+
+====================================================================================================
+Current   (37,049,425 rows measured)
+====================================================================================================
+  rung          rows     cum share    hazard %   change (pp)
+----------------------------------------------------------------------------------------------------
+     1     1,999,609         5.40%        3.48             -
+     2     1,918,591        10.58%        2.15         -1.33
+     3     1,871,945        15.63%        1.78         -0.36
+     4     1,833,130        20.58%        1.77         -0.01
+     5     1,795,752        25.42%        1.62         -0.15
+     6     1,763,071        30.18%        1.54         -0.08
+     7     1,731,992        34.86%        1.46         -0.07
+     8     1,703,237        39.45%        1.40         -0.07
+     9     1,675,790        43.98%        1.37         -0.02
+    10     1,649,174        48.43%        1.37         -0.01
+    11     1,622,185        52.81%        1.40         +0.04
+    12     1,586,345        57.09%        1.49         +0.08
+    13     1,489,168        61.11%        1.53         +0.04
+    14     1,410,647        64.92%        1.53         +0.00
+    15     1,327,566        68.50%        1.50         -0.03
+    16     1,248,099        71.87%        1.52         +0.01
+    17     1,176,596        75.04%        1.56         +0.04
+    18     1,098,853        78.01%        1.60         +0.04
+    19     1,020,558        80.76%        1.64         +0.04
+    20       932,822        83.28%        1.65         +0.01
+    21       846,552        85.57%        1.65         +0.00
+    22       766,328        87.63%        1.64         -0.01
+    23       701,395        89.53%        1.64         +0.00
+    24       638,649        91.25%        1.64         +0.00
+    25       567,039        92.78%        1.56         -0.08
+    26       506,392        94.15%        1.58         +0.02
+    27       444,890        95.35%        1.51         -0.07
+    28       394,238        96.41%        1.54         +0.04
+    29       342,381        97.34%        1.49         -0.05
+    30       292,957        98.13%        1.58         +0.09
+    31       238,229        98.77%        1.55         -0.03
+    32       188,790        99.28%        1.56         +0.00
+    33       140,486        99.66%        1.68         +0.12
+    34        86,959        99.89%        1.76         +0.09
+    35        38,410       100.00%        2.34         +0.57
+----------------------------------------------------------------------------------------------------
+reporting stop: rung 36 has 599 rows (< 1,000); not reported, nor any rung above it.
+               600 rows (0.002% of the state) sit at rungs >= 36, unreported.
+flatness rule: rung 3 (|change| < 1.0 pp at rungs 3, 4, 5)
+mass rule    : rung 27 (95.35% of rows at or below; 4.65% strictly above)
+binding      : 27  (mass)
+
+====================================================================================================
+DQ30   (492,877 rows measured)
+====================================================================================================
+  rung          rows     cum share    hazard %   change (pp)
+----------------------------------------------------------------------------------------------------
+     1       316,429        64.20%       70.11             -
+     2        88,025        82.06%       51.23        -18.88
+     3        38,919        89.96%       43.50         -7.73
+     4        20,111        94.04%       38.75         -4.74
+     5        11,188        96.31%       35.01         -3.74
+     6         6,461        97.62%       32.10         -2.91
+     7         3,974        98.42%       30.65         -1.45
+     8         2,437        98.92%       27.37         -3.28
+     9         1,602        99.24%       23.91         -3.46
+    10         1,069        99.46%       22.36         -1.55
+----------------------------------------------------------------------------------------------------
+reporting stop: rung 11 has 738 rows (< 1,000); not reported, nor any rung above it.
+               2,662 rows (0.540% of the state) sit at rungs >= 11, unreported.
+flatness rule: NEVER SATISFIED. No run of 3 consecutive reported rungs has |change| < 1.0 pp (rungs reported: 1-10).
+mass rule    : rung 5 (96.31% of rows at or below; 3.69% strictly above)
+binding      : 5  (mass (flatness never satisfied))
+
+====================================================================================================
+DQ60   (116,398 rows measured)
+====================================================================================================
+  rung          rows     cum share    hazard %   change (pp)
+----------------------------------------------------------------------------------------------------
+     1        90,533        77.78%       79.96             -
+     2        16,135        91.64%       61.82        -18.14
+     3         5,495        96.36%       54.41         -7.41
+     4         2,270        98.31%       50.79         -3.62
+----------------------------------------------------------------------------------------------------
+reporting stop: rung 5 has 993 rows (< 1,000); not reported, nor any rung above it.
+               1,965 rows (1.688% of the state) sit at rungs >= 5, unreported.
+flatness rule: NEVER SATISFIED. No run of 3 consecutive reported rungs has |change| < 1.0 pp (rungs reported: 1-4).
+mass rule    : rung 3 (96.36% of rows at or below; 3.64% strictly above)
+binding      : 3  (mass (flatness never satisfied))
+
+====================================================================================================
+DQ90+   (188,056 rows measured)
+====================================================================================================
+  rung          rows     cum share    hazard %   change (pp)
+----------------------------------------------------------------------------------------------------
+     1        48,428        25.75%       18.05             -
+     2        34,532        44.11%       13.01         -5.04
+     3        26,319        58.11%       12.47         -0.54
+     4        19,927        68.71%       11.71         -0.76
+     5        15,027        76.70%       12.64         +0.92
+     6        11,306        82.71%       11.53         -1.10
+     7         8,539        87.25%       11.41         -0.13
+     8         6,386        90.65%       11.07         -0.34
+     9         4,782        93.19%       10.92         -0.16
+    10         3,588        95.10%       10.79         -0.13
+    11         2,707        96.54%       11.38         +0.59
+    12         1,951        97.57%       10.35         -1.02
+    13         1,376        98.30%        9.67         -0.69
+----------------------------------------------------------------------------------------------------
+reporting stop: rung 14 has 984 rows (< 1,000); not reported, nor any rung above it.
+               3,188 rows (1.695% of the state) sit at rungs >= 14, unreported.
+flatness rule: rung 3 (|change| < 1.0 pp at rungs 3, 4, 5)
+mass rule    : rung 10 (95.10% of rows at or below; 4.90% strictly above)
+binding      : 10  (mass)
+
+====================================================================================================
+SUMMARY   (selected cap per state; flatness / mass / binding)
+====================================================================================================
+Current  cap =  27   bound by mass                               flatness 3              mass 27
+DQ30     cap =   5   bound by mass (flatness never satisfied)    flatness never          mass 5
+DQ60     cap =   3   bound by mass (flatness never satisfied)    flatness never          mass 3
+DQ90+    cap =  10   bound by mass                               flatness 3              mass 10
+====================================================================================================
+runtime: 24.4 s
