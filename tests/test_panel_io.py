@@ -94,10 +94,10 @@ def make_frame(quarter, n):
     return pd.DataFrame({
         "loan_id": pd.array(["F%s%07d" % (quarter[2:], i) for i in range(n)],
                             dtype="string"),
-        "origin_period": np.full(n, 200601, dtype=np.int32),
-        "origin_state": pd.Categorical.from_codes(np.zeros(n, np.int8),
+        "from_period": np.full(n, 200601, dtype=np.int32),
+        "from_state": pd.Categorical.from_codes(np.zeros(n, np.int8),
                                                   categories=panel.STATES),
-        "next_state": pd.Categorical.from_codes(np.zeros(n, np.int8),
+        "to_state": pd.Categorical.from_codes(np.zeros(n, np.int8),
                                                 categories=panel.STATES),
         "run_length": np.ones(n, dtype=np.int32),
         "loan_age": pd.array(np.arange(n, dtype=np.int32), dtype="Int32"),

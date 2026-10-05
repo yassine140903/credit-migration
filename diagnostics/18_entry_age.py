@@ -7,13 +7,13 @@ joins no origination characteristics and proposes no cut point.
 
 DEFINITION
     entry age   the minimum loan_age over a loan's panel rows. The panel is
-                written in (loan_id, origin_period) order, so this is meant to
+                written in (loan_id, from_period) order, so this is meant to
                 equal the loan_age on the loan's first panel row; section
                 CHECKS counts any loan where the two disagree.
 
     Unit: loans with at least one panel row. A loan with no panel row is not in
     the panel and not counted here. The first panel row is the first EMITTED
-    origin month, which can sit after the loan's first performance month where
+    from month, which can sit after the loan's first performance month where
     src/panel.py dropped or suppressed the earliest pairs (R1, R3).
 
 READING
@@ -91,7 +91,7 @@ def ranges(values):
 
 def process_file(path):
     """Per-loan entry ages for one partition, plus the tallies CHECKS needs."""
-    t = pq.read_table(path, columns=["loan_id", "origin_period", "loan_age"])
+    t = pq.read_table(path, columns=["loan_id", "from_period", "loan_age"])
     n = t.num_rows
     res = {"name": os.path.basename(path), "rows": n, "loans": 0,
            "prefixes": set(), "null_rows": 0, "all_null_loans": 0,
@@ -99,7 +99,7 @@ def process_file(path):
     if n == 0:
         return res
     ids = t["loan_id"].combine_chunks()
-    period = t["origin_period"].to_numpy()
+    period = t["from_period"].to_numpy()
     age_col = t["loan_age"].combine_chunks()
 
     head, tail = ids.slice(0, n - 1), ids.slice(1)
@@ -108,7 +108,7 @@ def process_file(path):
     change = pc.not_equal(tail, head).to_numpy(zero_copy_only=False)
     same = ~change
     if np.any(np.diff(period)[same] <= 0):
-        raise SystemExit("%s: origin_period not strictly increasing within a "
+        raise SystemExit("%s: from_period not strictly increasing within a "
                          "loan" % res["name"])
     starts = np.concatenate(([0], np.nonzero(change)[0] + 1))
 

@@ -249,12 +249,12 @@ def process_file(path, pidx, other_flags):
 def panel_pass(by_prefix):
     """Panel rows by state, split by the loan's modification status."""
     # columns: unmodified, modified (all), modified before first flag, at/after
-    origin = np.zeros((len(STATES), 4), dtype=np.int64)
-    nxt = np.zeros((len(STATES), 4), dtype=np.int64)
+    from_counts = np.zeros((len(STATES), 4), dtype=np.int64)
+    to_counts = np.zeros((len(STATES), 4), dtype=np.int64)
     in_panel = {}
     for path in sorted(glob.glob(PANEL_GLOB)):
-        t = pq.read_table(path, columns=["loan_id", "origin_period",
-                                         "origin_state", "next_state"])
+        t = pq.read_table(path, columns=["loan_id", "from_period",
+                                         "from_state", "to_state"])
         ids = t["loan_id"].combine_chunks()
         prefix = ids[0].as_py()[:5]
         tails = pc.cast(pc.utf8_slice_codeunits(ids, 5, 12), "int64").to_numpy()
@@ -263,9 +263,9 @@ def panel_pass(by_prefix):
         safe = np.clip(pos, 0, max(len(info["mod_tails"]) - 1, 0))
         is_mod = (len(info["mod_tails"]) > 0) & (info["mod_tails"][safe] == tails)
         first = to_yyyymm(info["first_mod"][safe].astype(np.int64))
-        post = is_mod & (t["origin_period"].to_numpy() >= first)
+        post = is_mod & (t["from_period"].to_numpy() >= first)
         pre = is_mod & ~post
-        for arr, col in ((origin, "origin_state"), (nxt, "next_state")):
+        for arr, col in ((from_counts, "from_state"), (to_counts, "to_state")):
             codes = t[col].combine_chunks().indices.to_numpy()
             names = t[col].combine_chunks().dictionary.to_pylist()
             remap = np.array([STATES.index(s) for s in names])
@@ -274,7 +274,7 @@ def panel_pass(by_prefix):
                 arr[:, k] += np.bincount(s[m], minlength=len(STATES))
         uniq = np.unique(tails)
         in_panel[prefix] = uniq
-    return origin, nxt, in_panel
+    return from_counts, to_counts, in_panel
 
 
 def state_table(title, arr):
@@ -544,7 +544,7 @@ def main():
     rule("=")
     emit("7. MODIFIED LOANS IN THE PANEL")
     rule("=")
-    origin, nxt, in_panel = panel_pass(by_prefix)
+    from_counts, to_counts, in_panel = panel_pass(by_prefix)
     mod_in = sum(int(np.isin(f["mod_tails"], in_panel.get(f["prefix"],
                                                            np.empty(0))).sum())
                  for f in files)
@@ -564,10 +564,10 @@ def main():
     emit()
     emit("Panel rows (unit: rows) by the loan's modification status. 'before' and")
     emit("'at/after' split a modified loan's rows at its first flagged period,")
-    emit("by origin month.")
+    emit("by from month.")
     emit()
-    state_table("ORIGIN STATE", origin)
-    state_table("NEXT STATE", nxt)
+    state_table("FROM STATE", from_counts)
+    state_table("TO STATE", to_counts)
 
     rule("=")
     emit("runtime: %.1f s  (%.2f min)"

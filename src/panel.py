@@ -4,24 +4,24 @@ Run as a module:      python -m src.panel
 Import and drive:     from src.panel import build; build()
 
 WHAT A ROW IS
-    One row per OBSERVED consecutive-month transition of one loan: the origin
+    One row per OBSERVED consecutive-month transition of one loan: the from
     month t and the month t+1 that immediately follows it IN THE DATA. A loan
     observed for N months yields at most N-1 rows - fewer where a reporting hole
-    breaks the chain (R3) or where the origin month is already absorbing (R1).
+    breaks the chain (R3) or where the from-state is already absorbing (R1).
 
 ================================ SCHEMA ================================
 Three groups, kept distinct in the code and in the written file's column order.
 
 keys
     loan_id         str      Freddie loan sequence number
-    origin_period   int32    YYYYMM of month t
+    from_period   int32    YYYYMM of month t
 
 states                       categorical over the six-state space
-    origin_state             Current, DQ30, DQ60, DQ90+, Prepaid, Default
-    next_state               same categories; Prepaid and Default are absorbing
+    from_state             Current, DQ30, DQ60, DQ90+, Prepaid, Default
+    to_state               same categories; Prepaid and Default are absorbing
 
 features                     everything the model is allowed to read
-    run_length      int32    consecutive months in origin_state as of month t,
+    run_length      int32    consecutive months in from_state as of month t,
                              counting t itself as 1 (R5)
     loan_age        int32    months from the origination month (first payment
                              month minus one) to month t. NOT Freddie's reported
@@ -67,7 +67,7 @@ metadata                     bookkeeping - NEVER a model input
     METADATA IS NEVER A FEATURE. is_skip and is_fall are derived from the raw
     status at t+1, which is the label side of the pair. Feeding either into a
     model leaks the outcome: knowing "the status jumped by two or more" already
-    tells you next_state is not adjacent to origin_state. They exist so that
+    tells you to_state is not adjacent to from_state. They exist so that
     rows can be audited, counted and sliced after the fact, and so that a later
     decision to exclude them can be made without a rebuild. The same applies to
     post_gap and role; msa and postal_code are parked here, not offered as
@@ -76,15 +76,15 @@ metadata                     bookkeeping - NEVER a model input
 
 ================================ RULES =================================
 R1  TERMINAL ROW. The row carrying a zero-balance code IS the exit month. The
-    transition INTO that month is emitted with next_state = Prepaid (code 01) or
+    transition INTO that month is emitted with to_state = Prepaid (code 01) or
     Default (codes 02, 03, 09). No row is ever emitted with an absorbing state as
-    origin_state. The exit is dated by the REPORTING PERIOD; the zero-balance
+    from_state. The exit is dated by the REPORTING PERIOD; the zero-balance
     effective date is not read, and no loan is excluded for disagreeing with it.
 
 R2  CENSORING. Codes 15, 16 and 96, and loans that simply stop appearing, are
     censored. Rows are emitted up to the last OBSERVED transition and then stop;
     no final self-transition is ever fabricated for the last observed month.
-    Censoring is not a state and never appears in next_state - a censoring code
+    Censoring is not a state and never appears in to_state - a censoring code
     marks where follow-up ENDS, not what the loan is doing, so the pair landing
     on that month carries the state its own delinquency status maps to. Every
     censored loan is recorded separately with its last observed period and a
@@ -98,16 +98,16 @@ R3  GAPS. Where reporting periods are not strictly consecutive the pair spanning
 R4  SKIPS AND FALLS. Both are kept as ordinary observed transitions and flagged.
 
 R5  RUN LENGTH. Consecutive months the loan has held its current MAPPED state as
-    of the origin month, counting the origin month as 1, computed over the loan's
+    of the from month, counting the from month as 1, computed over the loan's
     FULL observed history before any role filtering, and reset by a state change
     or a gap.
 
 R6  ROLE. Grouped-temporal split, cut at 2008-12.
-        fit        train-split loan, origin month <= 2008-12
-        condition  test-split loan,  origin month <= 2008-12
-        evaluate   test-split loan,  origin month >  2008-12
+        fit        train-split loan, from month <= 2008-12
+        condition  test-split loan,  from month <= 2008-12
+        evaluate   test-split loan,  from month >  2008-12
     The train/test split is over LOANS, by a deterministic hash of loan_id,
-    80/20. Train-split rows with an origin month after the cut are excluded
+    80/20. Train-split rows with a from month after the cut are excluded
     entirely. `condition` rows exist only to carry state and run_length forward
     into the evaluation window; they are never fitted on.
 
@@ -128,7 +128,7 @@ R7  LOAN AGE AND MODIFICATION. Freddie's loan age restarts when a loan is
 
 ============================== ORDERING ================================
 Load-bearing, and implemented in this order inside build_quarter():
-    1 read and sort by (loan_id, period)      5 join macro on origin period
+    1 read and sort by (loan_id, period)      5 join macro on from period
     2 detect gaps, mark them                  6 join origination on loan_id,
     3 run_length and modification events        and compute loan_age from it
       over the full history                   7 emit pairs, applying R1 and R2
@@ -153,7 +153,7 @@ once, which is what makes the transition walk possible at all.
 ============================ DETERMINISM ===============================
 Same input, same output, same order: the loan split is a keyed BLAKE2b digest
 rather than Python's randomised hash(); the sort is stable and total on
-(loan_id, period); rows are written in (loan_id, origin_period) order; and the
+(loan_id, period); rows are written in (loan_id, from_period) order; and the
 column order is fixed by SCHEMA below.
 """
 
@@ -194,7 +194,7 @@ STAMP_KEY = b"panel_build_stamp"                # parquet footer metadata key
 CHUNKSIZE = 2_000_000
 RULE_W = 121
 
-CUT_YEAR, CUT_MONTH = 2008, 12          # R6: last origin month in the fit window
+CUT_YEAR, CUT_MONTH = 2008, 12          # R6: last from month in the fit window
 TRAIN_PCT = 80                          # R6: 80/20 loan split
 SPLIT_SEED = "credit-migration/2006-2007/v1"
 
@@ -220,8 +220,8 @@ R_FIT, R_CONDITION, R_EVALUATE, R_EXCLUDED = 0, 1, 2, -1
 CENSOR_REASONS = ["code_15", "code_16", "code_96", "no_further_observation"]
 
 # ---- schema, in written column order ------------------------------------
-KEYS = ["loan_id", "origin_period"]
-STATE_COLS = ["origin_state", "next_state"]
+KEYS = ["loan_id", "from_period"]
+STATE_COLS = ["from_state", "to_state"]
 FEATURES = ["run_length", "loan_age", "is_modified", "months_since_modification",
             "fico", "ltv", "dti", "rate_spread",
             "unemp_level", "unemp_chg_12m", "hpi_feature", "property_state"]
@@ -666,8 +666,8 @@ class Report(object):
         self.excluded_train_late = 0
         self.panel_rows = 0
         self.by_role = np.zeros(len(ROLES), dtype=np.int64)
-        self.by_origin = np.zeros(len(STATES), dtype=np.int64)
-        self.by_next = np.zeros(len(STATES), dtype=np.int64)
+        self.by_from_state = np.zeros(len(STATES), dtype=np.int64)
+        self.by_to_state = np.zeros(len(STATES), dtype=np.int64)
         self.fit_matrix = np.zeros((len(STATES), len(STATES)), dtype=np.int64)
         self.skips = 0
         self.falls = 0
@@ -952,21 +952,21 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     censor_frame.to_parquet(os.path.join(CENSOR_DIR, "censor_%s.parquet" % quarter),
                             engine="pyarrow", index=False, compression="snappy")
 
-    # ---- 7a. candidate pairs: consecutive, non-absorbing origin (R1, R3) -
-    nxt = np.nonzero(consecutive)[0]        # pair is (nxt-1 -> nxt)
-    org = nxt - 1
-    origin_state = state[org]
-    next_state = state[nxt]
-    live = ~np.isin(origin_state, ABSORBING)
+    # ---- 7a. candidate pairs: consecutive, non-absorbing from-state (R1, R3) -
+    to_idx = np.nonzero(consecutive)[0]        # pair is (to_idx-1 -> to_idx)
+    from_idx = to_idx - 1
+    from_state = state[from_idx]
+    to_state = state[to_idx]
+    live = ~np.isin(from_state, ABSORBING)
     rep.suppressed += int((~live).sum())
-    nxt, org = nxt[live], org[live]
-    origin_state, next_state = origin_state[live], next_state[live]
-    rep.candidates += len(org)
+    to_idx, from_idx = to_idx[live], from_idx[live]
+    from_state, to_state = from_state[live], to_state[live]
+    rep.candidates += len(from_idx)
 
-    origin_month = period[org].astype(np.int64)
+    from_month = period[from_idx].astype(np.int64)
 
     # ---- 4. assign role (R6) --------------------------------------------
-    loan_tail_of_pair = tail[org]
+    loan_tail_of_pair = tail[from_idx]
     uniq_tail = tail[is_first]
     loan_ids = [prefix + "%07d" % t for t in uniq_tail]
     is_train = split_flags(loan_ids)
@@ -974,39 +974,39 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     rep.test_loans += int((~is_train).sum())
     train_of_pair = is_train[np.searchsorted(uniq_tail, loan_tail_of_pair)]
 
-    before_cut = origin_month <= CUT
-    role = np.full(len(org), R_EXCLUDED, dtype=np.int8)
+    before_cut = from_month <= CUT
+    role = np.full(len(from_idx), R_EXCLUDED, dtype=np.int8)
     role[train_of_pair & before_cut] = R_FIT
     role[~train_of_pair & before_cut] = R_CONDITION
     role[~train_of_pair & ~before_cut] = R_EVALUATE
     keep = role >= 0
     rep.excluded_train_late += int((~keep).sum())
 
-    candidate_tails = tail[org]        # before the role filter, for the zero-row tally
-    nxt, org = nxt[keep], org[keep]
-    origin_state, next_state = origin_state[keep], next_state[keep]
-    origin_month, role = origin_month[keep], role[keep]
-    m = len(org)
+    candidate_tails = tail[from_idx]        # before the role filter, for the zero-row tally
+    to_idx, from_idx = to_idx[keep], from_idx[keep]
+    from_state, to_state = from_state[keep], to_state[keep]
+    from_month, role = from_month[keep], role[keep]
+    m = len(from_idx)
     if m == 0:
         return 0, quarter, time.time() - t0
 
     # ---- R4 flags, on the RAW status, both ends numeric ------------------
-    a_raw, b_raw = st[org].astype(np.int32), st[nxt].astype(np.int32)
+    a_raw, b_raw = st[from_idx].astype(np.int32), st[to_idx].astype(np.int32)
     both_numeric = (a_raw >= 0) & (b_raw >= 0)
     is_skip = both_numeric & ((b_raw - a_raw) >= 2)
     is_fall = both_numeric & ((a_raw - b_raw) >= 2)
-    post_gap = gap_row[org]
+    post_gap = gap_row[from_idx]
     rep.skips += int(is_skip.sum())
     rep.falls += int(is_fall.sum())
     rep.post_gap += int(post_gap.sum())
 
-    # ---- 5. join macro on the ORIGIN period ------------------------------
-    unemp_level = lookup(unrate, origin_month)
-    unemp_chg = lookup(unchg, origin_month)
+    # ---- 5. join macro on the FROM period ------------------------------
+    unemp_level = lookup(unrate, from_month)
+    unemp_chg = lookup(unchg, from_month)
 
     # ---- 6. join origination on loan_id ----------------------------------
     orig = load_origination(orig_path, oidx, pmms, rep.state_categories)
-    feats, matched = join_origination(orig, tail[org])
+    feats, matched = join_origination(orig, tail[from_idx])
     rep.orig_matched += matched
 
     # loan_age from the origination month, not Freddie's reported age (R7)
@@ -1016,8 +1016,8 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
             "%s: %d panel rows belong to loans with no usable first payment "
             "date, so loan_age cannot be computed" % (quarter,
                                                       int((orig_month < 0).sum())))
-    true_age = (origin_month - orig_month).astype(np.int32)
-    reported = age[org]
+    true_age = (from_month - orig_month).astype(np.int32)
+    reported = age[from_idx]
     changed = (reported != -9999) & (true_age != reported)
     rep.age_corrected += int(changed.sum())
     for v, c in pd.Series(true_age[changed] - reported[changed]).value_counts().items():
@@ -1025,19 +1025,19 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     rep.age_negative += int((true_age < 0).sum())
     loan_age = pd.array(true_age, dtype="Int32")
 
-    is_modified = is_mod_row[org]
-    months_since = pd.array(months_since_row[org], dtype="Int32")
+    is_modified = is_mod_row[from_idx]
+    months_since = pd.array(months_since_row[from_idx], dtype="Int32")
     months_since[~is_modified] = pd.NA
     rep.rows_modified += int(is_modified.sum())
     loan_id = pd.array(
-        prefix + pd.Series(tail[org]).astype(str).str.zfill(7), dtype="string")
+        prefix + pd.Series(tail[from_idx]).astype(str).str.zfill(7), dtype="string")
 
     frame = pd.DataFrame({
         "loan_id": loan_id,
-        "origin_period": to_yyyymm(origin_month).astype(np.int32),
-        "origin_state": pd.Categorical.from_codes(origin_state, categories=STATES),
-        "next_state": pd.Categorical.from_codes(next_state, categories=STATES),
-        "run_length": run_length[org],
+        "from_period": to_yyyymm(from_month).astype(np.int32),
+        "from_state": pd.Categorical.from_codes(from_state, categories=STATES),
+        "to_state": pd.Categorical.from_codes(to_state, categories=STATES),
+        "run_length": run_length[from_idx],
         "loan_age": loan_age,
         "is_modified": is_modified,
         "months_since_modification": months_since,
@@ -1060,25 +1060,25 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
 
     # Deterministic row order, already achieved: the source was lexsorted on
     # (tail, period), loan_id is that tail zero-padded to a fixed width behind a
-    # constant prefix - so it orders identically - and org indexes that array in
+    # constant prefix - so it orders identically - and from_idx indexes that array in
     # increasing order. Asserted rather than re-sorted, which would copy the
     # whole frame to no effect.
-    if not (np.all(np.diff(tail[org]) >= 0)
-            and np.all(np.diff(origin_month)[np.diff(tail[org]) == 0] > 0)):
-        raise RuntimeError("emitted rows are not in (loan_id, origin_period) "
+    if not (np.all(np.diff(tail[from_idx]) >= 0)
+            and np.all(np.diff(from_month)[np.diff(tail[from_idx]) == 0] > 0)):
+        raise RuntimeError("emitted rows are not in (loan_id, from_period) "
                            "order for %s" % quarter)
     # R7: loan_age never decreases within a loan - no exceptions.
-    same_loan = np.diff(tail[org]) == 0
+    same_loan = np.diff(tail[from_idx]) == 0
     if not np.all(np.diff(true_age)[same_loan] >= 0):
         raise RuntimeError("loan_age decreases within a loan in %s" % quarter)
 
     # ---- report tallies --------------------------------------------------
     rep.by_role += np.bincount(role, minlength=len(ROLES))
-    rep.by_origin += np.bincount(origin_state, minlength=len(STATES))
-    rep.by_next += np.bincount(next_state, minlength=len(STATES))
+    rep.by_from_state += np.bincount(from_state, minlength=len(STATES))
+    rep.by_to_state += np.bincount(to_state, minlength=len(STATES))
     fit = role == R_FIT
     if fit.any():
-        np.add.at(rep.fit_matrix, (origin_state[fit], next_state[fit]), 1)
+        np.add.at(rep.fit_matrix, (from_state[fit], to_state[fit]), 1)
     for col in SCHEMA:
         rep.nulls[col] += int(frame[col].isna().sum())
 
@@ -1088,13 +1088,13 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     rows_per_loan = np.bincount(np.searchsorted(uniq_tail, tail),
                                 minlength=len(uniq_tail))
     has_candidate = np.isin(uniq_tail, candidate_tails)
-    has_emitted = np.isin(uniq_tail, tail[org])
+    has_emitted = np.isin(uniq_tail, tail[from_idx])
     silent = ~has_emitted
     single = silent & (rows_per_loan == 1)
     no_candidate = silent & (rows_per_loan > 1) & ~has_candidate
     role_only = silent & has_candidate
     rep.bump_zero("single observation, no pair possible", int(single.sum()))
-    rep.bump_zero("every pair dropped by R3 (gap) or R1 (absorbing origin)",
+    rep.bump_zero("every pair dropped by R3 (gap) or R1 (absorbing from-state)",
                   int(no_candidate.sum()))
     rep.bump_zero("all pairs removed by the R6 role filter (train, after cut)",
                   int(role_only.sum()))
@@ -1120,7 +1120,7 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
     emit("chunksize   : %s" % fmt(CHUNKSIZE))
     emit("split       : %d/%d over loans, keyed BLAKE2b of loan_id, seed %r"
          % (TRAIN_PCT, 100 - TRAIN_PCT, SPLIT_SEED))
-    emit("cut         : origin month <= %d-%02d is the fit window"
+    emit("cut         : from month <= %d-%02d is the fit window"
          % (CUT_YEAR, CUT_MONTH))
     emit()
 
@@ -1172,7 +1172,7 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
                  % (prov["path"], fmt(prov.get("n_months", 0)),
                     prov.get("fetched", "?")))
     emit()
-    emit("unemp_level / unemp_chg_12m are joined on the ORIGIN month.")
+    emit("unemp_level / unemp_chg_12m are joined on the FROM month.")
     emit("rate_spread is the note rate minus the PMMS 30-year fixed rate in the")
     emit("origination month, taken as the first payment month minus one.")
     emit()
@@ -1200,7 +1200,7 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
     emit("%-58s %18s" % ("loans", fmt(rep.loans)))
     emit("%-58s %18s" % ("gap-spanning pairs dropped (R3)", fmt(rep.gap_pairs)))
     emit("%-58s %18s" % ("duplicate-period pairs", fmt(rep.dup_pairs)))
-    emit("%-58s %18s" % ("pairs with an absorbing origin, suppressed (R1)",
+    emit("%-58s %18s" % ("pairs with an absorbing from-state, suppressed (R1)",
                          fmt(rep.suppressed)))
     rule()
     identity = (rep.perf_rows - rep.dropped_rows - rep.loans - rep.gap_pairs
@@ -1212,7 +1212,7 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
                          "yes" if identity == rep.candidates else "NO"))
     rule()
     emit("%-58s %18s %12s" % ("candidate pairs", fmt(rep.candidates), "100.0000%"))
-    emit("%-58s %18s %12s" % ("excluded: train-split loan, origin after the cut",
+    emit("%-58s %18s %12s" % ("excluded: train-split loan, from month after the cut",
                               fmt(rep.excluded_train_late),
                               pct(rep.excluded_train_late, rep.candidates)))
     emit("%-58s %18s %12s" % ("PANEL ROWS WRITTEN", fmt(rep.panel_rows),
@@ -1248,7 +1248,7 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
     emit("%-58s %18s" % ("median correction (new loan_age - Freddie's)", median))
     emit("%-58s %18s" % ("panel rows with a negative loan_age", fmt(rep.age_negative)))
     emit()
-    emit("loan_age = origin month - (first payment month - 1). Freddie's reported")
+    emit("loan_age = from month - (first payment month - 1). Freddie's reported")
     emit("age restarts at modification; this does not. Unflagged loans have")
     emit("each age reset treated as a modification:")
     for i in range(0, n_unflagged, 6):
@@ -1257,7 +1257,7 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
 
     # ---- roles and states ------------------------------------------------
     rule("=")
-    emit("COUNTS BY ROLE, ORIGIN STATE AND NEXT STATE")
+    emit("COUNTS BY ROLE, FROM STATE AND TO STATE")
     rule("=")
     emit("Unit: panel rows (%s)." % fmt(rep.panel_rows))
     emit()
@@ -1269,19 +1269,19 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
     rule()
     emit("%-22s%18s%12s" % ("TOTAL", fmt(rep.by_role.sum()), "100.0000%"))
     emit()
-    emit("%-22s%18s%12s%18s%12s" % ("state", "as origin", "share",
-                                    "as next", "share"))
+    emit("%-22s%18s%12s%18s%12s" % ("state", "as from_state", "share",
+                                    "as to_state", "share"))
     rule()
     for i, s in enumerate(STATES):
         emit("%-22s%18s%12s%18s%12s"
-             % (s, fmt(rep.by_origin[i]), pct(rep.by_origin[i], rep.panel_rows),
-                fmt(rep.by_next[i]), pct(rep.by_next[i], rep.panel_rows)))
+             % (s, fmt(rep.by_from_state[i]), pct(rep.by_from_state[i], rep.panel_rows),
+                fmt(rep.by_to_state[i]), pct(rep.by_to_state[i], rep.panel_rows)))
     rule()
     emit("%-22s%18s%12s%18s%12s"
-         % ("TOTAL", fmt(rep.by_origin.sum()), "100.0000%",
-            fmt(rep.by_next.sum()), "100.0000%"))
+         % ("TOTAL", fmt(rep.by_from_state.sum()), "100.0000%",
+            fmt(rep.by_to_state.sum()), "100.0000%"))
     emit()
-    emit("Prepaid and Default never appear as an origin: R1 suppresses those rows.")
+    emit("Prepaid and Default never appear as a from_state: R1 suppresses those rows.")
     emit()
 
     # ---- fit transition matrix ------------------------------------------
@@ -1328,7 +1328,7 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
     emit("CENSORED LOANS BY REASON   (unit: loans)")
     rule("=")
     emit("Written per quarter to %s. Censoring is recorded here and never" % CENSOR_DIR)
-    emit("appears in next_state (R2).")
+    emit("appears in to_state (R2).")
     emit()
     total_cens = int(rep.censored.sum())
     emit("%-40s%18s%12s%12s" % ("censor_reason", "loans", "of censored",

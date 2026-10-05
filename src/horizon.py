@@ -9,15 +9,15 @@ TIMELINE
                 h in {6, 12, 24, 60}: 2009-06, 2009-12, 2010-12, 2013-12.
 
 OBSERVATIONS
-    A panel row (loan, t, origin_state, next_state) observes the loan in TWO
-    months: t (origin_state) and t + 1 (next_state). The observation table is
+    A panel row (loan, t, from_state, to_state) observes the loan in TWO
+    months: t (from_state) and t + 1 (to_state). The observation table is
     the union of both, one state per (loan, month); two rows disagreeing about
     a month is an error. Only test-split rows (condition, evaluate) are read.
 
     Consequence at the boundary: the transition 2008-12 -> 2009-01 is a
-    CONDITION row (its origin month is <= the cut), yet its next_state is the
+    CONDITION row (its from month is <= the cut), yet its to_state is the
     first post-cut observation. An absorption landing in 2009-01 exists ONLY on
-    that row, because the build emits nothing from an absorbing origin (R1).
+    that row, because the build emits nothing from an absorbing state (R1).
     It is therefore read as an outcome; the report counts how many outcomes
     depend on it.
 
@@ -27,8 +27,8 @@ STEP 1  ELIGIBILITY (depends only on the state at the cut)
                 outside the universe.
     absorbed    the loan's first absorbing observation is at or before the cut
     eligible    observed at the cut month in a transient state. That month is
-                observed only through condition rows (origin 2008-12, or the
-                next_state of origin 2008-11).
+                observed only through condition rows (from_period 2008-12, or the
+                to_state of from_period 2008-11).
     unobserved  not absorbed, no observation at the cut, split by reason:
                     enters after the cut        first observation > cut
                     follow-up ends before cut   last observation < cut
@@ -61,7 +61,7 @@ I_ABSORBING = np.array([STATES.index(s) for s in ABSORBING])
 CUT = panel.CUT                                   # month index of 2008-12
 HORIZONS = (6, 12, 24, 60)
 TEST_ROLES = ["condition", "evaluate"]
-COLUMNS = ["loan_id", "origin_period", "origin_state", "next_state", "role"]
+COLUMNS = ["loan_id", "from_period", "from_state", "to_state", "role"]
 CENSORED = -1                                     # realised-state code
 
 EXCLUDED = ["absorbed at or before the cut",
@@ -107,11 +107,11 @@ def _codes(series):
 def _per_loan(df, horizons, cut):
     """Per-loan summary for one partition's test rows."""
     key, ids = pd.factorize(df["loan_id"].to_numpy())
-    t = month_index(df["origin_period"].to_numpy())
-    o, d = _codes(df["origin_state"]), _codes(df["next_state"])
+    t = month_index(df["from_period"].to_numpy())
+    o, d = _codes(df["from_state"]), _codes(df["to_state"])
     is_cond = (df["role"] == "condition").to_numpy()
 
-    # every month a row observes: its origin month and the month after it
+    # every month a row observes: its from month and the month after it
     obs = pd.DataFrame({"key": np.concatenate([key, key]),
                         "month": np.concatenate([t, t + 1]),
                         "state": np.concatenate([o, d]),

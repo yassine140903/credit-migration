@@ -345,8 +345,8 @@ def run(out_dir=OUT_DIR):
     # ---- the three models and the two oracles -----------------------------------
     base_counts, P_df = baseline.load_baseline()
     P = P_df.to_numpy()
-    fit_next, n_fit = nulls.fit_next_state_counts()
-    marg = nulls.marginal_distribution(fit_next)
+    fit_to, n_fit = nulls.fit_to_state_counts()
+    marg = nulls.marginal_distribution(fit_to)
     col_sums = base_counts.to_numpy().sum(axis=0)
 
     preds = {"persistence": nulls.persistence_predictions(start),
@@ -402,7 +402,7 @@ def run(out_dir=OUT_DIR):
     emit("persistence  identity matrix chained by src.horizon.chain /")
     emit("             homogeneous_step - the baseline's own path. Every loan keeps")
     emit("             its state at the cut with probability 1.0 at every horizon.")
-    emit("marginal     the empirical distribution of next_state across ALL fit rows")
+    emit("marginal     the empirical distribution of to_state across ALL fit rows")
     emit("             (role == fit), applied to every loan regardless of its state")
     emit("             at the cut, identical at every horizon; not chained.")
     emit("baseline     the pooled matrix from src.baseline.load_baseline(), chained.")
@@ -428,19 +428,19 @@ def run(out_dir=OUT_DIR):
     emit("             the start state alone buys.")
     rule()
     emit()
-    emit("Marginal distribution (unit: fit rows, next_state):")
+    emit("Marginal distribution (unit: fit rows, to_state):")
     rule()
     emit("%-10s%18s%14s%22s" % ("state", "fit rows", "share", "baseline col. sum"))
     rule()
     for k, s in enumerate(STATES):
-        emit("%-10s%18s%14s%22s" % (s, fmt(fit_next[k]), pct(fit_next[k], n_fit),
+        emit("%-10s%18s%14s%22s" % (s, fmt(fit_to[k]), pct(fit_to[k], n_fit),
                                     fmt(col_sums[k])))
     rule()
-    emit("%-10s%18s%14s%22s" % ("TOTAL", fmt(fit_next.sum()),
-                                pct(fit_next.sum(), n_fit), fmt(col_sums.sum())))
+    emit("%-10s%18s%14s%22s" % ("TOTAL", fmt(fit_to.sum()),
+                                pct(fit_to.sum(), n_fit), fmt(col_sums.sum())))
     emit("marginal sums to 1.0 within %g: PASS   (sum = %.17f)"
          % (nulls.TOL, marg.sum()))
-    same_cols = np.array_equal(fit_next, col_sums)
+    same_cols = np.array_equal(fit_to, col_sums)
     emit("equals the column sums of artifacts/baseline/counts.csv: %s"
          % ("PASS" if same_cols else "FAIL"))
     emit("persistence predictions equal one-hot(state at cut) at every h: %s"

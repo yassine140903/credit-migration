@@ -250,9 +250,9 @@ class Acc(object):
         self.jump_by_stat = np.zeros((NSTAT, NJUMP), dtype=np.int64)
         self.skip_cells = np.zeros((NSTATE, NSTATE), dtype=np.int64)
         self.all_cells = np.zeros((NSTATE, NSTATE), dtype=np.int64)
-        # D: [origin group][t+2 or t+3][bucket]
+        # D: [from group][t+2 or t+3][bucket]
         self.future = np.zeros((2, 2, NFUT), dtype=np.int64)
-        # E: [origin group][run bucket], raw-status run and mapped-state run
+        # E: [from group][run bucket], raw-status run and mapped-state run
         self.run_raw = np.zeros((2, NRUN), dtype=np.int64)
         self.run_map = np.zeros((2, NRUN), dtype=np.int64)
         self.year_hist = {}
@@ -385,7 +385,7 @@ def process_file(path, acc):
     for y, c in zip(*np.unique(yrs, return_counts=True)):
         acc.year_hist[int(y)] = acc.year_hist.get(int(y), 0) + int(c)
 
-    origin = (sa >= 1).astype(np.int64)          # 0 = from status 0, 1 = from >=1
+    from_group = (sa >= 1).astype(np.int64)          # 0 = from status 0, 1 = from >=1
 
     # ---- D: status at t+2 and t+3, located by binary search, not by offset
     g = np.searchsorted(starts, si, side="right") - 1
@@ -400,7 +400,7 @@ def process_file(path, acc):
         s_k = np.where(found, raw[safe].astype(np.int32), F_GAP)
         s_k = np.where(want_per > loan_last_per, F_END, s_k)
         bk = bucket_future(s_k, sb)
-        np.add.at(acc.future, (origin, col, bk), 1)
+        np.add.at(acc.future, (from_group, col, bk), 1)
 
     # ---- E: run length in the state held immediately before the skip
     ar = np.arange(n, dtype=np.int64)
@@ -411,7 +411,7 @@ def process_file(path, acc):
         newrun[1:] = is_first[1:] | (dp != 1) | (val[1:] != val[:-1])
         run_start = np.maximum.accumulate(np.where(newrun, ar, 0))
         run_len = ar - run_start + 1
-        np.add.at(target_acc, (origin, bucket_run(run_len[si])), 1)
+        np.add.at(target_acc, (from_group, bucket_run(run_len[si])), 1)
         del newrun, run_start, run_len
 
 
@@ -658,12 +658,12 @@ def main():
     emit()
     n0 = int(acc.future[0][0].sum())
     n1 = int(acc.future[1][0].sum())
-    emit("origin groups: status(t) == 0: %s skips   |   status(t) >= 1: %s skips"
+    emit("from groups: status(t) == 0: %s skips   |   status(t) >= 1: %s skips"
          % (fmt(n0), fmt(n1)))
     emit()
     emit("%-26s%22s%22s%22s%22s"
-         % ("", "origin 0: t+2", "origin 0: t+3",
-            "origin >=1: t+2", "origin >=1: t+3"))
+         % ("", "from 0: t+2", "from 0: t+3",
+            "from >=1: t+2", "from >=1: t+3"))
     emit("%-26s%22s%22s%22s%22s"
          % ("status at that month", "count     share", "count     share",
             "count     share", "count     share"))
@@ -698,7 +698,7 @@ def main():
         emit(title)
         rule()
         emit("%-26s%22s%22s%22s"
-             % ("", "all skips", "origin 0", "origin >=1"))
+             % ("", "all skips", "from 0", "from >=1"))
         emit("%-26s%22s%22s%22s"
              % ("run length (months)", "count     share", "count     share",
                 "count     share"))

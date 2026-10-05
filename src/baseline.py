@@ -8,8 +8,8 @@ Estimation only - no forecasting, no matrix powers, no lifetime PD.
 INPUT
     data/panel/panel_*.parquet through src.panel_io.load_panel, which validates
     the whole panel against its manifest first. Four columns are read, one
-    partition at a time, in a single pass: origin_period, origin_state,
-    next_state, role. Only rows with role == "fit" enter any count; condition
+    partition at a time, in a single pass: from_period, from_state,
+    to_state, role. Only rows with role == "fit" enter any count; condition
     and evaluate rows are counted by role for the report and nothing else.
 
 STATE ORDER - fixed everywhere, asserted against src.panel.STATES
@@ -19,9 +19,9 @@ STATE ORDER - fixed everywhere, asserted against src.panel.STATES
     CONSTRUCTION to the identity, never estimated.
 
 STEPS
-    1  count matrix     6x6 integer counts of fit rows, origin x destination.
+    1  count matrix     6x6 integer counts of fit rows, from x to.
                         Its total must equal the fit-row count taken from the
-                        role column alone; the absorbing origin rows must be
+                        role column alone; the absorbing from-state rows must be
                         all zero. Either failure stops the run.
     2  structural zeros Current->DQ60, Current->DQ90+, DQ30->DQ90+ are expected
                         to be zero if the delinquency counter advances at most
@@ -30,7 +30,7 @@ STEPS
                         no floor. A zero row total is a hard error.
     4  sparsity         per estimated row: total, smallest non-zero cell, zero
                         cells. Reported only.
-    5  time instability the same estimate per calendar year of origin_period in
+    5  time instability the same estimate per calendar year of from_period in
                         the fit window. Diagnostic only; used for nothing.
 
 OUTPUT (artifacts/baseline/)
@@ -62,7 +62,7 @@ FIT_ROLE = "fit"
 FIT_YEARS = (2006, 2007, 2008)
 CUT_PERIOD = panel.CUT_YEAR * 100 + panel.CUT_MONTH        # 200812
 STRUCTURAL_ZEROS = [("Current", "DQ60"), ("Current", "DQ90+"), ("DQ30", "DQ90+")]
-COLUMNS = ["origin_period", "origin_state", "next_state", "role"]
+COLUMNS = ["from_period", "from_state", "to_state", "role"]
 
 OUT_DIR = os.path.join("artifacts", "baseline")
 COUNTS_CSV = "counts.csv"
@@ -84,16 +84,17 @@ class BaselineError(RuntimeError):
 # ==========================================================================
 # estimation - pure functions of counts
 # ==========================================================================
-def count_transitions(origin, dest):
-    """6x6 int64 counts from integer state codes (0..5), origin x destination."""
-    origin = np.asarray(origin, dtype=np.int64)
-    dest = np.asarray(dest, dtype=np.int64)
-    flat = np.bincount(origin * N_STATES + dest, minlength=N_STATES * N_STATES)
+def count_transitions(from_state, to_state):
+    """6x6 int64 counts from integer state codes (0..5), from x to."""
+    from_state = np.asarray(from_state, dtype=np.int64)
+    to_state = np.asarray(to_state, dtype=np.int64)
+    flat = np.bincount(from_state * N_STATES + to_state,
+                       minlength=N_STATES * N_STATES)
     return flat.reshape(N_STATES, N_STATES)
 
 
 def absorbing_row_violations(counts):
-    """{state: row counts} for each absorbing origin row that is not all zero."""
+    """{state: row counts} for each absorbing from-state row that is not all zero."""
     out = {}
     for s in ABSORBING:
         row = counts[STATES.index(s)]
@@ -111,7 +112,7 @@ def probability_matrix(counts):
     counts = np.asarray(counts)
     bad = absorbing_row_violations(counts)
     if bad:
-        raise BaselineError("absorbing origin row(s) carry counts: %s"
+        raise BaselineError("absorbing from-state row(s) carry counts: %s"
                             % {s: r.tolist() for s, r in bad.items()})
     totals = counts.sum(axis=1)
     zero = [s for s in ESTIMATED if totals[STATES.index(s)] == 0]
@@ -132,7 +133,7 @@ def probability_matrix(counts):
 
 def counts_frame(counts):
     return pd.DataFrame(np.asarray(counts, dtype=np.int64),
-                        index=pd.Index(STATES, name="origin_state"),
+                        index=pd.Index(STATES, name="from_state"),
                         columns=STATES)
 
 
@@ -180,9 +181,9 @@ def scan_panel():
 
         fit = (df["role"] == FIT_ROLE).to_numpy()
         scan["fit_rows"] += int(fit.sum())
-        o = _codes(df["origin_state"])[fit]
-        d = _codes(df["next_state"])[fit]
-        period = df["origin_period"].to_numpy()[fit].astype(np.int64)
+        o = _codes(df["from_state"])[fit]
+        d = _codes(df["to_state"])[fit]
+        period = df["from_period"].to_numpy()[fit].astype(np.int64)
         del df
 
         ok = (o >= 0) & (d >= 0)
@@ -239,7 +240,7 @@ def pct(num, den, dp=4):
 def matrix_table(rep, counts, rows=STATES, shares=False, basis=None):
     """Counts, and optionally each row's shares on the line beneath."""
     w = 16
-    rep.emit("%-10s" % "origin" + "".join("%*s" % (w, s) for s in STATES)
+    rep.emit("%-10s" % "from" + "".join("%*s" % (w, s) for s in STATES)
              + "%*s" % (w + 2, "row total") + ("   basis" if basis else ""))
     rep.rule()
     for s in rows:
@@ -299,7 +300,7 @@ def run(out_dir=OUT_DIR):
 
     # ---- 1 ---------------------------------------------------------------------
     rep.rule("=")
-    rep.emit("1. COUNT MATRIX   (unit: fit rows; rows = origin, columns = destination)")
+    rep.emit("1. COUNT MATRIX   (unit: fit rows; rows = from, columns = to)")
     rep.rule("=")
     matrix_table(rep, counts)
     total = int(counts.sum())
@@ -308,9 +309,9 @@ def run(out_dir=OUT_DIR):
     rep.emit("%-58s%18s" % ("fit rows with a null or unmapped state",
                             fmt(scan["fit_null_state"])))
     lo, hi = scan["fit_period_range"]
-    rep.emit("%-58s%18s" % ("fit origin_period range",
+    rep.emit("%-58s%18s" % ("fit from_period range",
                             "%s - %s" % (lo, hi) if lo is not None else "n/a"))
-    rep.emit("%-58s%18s   %s" % ("fit rows with origin_period after %d" % CUT_PERIOD,
+    rep.emit("%-58s%18s   %s" % ("fit rows with from_period after %d" % CUT_PERIOD,
                                  fmt(scan["fit_after_cut"]),
                                  "PASS" if scan["fit_after_cut"] == 0 else "FAIL"))
     if total != scan["fit_rows"]:
@@ -319,7 +320,7 @@ def run(out_dir=OUT_DIR):
     rep.emit("%-58s%18s" % ("matrix total == fit rows", "PASS"))
     bad = absorbing_row_violations(counts)
     for s in ABSORBING:
-        rep.emit("%-58s%18s" % ("%s origin row all zero" % s,
+        rep.emit("%-58s%18s" % ("%s from-state row all zero" % s,
                                 "FAIL" if s in bad else "PASS"))
     if bad:
         for s, row in bad.items():
@@ -364,13 +365,13 @@ def run(out_dir=OUT_DIR):
     p = probability_matrix(counts)
     basis = {s: ("estimated" if s in ESTIMATED else "SET BY CONSTRUCTION")
              for s in STATES}
-    rep.emit("Each origin: counts on the first line, row shares (p) beneath.")
+    rep.emit("Each from-state: counts on the first line, row shares (p) beneath.")
     rep.emit()
     matrix_table(rep, counts, shares=True, basis=basis)
     rep.emit("Prepaid and Default are absorbing: 1.0 on the diagonal, 0.0 elsewhere,")
     rep.emit("set by construction and not estimated (their count rows are zero).")
     rep.emit()
-    rep.emit("%-10s%24s%14s   %s" % ("origin", "row sum", "|sum - 1|", "result"))
+    rep.emit("%-10s%24s%14s   %s" % ("from", "row sum", "|sum - 1|", "result"))
     rep.rule()
     for i, s in enumerate(STATES):
         sm = p[i].sum()
@@ -385,9 +386,9 @@ def run(out_dir=OUT_DIR):
     rep.rule("=")
     rep.emit("4. ROW SPARSITY   (unit: fit rows; reported only, no action taken)")
     rep.rule("=")
-    rep.emit("%-10s%18s%26s%12s%14s   %s" % ("origin", "row total",
+    rep.emit("%-10s%18s%26s%12s%14s   %s" % ("from", "row total",
                                               "smallest non-zero cell", "share",
-                                              "zero cells", "zero-cell destinations"))
+                                              "zero cells", "zero-cell to-states"))
     rep.rule()
     for s in ESTIMATED:
         i = STATES.index(s)
@@ -409,7 +410,7 @@ def run(out_dir=OUT_DIR):
     rep.rule("=")
     rep.emit("The pooled matrix of section 3 is the baseline. The yearly matrices")
     rep.emit("below exist only to quantify what pooling averages over; nothing")
-    rep.emit("downstream uses them. Year = calendar year of origin_period.")
+    rep.emit("downstream uses them. Year = calendar year of from_period.")
     rep.emit()
     years = sorted(set(FIT_YEARS) | set(scan["by_year"]))
     by_year = {y: scan["by_year"].get(y, np.zeros((N_STATES, N_STATES),
@@ -467,7 +468,7 @@ def run(out_dir=OUT_DIR):
     # ---- outputs ----------------------------------------------------------------
     os.makedirs(out_dir, exist_ok=True)
     counts_frame(counts).to_csv(os.path.join(out_dir, COUNTS_CSV))
-    mat = pd.DataFrame(p, index=pd.Index(STATES, name="origin_state"),
+    mat = pd.DataFrame(p, index=pd.Index(STATES, name="from_state"),
                        columns=STATES)
     mat["row_basis"] = ["estimated" if s in ESTIMATED else "by_construction"
                         for s in STATES]

@@ -30,7 +30,7 @@ STATE MAPPING for PART A
     non-numeric as 'other'. RA is deliberately NOT folded into Default here:
     the question is what the file says, and folding would hide it. Note that
     src/panel.py maps RA to Default and suppresses those rows as absorbing
-    origins; A.3 states how many rows that removes so the two views reconcile.
+    from-states; A.3 states how many rows that removes so the two views reconcile.
 
 PART B checks three properties the panel build relies on, independently of
 src/panel.py - nothing is imported from it and the panel is only read.
@@ -344,7 +344,7 @@ def process_file(path, pidx, acc, sample_by_prefix):
     np.add.at(acc.state_prev, (grp[both], state[prev[both]]), 1)
     acc.prev_missing += np.bincount(grp[~both], minlength=NGROUP)
 
-    # A.3 - the pair src/panel.py would emit: origin = row before, next = code row
+    # A.3 - the pair src/panel.py would emit: from = row before, to = code row
     np.add.at(acc.xtab, (grp[both], state[prev[both]], state[rows[both]]), 1)
 
     # A.4 - run length as of the row before
@@ -562,12 +562,12 @@ def main():
     rule("=")
     emit("A.3  THE TRANSITION src/panel.py EMITS FOR THESE LOANS")
     rule("=")
-    emit("Unit: loans with a strictly preceding month. Origin is the mapped state")
-    emit("on the row before, next is the mapped state on the code row. This is")
+    emit("Unit: loans with a strictly preceding month. The from-state is the mapped state")
+    emit("on the row before, the to-state is the mapped state on the code row. This is")
     emit("exactly the last pair the panel carries for each of these loans.")
     emit()
-    emit("src/panel.py maps RA to Default and suppresses any pair whose origin is")
-    emit("absorbing, so every cell in the RA origin row below is NOT emitted; the")
+    emit("src/panel.py maps RA to Default and suppresses any pair whose from-state is")
+    emit("absorbing, so every cell in the RA from-state row below is NOT emitted; the")
     emit("count is stated under each table.")
     emit()
     for g in range(NGROUP):
@@ -576,7 +576,7 @@ def main():
         emit("A.3.%d  %s   (loans with a preceding month: %s)"
              % (g + 1, GROUPS[g], fmt(tot)))
         rule()
-        emit("%-16s%14s%s" % ("origin \\ next", "loans",
+        emit("%-16s%14s%s" % ("from \\ to", "loans",
                               "".join("%13s" % s for s in ST_LABELS)))
         rule()
         for i in range(NSTATE):
@@ -592,7 +592,7 @@ def main():
              % (fmt(tab[3][0]), fmt(tot), pct(tab[3][0], tot)))
         emit("    FLAGGED  DQ90+ -> DQ30    : %s of %s (%s)"
              % (fmt(tab[3][1]), fmt(tot), pct(tab[3][1], tot)))
-        emit("    suppressed by R1 (RA origin, not in the panel): %s of %s (%s)"
+        emit("    suppressed by R1 (RA from-state, not in the panel): %s of %s (%s)"
              % (fmt(tab[S_RA].sum()), fmt(tot), pct(int(tab[S_RA].sum()), tot)))
         emit()
 
@@ -661,7 +661,7 @@ def main():
     emit("%-58s%18s%12s" % ("of those, zero strictly consecutive pairs (gap-only)",
                             fmt(acc.gap_only_loans),
                             pct(acc.gap_only_loans, acc.loans)))
-    emit("%-58s%18s%12s" % ("of those, every consecutive pair has an RA origin",
+    emit("%-58s%18s%12s" % ("of those, every consecutive pair has an RA from-state",
                             fmt(acc.absorbing_only_loans),
                             pct(acc.absorbing_only_loans, acc.loans)))
     rule()

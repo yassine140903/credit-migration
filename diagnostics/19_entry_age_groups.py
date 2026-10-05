@@ -162,7 +162,7 @@ def resolve():
 def process_partition(path):
     """Per-loan frame (id, entry age, first-row age, features) and, for the
     anomaly loans, their panel rows."""
-    cols = ["loan_id", "origin_period", "loan_age"] + [f for f, _ in FEATURES]
+    cols = ["loan_id", "from_period", "loan_age"] + [f for f, _ in FEATURES]
     t = pq.read_table(path, columns=cols)
     n = t.num_rows
     ids = t["loan_id"].combine_chunks()
@@ -178,7 +178,7 @@ def process_partition(path):
         raise SystemExit("%s has null loan_age; diagnostic 18 found none"
                          % os.path.basename(path))
     age = t["loan_age"].to_numpy().astype(np.int64)
-    period = t["origin_period"].to_numpy().astype(np.int64)
+    period = t["from_period"].to_numpy().astype(np.int64)
     entry = np.minimum.reduceat(age, starts)
     first = age[starts]
 

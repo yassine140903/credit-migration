@@ -363,7 +363,7 @@ class Acc(object):
         self.d_all = {f: np.zeros((NSTAT, 3), dtype=np.int64) for f in FLAG_ORDER}
         self.flag_values = {f: np.zeros(len(flag_labels(f)), dtype=np.int64)
                             for f in FLAG_ORDER}
-        # E: [origin group 0 = status 2, 1 = status >=3][t+2 / t+3][bucket]
+        # E: [from group 0 = status 2, 1 = status >=3][t+2 / t+3][bucket]
         self.future = np.zeros((2, 2, NFUT), dtype=np.int64)
         self.run_map = np.zeros((2, NRUN), dtype=np.int64)
         self.year_hist = {}
@@ -525,7 +525,7 @@ def process_file(path, acc, idx):
                                return_counts=True)):
         acc.year_hist[int(y)] = acc.year_hist.get(int(y), 0) + int(c)
 
-    origin = (fa >= 3).astype(np.int64)      # 0 = from status 2, 1 = from >= 3
+    from_group = (fa >= 3).astype(np.int64)      # 0 = from status 2, 1 = from >= 3
 
     # ---- E: status at t+2 and t+3, located by period, not by row offset
     g = np.searchsorted(starts, fi, side="right") - 1
@@ -539,7 +539,7 @@ def process_file(path, acc, idx):
         found = (pos < n) & (key[safe] < target + (1 << PER_SH))
         s_k = np.where(found, raw[safe].astype(np.int32), F_GAP)
         s_k = np.where(want > loan_last, F_END, s_k)
-        np.add.at(acc.future, (origin, col, bucket_future(s_k)), 1)
+        np.add.at(acc.future, (from_group, col, bucket_future(s_k)), 1)
 
     # ---- F: run length on the mapped state, ending at t
     ms = map4(raw)
@@ -548,7 +548,7 @@ def process_file(path, acc, idx):
     newrun[0] = True
     newrun[1:] = is_first[1:] | (dp != 1) | (ms[1:] != ms[:-1])
     run_start = np.maximum.accumulate(np.where(newrun, ar, 0))
-    np.add.at(acc.run_map, (origin, bucket_run(ar[fi] - run_start[fi] + 1)), 1)
+    np.add.at(acc.run_map, (from_group, bucket_run(ar[fi] - run_start[fi] + 1)), 1)
 
 
 # --------------------------------------------------------------------------
@@ -852,12 +852,12 @@ def main():
     emit("  'loan ends'  no observed row at any period >= that month")
     emit("  'gap'        the loan is observed later but not in that month")
     emit()
-    emit("origin groups: status(t) == 2: %s falls   |   status(t) >= 3: %s falls"
+    emit("from groups: status(t) == 2: %s falls   |   status(t) >= 3: %s falls"
          % (fmt(n2), fmt(n3)))
     emit()
     emit("%-24s%22s%22s%22s%22s"
-         % ("", "origin 2: t+2", "origin 2: t+3",
-            "origin >=3: t+2", "origin >=3: t+3"))
+         % ("", "from 2: t+2", "from 2: t+3",
+            "from >=3: t+2", "from >=3: t+3"))
     emit("%-24s%22s%22s%22s%22s"
          % ("status at that month", "count     share", "count     share",
             "count     share", "count     share"))
@@ -882,7 +882,7 @@ def main():
     emit()
     tot_all = int(acc.run_map.sum())
     emit("%-24s%22s%22s%22s"
-         % ("", "all falls", "origin 2", "origin >=3"))
+         % ("", "all falls", "from 2", "from >=3"))
     emit("%-24s%22s%22s%22s"
          % ("run length (months)", "count     share", "count     share",
             "count     share"))

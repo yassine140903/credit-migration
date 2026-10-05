@@ -1,7 +1,7 @@
 """The one entry point for reading the built panel.
 
     from src.panel_io import load_panel
-    fit = load_panel(roles=["fit"], columns=["loan_id", "run_length", "next_state"])
+    fit = load_panel(roles=["fit"], columns=["loan_id", "run_length", "to_state"])
 
 Every call first validates the WHOLE panel on disk against panel_manifest.json,
 which src/panel.py writes only at the end of a successful build: partition

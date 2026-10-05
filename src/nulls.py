@@ -12,7 +12,7 @@ MODEL A  PERSISTENCE
 MODEL B  MARGINAL
     One distribution for every loan, whatever its state at the cut, and the
     same at every horizon; it does not chain. It is the empirical distribution
-    of next_state across ALL fit rows of the panel (role == "fit"), read
+    of to_state across ALL fit rows of the panel (role == "fit"), read
     directly from the panel.
 
 MODEL C  ORACLE MARGINAL - ORACLE (not achievable)
@@ -53,13 +53,13 @@ def persistence_predictions(start_states, horizons=hz.HORIZONS):
                     horizons)
 
 
-def fit_next_state_counts():
-    """Counts of next_state over every fit row, in the harness state order."""
-    df = load_panel(roles=[FIT_ROLE], columns=["next_state"])
-    vc = df["next_state"].value_counts(dropna=False)
+def fit_to_state_counts():
+    """Counts of to_state over every fit row, in the harness state order."""
+    df = load_panel(roles=[FIT_ROLE], columns=["to_state"])
+    vc = df["to_state"].value_counts(dropna=False)
     unknown = [s for s in vc.index if s not in hz.STATES]
     if unknown:
-        raise hz.HorizonError("next_state carries unknown or null value(s) %s"
+        raise hz.HorizonError("to_state carries unknown or null value(s) %s"
                               % unknown)
     return np.array([int(vc.get(s, 0)) for s in hz.STATES], dtype=np.int64), \
         len(df)

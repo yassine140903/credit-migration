@@ -92,9 +92,9 @@ def run(out_dir=OUT_DIR):
     emit("horizons     : %s" % ", ".join("h=%d -> %s" % (h, hz.ym(targets[h]))
                                          for h in hz.HORIZONS))
     emit("state order  : %s" % ", ".join(STATES))
-    emit("A month is observed by a row's origin_state (month t) or next_state")
+    emit("A month is observed by a row's from_state (month t) or to_state")
     emit("(month t+1). The 2008-12 -> 2009-01 transition is a condition row; its")
-    emit("next_state is read as the first post-cut outcome (see section 2).")
+    emit("to_state is read as the first post-cut outcome (see section 2).")
     emit()
 
     # ---- 1 ---------------------------------------------------------------------
@@ -173,7 +173,7 @@ def run(out_dir=OUT_DIR):
                 pct(tr, obs, 2)))
     rule()
     first_post = int((E["absorb_month"] == hz.CUT + 1).sum())
-    emit("eligible loans absorbing in %s - read from the condition row with origin"
+    emit("eligible loans absorbing in %s - read from the condition row with from month"
          % hz.ym(hz.CUT + 1))
     emit("%s, the only row carrying that absorption: %s"
          % (hz.ym(hz.CUT), fmt(first_post)))

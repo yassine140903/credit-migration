@@ -16,7 +16,7 @@ DEFINITIONS
     bucket          0 rows, exactly 1 row, 2 or more rows
     consecutive     two rows of one loan whose periods differ by exactly one
     pair            month - the only pairs src/panel.py can emit (R3)
-    live pair       a consecutive pair whose ORIGIN row is not absorbing:
+    live pair       a consecutive pair whose FROM row is not absorbing:
                     no zero-balance code 01/02/03/09 and a numeric delinquency
                     status (R1; non-numeric status such as RA maps to Default)
     split           the build's 80/20 train/test loan split, recomputed here
@@ -25,7 +25,7 @@ DEFINITIONS
 
 CAUSE (2-or-more bucket only) - the build's own rules, applied in its order
     R3  no consecutive pair       every adjacent pair spans a hole or repeats
-    R1  no live pair              every consecutive pair has an absorbing origin
+    R1  no live pair              every consecutive pair has an absorbing from-state
     R6  train, all live pairs     a train-split loan whose live pairs all
         after 2008-12             originate after the cut; the build excludes
                                   such rows by design
@@ -69,7 +69,7 @@ LIST_B = 50                     # 2+ bucket loans listed individually, at most
 MONTH_FLAG = 0.05               # section E: flag a month above this share
 FILE_FLAG = 1.5                 # section F: flag share ratio >= this or <= 1/this
 
-CUT = 2008 * 12 + 11            # R6: last origin month in the fit window, 2008-12
+CUT = 2008 * 12 + 11            # R6: last from month in the fit window, 2008-12
 SPLIT_SEED = "credit-migration/2006-2007/v1"
 TRAIN_PCT = 80
 

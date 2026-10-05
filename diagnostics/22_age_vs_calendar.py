@@ -6,19 +6,19 @@ mix of the fit pool. This tabulates the rates by loan age x calendar year so the
 two can be read apart. Diagnostic only - nothing downstream consumes it.
 
 DEFINITIONS
-    loan age        origin_period minus the loan's First Payment Date from the
+    loan age        from_period minus the loan's First Payment Date from the
                     origination file, in whole calendar months. A row whose
-                    origin month IS the first payment month has age 0.
+                    from month IS the first payment month has age 0.
                     (The panel's own loan_age column counts from the month
                     BEFORE the first payment; the offset is printed as a check.)
     age bucket      0-11, 12-23, 24-35, 36+
-    year            calendar year of origin_period; 2006, 2007, 2008 are
+    year            calendar year of from_period; 2006, 2007, 2008 are
                     tabulated. Rows in any other year are listed separately and
                     enter no count or percentage.
-    thin            a cell whose origin-row count is under 1,000. The DQ30 row
+    thin            a cell whose from-row count is under 1,000. The DQ30 row
                     decides thinness in steps 1-4, the Current row in 5-6. Thin
                     cells print counts only; their shares are suppressed.
-    structurally    a cell holding NO fit row of any origin state: no loan in
+    structurally    a cell holding NO fit row of any from state: no loan in
     absent          the pool had that age in that year. Distinct from zero.
     cure            DQ30 -> Current.   worsening   DQ30 -> DQ60
 
@@ -30,7 +30,7 @@ COUNTING
 
 SOURCES
     panel           fit rows only, via src.panel_io.load_panel, one partition
-                    at a time: loan_id, origin_period, origin_state, next_state,
+                    at a time: loan_id, from_period, from_state, to_state,
                     loan_age (for the offset check only), role
     origination     loan identifier and first payment date, chunked, indices
                     resolved from the published layout by src.panel.resolve
@@ -60,7 +60,7 @@ YEARS = [2006, 2007, 2008]
 AGE_EDGES = [0, 12, 24, 36]                      # lower edges; last is open
 AGE_LABELS = ["0-11", "12-23", "24-35", "36+"]
 THIN = 1000
-COLUMNS = ["loan_id", "origin_period", "origin_state", "next_state", "loan_age",
+COLUMNS = ["loan_id", "from_period", "from_state", "to_state", "loan_age",
            "role"]
 
 S = {s: i for i, s in enumerate(bl.STATES)}
@@ -68,7 +68,7 @@ NA, NY, NS = len(AGE_LABELS), len(YEARS), bl.N_STATES
 
 UNASSIGNED = ["loan_id not in any origination file",
               "first payment date missing or unparseable",
-              "origin month before first payment month (age < 0)"]
+              "from month before first payment month (age < 0)"]
 
 
 # ==========================================================================
@@ -137,12 +137,12 @@ def scan(fp_by_prefix):
         df = load_panel(columns=COLUMNS, quarters=[q])
         df = df[(df["role"] == bl.FIT_ROLE).to_numpy()].reset_index(drop=True)
         acc["fit_rows"] += len(df)
-        o = bl._codes(df["origin_state"])
-        d = bl._codes(df["next_state"])
+        o = bl._codes(df["from_state"])
+        d = bl._codes(df["to_state"])
         ok = (o >= 0) & (d >= 0)
         acc["null_state"] += int((~ok).sum())
 
-        per = df["origin_period"].to_numpy().astype(np.int64)
+        per = df["from_period"].to_numpy().astype(np.int64)
         month = (per // 100) * 12 + per % 100 - 1
         fp = lookup_fp(fp_by_prefix, df["loan_id"].astype(str))
         age = month - fp
@@ -204,28 +204,28 @@ def normalise(counts):
 # ==========================================================================
 # tables
 # ==========================================================================
-def cell_status(counts, a, y, origin):
-    """'absent', 'thin' or '' for an (age, year) cell and origin row."""
+def cell_status(counts, a, y, from_state):
+    """'absent', 'thin' or '' for an (age, year) cell and from row."""
     if counts[a, y].sum() == 0:
         return "absent"
-    if counts[a, y, S[origin]].sum() < THIN:
+    if counts[a, y, S[from_state]].sum() < THIN:
         return "thin"
     return ""
 
 
-def cell_text(counts, probs, a, y, origin, dest):
+def cell_text(counts, probs, a, y, from_state, to_state):
     """'p% (k/n)', or counts only when thin, or the absence marker."""
-    st = cell_status(counts, a, y, origin)
+    st = cell_status(counts, a, y, from_state)
     if st == "absent":
         return "structurally absent"
-    k = counts[a, y, S[origin], S[dest]]
-    n = counts[a, y, S[origin]].sum()
+    k = counts[a, y, S[from_state], S[to_state]]
+    n = counts[a, y, S[from_state]].sum()
     if st == "thin":
         return "thin %s/%s" % (bl.fmt(k), bl.fmt(n))
     p = probs[a, y]
     if p is None:
         return "refused %s/%s" % (bl.fmt(k), bl.fmt(n))
-    return "%.2f%% (%s/%s)" % (100.0 * p[S[origin], S[dest]], bl.fmt(k), bl.fmt(n))
+    return "%.2f%% (%s/%s)" % (100.0 * p[S[from_state], S[to_state]], bl.fmt(k), bl.fmt(n))
 
 
 def margin_text(k, n):
@@ -235,10 +235,10 @@ def margin_text(k, n):
     return "%s (%s/%s)" % (bl.pct(k, n, 2), bl.fmt(k), bl.fmt(n))
 
 
-def contrast(rep, counts, probs, origin, dest, title):
+def contrast(rep, counts, probs, from_state, to_state, title):
     """The two table shapes for one cell: calendar held, then age held."""
     w = 27
-    rep.emit("%s   (%s -> %s)" % (title, origin, dest))
+    rep.emit("%s   (%s -> %s)" % (title, from_state, to_state))
     rep.emit()
     rep.emit("(a) Calendar held, age varies - one row per year:")
     rep.rule()
@@ -247,7 +247,7 @@ def contrast(rep, counts, probs, origin, dest, title):
     rep.rule()
     for y, yr in enumerate(YEARS):
         rep.emit("%-8d" % yr + "".join("%*s" % (w, cell_text(counts, probs, a, y,
-                                                              origin, dest))
+                                                              from_state, to_state))
                                        for a in range(NA)))
     rep.rule()
     rep.emit()
@@ -257,38 +257,38 @@ def contrast(rep, counts, probs, origin, dest, title):
     rep.rule()
     for a, lab in enumerate(AGE_LABELS):
         rep.emit("%-8s" % lab + "".join("%*s" % (w, cell_text(counts, probs, a, y,
-                                                               origin, dest))
+                                                               from_state, to_state))
                                         for y in range(NY)))
     rep.rule()
     rep.emit("%-8s" % "all" + "".join(
-        "%*s" % (w, margin_text(counts[:, y, S[origin], S[dest]].sum(),
-                                counts[:, y, S[origin]].sum()))
+        "%*s" % (w, margin_text(counts[:, y, S[from_state], S[to_state]].sum(),
+                                counts[:, y, S[from_state]].sum()))
         for y in range(NY)))
     rep.emit("'all' pools every age bucket within the year (age-assigned rows only).")
     rep.emit()
 
 
-def grid(rep, counts, probs, origin, dest, title):
+def grid(rep, counts, probs, from_state, to_state, title):
     """One age x year table of a single cell, with margins."""
     w = 27
     rep.emit("%s   (%s -> %s; thin = %s row under %s)"
-             % (title, origin, dest, origin, bl.fmt(THIN)))
+             % (title, from_state, to_state, from_state, bl.fmt(THIN)))
     rep.rule()
     rep.emit("%-8s" % "age" + "".join("%*s" % (w, str(yr)) for yr in YEARS)
              + "%*s" % (w, "all years"))
     rep.rule()
     for a, lab in enumerate(AGE_LABELS):
         rep.emit("%-8s" % lab + "".join(
-            "%*s" % (w, cell_text(counts, probs, a, y, origin, dest))
+            "%*s" % (w, cell_text(counts, probs, a, y, from_state, to_state))
             for y in range(NY)) + "%*s" % (w, margin_text(
-                counts[a, :, S[origin], S[dest]].sum(),
-                counts[a, :, S[origin]].sum())))
+                counts[a, :, S[from_state], S[to_state]].sum(),
+                counts[a, :, S[from_state]].sum())))
     rep.rule()
     rep.emit("%-8s" % "all" + "".join(
-        "%*s" % (w, margin_text(counts[:, y, S[origin], S[dest]].sum(),
-                                counts[:, y, S[origin]].sum()))
+        "%*s" % (w, margin_text(counts[:, y, S[from_state], S[to_state]].sum(),
+                                counts[:, y, S[from_state]].sum()))
         for y in range(NY)) + "%*s" % (w, margin_text(
-            counts[:, :, S[origin], S[dest]].sum(), counts[:, :, S[origin]].sum())))
+            counts[:, :, S[from_state], S[to_state]].sum(), counts[:, :, S[from_state]].sum())))
     rep.emit()
 
 
@@ -311,14 +311,14 @@ def main():
     rep.emit("counting    : src.baseline.count_transitions, "
              "src.baseline.probability_matrix")
     rep.emit()
-    rep.emit("LOAN AGE = origin_period - First Payment Date (origination file), in")
-    rep.emit("calendar months. Age 0 = the origin month is the first payment month.")
+    rep.emit("LOAN AGE = from_period - First Payment Date (origination file), in")
+    rep.emit("calendar months. Age 0 = the from month is the first payment month.")
     rep.emit("buckets     : %s" % ", ".join(AGE_LABELS))
-    rep.emit("years       : %s (calendar year of origin_period)"
+    rep.emit("years       : %s (calendar year of from_period)"
              % ", ".join(map(str, YEARS)))
-    rep.emit("thin        : origin-row count under %s; shares suppressed, counts kept"
+    rep.emit("thin        : from-row count under %s; shares suppressed, counts kept"
              % bl.fmt(THIN))
-    rep.emit("absent      : no fit row of any origin state in the age x year cell")
+    rep.emit("absent      : no fit row of any from state in the age x year cell")
     rep.emit()
     rep.emit("RESOLVED ORIGINATION COLUMNS   (0-based index = published position - 1)")
     rep.rule()
@@ -354,7 +354,7 @@ def main():
                             "== fit rows", "PASS" if ident else "FAIL"))
     rep.emit()
     if n_un:
-        rep.emit("Unassigned rows by origin state:")
+        rep.emit("Unassigned rows by from state:")
         rep.rule()
         rep.emit("%-52s" % "reason" + "".join("%11s" % s for s in bl.STATES))
         rep.rule()
@@ -404,7 +404,7 @@ def main():
 
     # ---- 1 ---------------------------------------------------------------------
     rep.rule("=")
-    rep.emit("1. COVERAGE GRID - DQ30-origin fit rows by age x year   (unit: rows)")
+    rep.emit("1. COVERAGE GRID - DQ30-from fit rows by age x year   (unit: rows)")
     rep.rule("=")
     rep.emit("Read this before any rate: it decides which comparisons are readable.")
     rep.rule()
@@ -444,7 +444,7 @@ def main():
 
     # ---- 2 ---------------------------------------------------------------------
     rep.rule("=")
-    rep.emit("2. THE FULL DQ30 ROW BY AGE x YEAR   (unit: DQ30-origin fit rows)")
+    rep.emit("2. THE FULL DQ30 ROW BY AGE x YEAR   (unit: DQ30-from fit rows)")
     rep.rule("=")
     rep.emit("Counts on the first line, shares (from probability_matrix) beneath.")
     rep.emit("Thin cells: counts only.")
@@ -490,7 +490,7 @@ def main():
     rep.emit("6. CURRENT -> PREPAID BY AGE x YEAR")
     rep.rule("=")
     grid(rep, C, probs, "Current", "Prepaid", "Prepayment")
-    rep.emit("Cells read 'p (count/origin-row total)'. 'all' margins pool cells and")
+    rep.emit("Cells read 'p (count/from-row total)'. 'all' margins pool cells and")
     rep.emit("are row totals divided directly, since no cell matrix exists for them.")
     rep.emit()
 
