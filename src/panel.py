@@ -42,12 +42,27 @@ features                     everything the model is allowed to read
     hpi_feature     float32  PLACEHOLDER, emitted as all-null. The encoding is
                              not yet decided; the column exists so the join can
                              be added later without rebuilding the panel.
+    property_state  category Freddie "Property State", the two-letter code, from
+                             the origination file. A parquet dictionary of
+                             strings (dictionary<values=string, indices=int8>),
+                             NOT a numeric code: the category list is the union
+                             over every origination file, sorted, so every
+                             partition carries the same dictionary. Null where
+                             the field is blank - never imputed. Added so a
+                             state-level house-price index can be joined later;
+                             no such join exists yet and hpi_feature is untouched.
 
 metadata                     bookkeeping - NEVER a model input
     role            category fit / condition / evaluate (R6)
     post_gap        bool     month t is the first month after a reporting hole
     is_skip         bool     raw status rose by >= 2 rungs across the pair
     is_fall         bool     raw status fell by >= 2 rungs across the pair
+    msa             string   Freddie "Metropolitan Statistical Area (MSA) Or
+                             Metropolitan Division" code, as text; null where
+                             blank. Parked for finer geography; never imputed.
+    postal_code     string   Freddie "Postal Code", the 3-digit prefix, as text
+                             so leading zeros survive; null where blank. Parked
+                             like msa.
 
     METADATA IS NEVER A FEATURE. is_skip and is_fall are derived from the raw
     status at t+1, which is the label side of the pair. Feeding either into a
@@ -55,7 +70,8 @@ metadata                     bookkeeping - NEVER a model input
     tells you next_state is not adjacent to origin_state. They exist so that
     rows can be audited, counted and sliced after the fact, and so that a later
     decision to exclude them can be made without a rebuild. The same applies to
-    post_gap and role. Any model code must select the `features` group by name
+    post_gap and role; msa and postal_code are parked here, not offered as
+    inputs. Any model code must select the `features` group by name
     and must never select by "all columns except the states".
 
 ================================ RULES =================================
@@ -208,9 +224,16 @@ KEYS = ["loan_id", "origin_period"]
 STATE_COLS = ["origin_state", "next_state"]
 FEATURES = ["run_length", "loan_age", "is_modified", "months_since_modification",
             "fico", "ltv", "dti", "rate_spread",
-            "unemp_level", "unemp_chg_12m", "hpi_feature"]
-METADATA = ["role", "post_gap", "is_skip", "is_fall"]
+            "unemp_level", "unemp_chg_12m", "hpi_feature", "property_state"]
+METADATA = ["role", "post_gap", "is_skip", "is_fall", "msa", "postal_code"]
 SCHEMA = KEYS + STATE_COLS + FEATURES + METADATA
+
+# Non-numeric features, and the exact Arrow type each must carry on disk.
+# panel_io.validate enforces this independently of the manifest: a partition
+# or manifest that records anything else fails the load, with no override.
+CATEGORICAL_FEATURES = {
+    "property_state": "dictionary<values=string, indices=int8, ordered=0>"}
+MAX_CATEGORIES = 127                    # int8 dictionary indices
 
 # ---- attributes resolved from the published layout ----------------------
 PERF_WANTED = [
@@ -230,7 +253,13 @@ ORIG_WANTED = [
     ("ltv", "original loan-to-value (ltv)"),
     ("orig_rate", "original interest rate"),
     ("loan", "loan identifier"),
+    ("property_state", "property state"),
+    ("msa", "metropolitan statistical area (msa) or metropolitan division"),
+    ("postal_code", "postal code"),
 ]
+# 0-based indices the project relies on (Freddie fields 17, 5 and 19), asserted
+# after resolution - the same safeguard the performance file has.
+ORIG_EXPECTED = {"property_state": 16, "msa": 4, "postal_code": 18}
 PERF_SHEET = "monthly performance data file"
 ORIG_SHEET = "origination data file"
 
@@ -346,12 +375,15 @@ def resolve(path=LAYOUT):
 
     perf, perf_sheet = pick(PERF_SHEET, PERF_WANTED)
     orig, orig_sheet = pick(ORIG_SHEET, ORIG_WANTED)
-    for label, expect in PERF_EXPECTED.items():
-        got = perf[label][0]
-        if got != expect:
-            raise SystemExit(
-                "layout gives index %d for performance %r but the project uses "
-                "%d - stopping before any file is read" % (got, label, expect))
+    for which, found, expected in (("performance", perf, PERF_EXPECTED),
+                                   ("origination", orig, ORIG_EXPECTED)):
+        for label, expect in expected.items():
+            got = found[label][0]
+            if got != expect:
+                raise SystemExit(
+                    "layout gives index %d for %s %r but the project uses "
+                    "%d - stopping before any file is read"
+                    % (got, which, label, expect))
     return perf, orig, perf_sheet, orig_sheet
 
 
@@ -462,14 +494,45 @@ def split_flags(loan_ids):
 # ==========================================================================
 # origination features
 # ==========================================================================
-def load_origination(path, oidx, pmms):
-    """Sorted (loan tail, fico, ltv, dti, rate_spread) for one quarter.
+def state_categories(orig_paths, oidx):
+    """Sorted union of the Property State values in every origination file.
+
+    Read once, before the first write, so every partition shares one dictionary.
+    Blank is a missing value, not a category.
+    """
+    seen = set()
+    for path in orig_paths:
+        col = pd.read_csv(path, sep="|", header=None, dtype=str,
+                          usecols=[oidx["property_state"][0]], engine="c",
+                          na_filter=False).iloc[:, 0].str.strip()
+        seen.update(col.unique())
+    seen.discard("")
+    cats = sorted(seen)
+    if len(cats) > MAX_CATEGORIES:
+        raise SystemExit("%d distinct Property State values do not fit int8 "
+                         "dictionary indices" % len(cats))
+    return cats
+
+
+def _text(frame, col):
+    """Stripped text column as an object array, None where blank."""
+    s = frame[col].str.strip().to_numpy(dtype=object)
+    s[s == ""] = None
+    return s
+
+
+def load_origination(path, oidx, pmms, categories=None):
+    """Sorted (loan tail, fico, ltv, dti, rate_spread, geography) for a quarter.
 
     The loan sequence number is a per-file constant 5-character prefix plus a
     7-digit tail, so the tail alone keys the quarter and sorts numerically.
     rate_spread is the note rate minus the PMMS 30-year fixed rate prevailing in
     the origination month, which is taken as the first payment month minus one -
     the origination date itself is not carried in the file.
+
+    property_state is returned as int8 codes into `categories` (-1 where blank),
+    which defaults to this file's own sorted values; a non-blank value outside
+    `categories` is an error. msa and postal_code are text, None where blank.
     """
     cols = sorted(oidx[k][0] for k in oidx)
     frame = pd.read_csv(path, sep="|", header=None, dtype=str, usecols=cols,
@@ -496,10 +559,25 @@ def load_origination(path, oidx, pmms):
     market = lookup(pmms, orig_month)
     spread = (rate - market).astype(np.float32)
 
+    state = _text(frame, oidx["property_state"][0])
+    present = np.array([v is not None for v in state], dtype=bool)
+    if categories is None:
+        categories = sorted(set(state[present]))
+    state_code = pd.Categorical(state, categories=categories).codes
+    unknown = present & (state_code < 0)
+    if unknown.any():
+        raise RuntimeError("%s: Property State value(s) outside the category "
+                           "list: %s" % (path, sorted(set(state[unknown]))))
+    msa = _text(frame, oidx["msa"][0])
+    postal = _text(frame, oidx["postal_code"][0])
+
     order = np.argsort(tail.to_numpy(), kind="stable")
     return {"tail": tail.to_numpy()[order], "fico": fico[order],
             "ltv": ltv[order], "dti": dti[order], "rate_spread": spread[order],
             "orig_month": orig_month[order],
+            "property_state": state_code[order].astype(np.int8),
+            "state_categories": list(categories),
+            "msa": msa[order], "postal_code": postal[order],
             "n": len(order), "n_spread": int(np.isfinite(spread).sum())}
 
 
@@ -514,6 +592,13 @@ def join_origination(orig, tails):
         vals[hit] = orig[col][safe][hit]
         out[col] = vals
     out["orig_month"] = np.where(hit, orig["orig_month"][safe], -1)  # -1: none
+    code = np.full(len(tails), -1, dtype=np.int8)              # -1: none
+    code[hit] = orig["property_state"][safe][hit]
+    out["property_state"] = code
+    for col in ("msa", "postal_code"):
+        vals = np.full(len(tails), None, dtype=object)
+        vals[hit] = orig[col][safe][hit]
+        out[col] = vals
     return out, int(hit.sum())
 
 
@@ -590,6 +675,7 @@ class Report(object):
         self.censored = np.zeros(len(CENSOR_REASONS), dtype=np.int64)
         self.terminated = 0
         self.nulls = {c: 0 for c in SCHEMA}
+        self.state_categories = None    # Property State dictionary, whole build
         self.zero_row_loans = {}
         self.orig_matched = 0
         self.train_loans = 0
@@ -919,7 +1005,7 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     unemp_chg = lookup(unchg, origin_month)
 
     # ---- 6. join origination on loan_id ----------------------------------
-    orig = load_origination(orig_path, oidx, pmms)
+    orig = load_origination(orig_path, oidx, pmms, rep.state_categories)
     feats, matched = join_origination(orig, tail[org])
     rep.orig_matched += matched
 
@@ -962,10 +1048,14 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
         "unemp_level": unemp_level,
         "unemp_chg_12m": unemp_chg,
         "hpi_feature": np.full(m, np.nan, dtype=np.float32),
+        "property_state": pd.Categorical.from_codes(
+            feats["property_state"], categories=orig["state_categories"]),
         "role": pd.Categorical.from_codes(role, categories=ROLES),
         "post_gap": post_gap,
         "is_skip": is_skip,
         "is_fall": is_fall,
+        "msa": pd.array(feats["msa"], dtype="string"),
+        "postal_code": pd.array(feats["postal_code"], dtype="string"),
     })[SCHEMA]
 
     # Deterministic row order, already achieved: the source was lexsorted on
@@ -1324,6 +1414,7 @@ def build(allow_multi_file_loans=False):
                           for p in perf_paths}
     rep.prefix_collisions = check_prefixes(rep.prefix_by_file,
                                            allow_multi_file_loans)
+    rep.state_categories = state_categories(orig_paths, oidx)
 
     # First write of the build: remove the previous manifest, so a build that
     # stops partway leaves partitions but no manifest vouching for them.

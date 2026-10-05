@@ -42,7 +42,11 @@ class ModificationTest(unittest.TestCase):
             {"tail": np.array([1]), "orig_month": np.array([60]), "n": 1,
              "fico": np.zeros(1, np.float32), "ltv": np.zeros(1, np.float32),
              "dti": np.zeros(1, np.float32),
-             "rate_spread": np.zeros(1, np.float32)}, tail)[0]["orig_month"]
+             "rate_spread": np.zeros(1, np.float32),
+             "property_state": np.zeros(1, np.int8),
+             "msa": np.array([None], dtype=object),
+             "postal_code": np.array([None], dtype=object)},
+            tail)[0]["orig_month"]
         true_age = period - orig
         self.assertEqual(list(true_age), [40, 41, 42, 43])
         self.assertTrue(np.all(np.diff(true_age) > 0))
@@ -107,10 +111,15 @@ def make_frame(quarter, n):
         "unemp_level": np.full(n, 5, dtype=np.float32),
         "unemp_chg_12m": np.zeros(n, dtype=np.float32),
         "hpi_feature": np.full(n, np.nan, dtype=np.float32),
+        "property_state": pd.Categorical.from_codes(
+            np.where(np.arange(n) == 1, -1, 0).astype(np.int8),
+            categories=["CA", "TX"]),
         "role": pd.Categorical.from_codes(codes, categories=panel.ROLES),
         "post_gap": np.zeros(n, dtype=bool),
         "is_skip": np.zeros(n, dtype=bool),
         "is_fall": np.zeros(n, dtype=bool),
+        "msa": pd.array(["12980"] + [None] * (n - 1), dtype="string"),
+        "postal_code": pd.array(["010"] * n, dtype="string"),
     })[panel.SCHEMA]
 
 
@@ -159,6 +168,37 @@ class LoaderTest(unittest.TestCase):
         self.assertEqual(types["months_since_modification"], "int32")
         self.assertEqual([c["name"] for c in self.manifest["schema"]],
                          panel.SCHEMA)
+
+    def test_property_state_is_a_string_dictionary_feature(self):
+        types = {c["name"]: c["type"] for c in self.manifest["schema"]}
+        self.assertEqual(types["property_state"],
+                         "dictionary<values=string, indices=int8, ordered=0>")
+        self.assertIn("property_state", panel.FEATURES)
+        self.assertNotIn("property_state", panel.METADATA)
+        for col in ("msa", "postal_code"):
+            self.assertIn(col, panel.METADATA)
+            self.assertNotIn(col, panel.FEATURES)
+        df = load_panel()
+        self.assertIsInstance(df["property_state"].dtype, pd.CategoricalDtype)
+        self.assertEqual(list(df["property_state"].isna()),
+                         [False, True, False, False, True])   # row 1 of each file
+        self.assertEqual(set(df["property_state"].dropna()), {"CA"})
+        self.assertEqual(df["postal_code"].iloc[0], "010")    # leading zero kept
+
+    def test_property_state_with_another_type_raises(self):
+        # a numeric property_state - in the files AND recorded in the manifest -
+        # must still be refused: the declared type is not the manifest's to set
+        bad = {q: make_frame(q, n).assign(
+            property_state=np.zeros(n, dtype=np.float32))
+            for q, n in QUARTERS.items()}
+        rep = panel.Report()
+        rep.build_stamp = STAMP
+        for q, n in QUARTERS.items():
+            rep.schemas[q] = panel.write_partition(bad[q], self.path(q), STAMP)
+            rep.quarters.append((q, n, 0.0))
+        panel.write_manifest(rep, self.dir)
+        self.assertPanelError("column property_state", "float",
+                              "the schema declares")
 
     def test_missing_partition_raises(self):
         os.remove(self.path("2006Q2"))

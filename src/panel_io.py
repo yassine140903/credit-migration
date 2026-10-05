@@ -26,7 +26,8 @@ import os
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from src.panel import MANIFEST_NAME, PANEL_DIR, PANEL_FILE, ROLES, STAMP_KEY
+from src.panel import (CATEGORICAL_FEATURES, MANIFEST_NAME, PANEL_DIR,
+                       PANEL_FILE, ROLES, STAMP_KEY)
 
 
 class PanelError(RuntimeError):
@@ -60,6 +61,14 @@ def validate(manifest):
         problems.append("%s: on disk, not in the manifest" % name)
 
     want = [(c["name"], c["type"]) for c in manifest["schema"]]
+    # Non-numeric features must carry exactly the type src.panel declares for
+    # them, whatever the manifest says: the manifest records what was written,
+    # it does not get to redefine what a feature is.
+    want_types = dict(want)
+    for col, declared in CATEGORICAL_FEATURES.items():
+        if want_types.get(col) != declared:
+            problems.append("column %s: manifest records %s, the schema "
+                            "declares %s" % (col, want_types.get(col), declared))
     for name in sorted(set(listed) & on_disk):
         with pq.ParquetFile(os.path.join(PANEL_DIR, name)) as f:
             rows = f.metadata.num_rows
