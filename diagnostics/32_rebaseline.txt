@@ -1,0 +1,571 @@
+Re-baseline of the stale gates on the current panel
+panel fingerprint required: 71d85ff7fd2c5d1a   (old 3b1209189824e42f)
+
+======================================================================================================================
+1. GATES RE-RUN
+======================================================================================================================
+diagnostic 23   python diagnostics/23_origination_validity.py   (output rewritten over its .txt)
+    data fingerprint: 71d85ff7fd2c5d1a   required 71d85ff7fd2c5d1a   saved nulls run 71d85ff7fd2c5d1a   PASS
+    data/macro/MORTGAGE30US.csv unchanged (size, mtime): PASS
+    every origination loan classified once per field: PASS (asserted per field)
+    RESULT: PASS   (WANT_FP in the script is 71d85ff7fd2c5d1a; confirmed by the run, not assumed)
+horizon_baseline   python -m src.horizon_baseline   (outputs regenerated in artifacts/horizon_baseline/)
+    checks in its report: 3 PASS, 0 FAIL.   It uses the SAVED count matrix artifacts/baseline/counts.csv,
+    unchanged. It is a prerequisite of the nulls job (the nulls job reconciles against it), not one of the two gates you named.
+cell_counts   python -m src.diagnostics.cell_counts   (reports/cell_counts.csv regenerated; also a prerequisite)
+    proportions sum to 1 within 1e-09 (relative), all 32 cells: PASS
+    cell_brier == 1 - sum p^2 within 1e-12, all cells: PASS
+    realised Default and Prepaid vs scores.csv / compounding.csv: PASS
+    data fingerprint 71d85ff7fd2c5d1a vs saved nulls run 71d85ff7fd2c5d1a: PASS
+    exit code 0   RESULT: PASS
+nulls job   python -m src.horizon_nulls --out-dir <temp>   (artifacts/horizon_nulls/ NOT overwritten)
+    exit code 1   RESULT: FAIL (stopped by its own gate, see below)
+    equals the column sums of artifacts/baseline/counts.csv: FAIL
+    HARD ERROR: like-for-like check failed
+    state               fit rows         share     baseline col. sum
+    ----------------------------------------------------------------------------------------------------------------------------------------------------------
+    Current           38,939,122      96.8393%            39,109,261
+    DQ30                 560,573       1.3941%               563,965
+    DQ60                 137,744       0.3426%               138,474
+    DQ90+                233,923       0.5818%               234,623
+    Prepaid              331,492       0.8244%               332,143
+    Default                7,182       0.0179%                 7,184
+    ----------------------------------------------------------------------------------------------------------------------------------------------------------
+    TOTAL             40,210,036     100.0000%            40,385,650
+
+WHY THE NULLS JOB CANNOT PASS YET (two independent blockers, both self-references to the old universe):
+  (a) it checks that the marginal of the CURRENT panel's fit rows equals the column sums of artifacts/baseline/counts.csv.
+      counts.csv is the baseline MODEL (a pooled count matrix estimated from fit rows). It was estimated on the old panel;
+      the fit rows now differ by the territory and null-ltv fit rows. Passing needs `python -m src.baseline` to re-estimate
+      it. That is model estimation, which this task excluded, so it was NOT run.
+  (b) its pooling check compares against its own previous artifacts/horizon_nulls/model_comparison.csv (old universe).
+      Passing the first time on a changed universe needs that stale reference removed once (a bootstrap pass), then a
+      second run to check against the genuine new one. Replacing that file was declined, so it was NOT done.
+State left behind: artifacts/horizon_nulls/ is unchanged (still the old universe's tables). nulls_report.txt still carries
+the 'stale tables' note, correctly: the tables are NOT current, so the note was NOT removed.
+artifacts/horizon_baseline/ and reports/cell_counts.csv ARE regenerated (old matrix, new universe); if the baseline is
+re-estimated they must be regenerated again, in the order baseline -> horizon_baseline -> cell_counts -> nulls (twice).
+
+======================================================================================================================
+2. DIAGNOSTIC 23: WHAT MOVED, AND WHY
+======================================================================================================================
+panel loans 2,425,495 -> 2,415,202 (10,293 fewer);  panel rows 69,927,577 -> 69,520,712 (406,865 fewer)
+Accounted for by:
+   territory loans (GU, PR, VI)     10,073 loans   400,089 rows   <- expected cause
+   null-ltv loans (999 sentinel)       219 loans     6,775 rows   <- expected cause
+   the named malformed loan              1 loan          1 row    <- NOT one of the two exclusions: the old .txt predates
+                                                                    the build that excluded F06Q30148547 (69,927,577 rows)
+   arithmetic: 2,425,495 - 10,073 - 219 - 1 = 2,415,202 (new 2,415,202);  69,927,577 - 400,089 - 6,775 - 1 = 69,520,712 (new 69,520,712)   closes: True
+
+Moves with a cause OTHER than the two exclusions (flagged, not absorbed):
+  1. The malformed loan (above): the rate_spread<-orig_rate and property_state<-state MALFORMED buckets go from 1 loan to 0,
+     and the first_payment VALID row loses its 1 loan with no panel row. One loan, one row.
+  2. postal_code '000' (8 loans, 180 rows): the old output said the sentinel REACHED the panel as raw text (YES, 8 loans);
+     it now says NO. Not caused by either exclusion (the same 8 loans / 180 rows remain): the hardening change to src/panel.py
+     since that run now nulls '000'. The old .txt predates it.
+  3. 'source lines' section: every src/panel.py line citation moved (267 -> 326, 550 -> not found, ...). Caused by the edits to
+     src/panel.py (docstring, HPI join, exclusions) and the earlier hardening rewrite. Four of the patterns it greps for
+     (ltv[ltv >= LTV_NA], dti[dti >= DTI_NA], rate = num("orig_rate"), seen.discard) now report NOT FOUND because that code
+     no longer exists in that form. The diagnostic's gate does not check these lines, so it still passes, but the section
+     describes code that has been replaced. Needs a decision: update the patterns, or retire the section.
+  4. 'origination loans with no panel row' 6,241 -> 16,534: +10,292 (the two exclusions) +1 (the malformed loan). Expected.
+
+Everything else that moved is the removal of those loans from the panel: the territory tables go to zero, the ltv SENTINEL
+bucket (219 loans) goes to zero, the fico / dti / msa bucket counts fall by the removed loans' share, the harness universe
+goes 407,555 -> 405,705 (section 3), the territory share of that universe goes 1,810 -> 0.
+
+Full line diff of diagnostic 23 (< previous run, > this run):
+  < panel build  : 2026-10-05T10:54:52.953781  (69,927,577 rows, 8 partitions; validated against its manifest)
+  > panel build  : 2026-10-06T16:50:16.061215  (69,520,712 rows, 8 partitions; validated against its manifest)
+  < panel loans  : 2,425,495 loans have at least one panel row; 6,241 origination loans have none
+  > panel loans  : 2,415,202 loans have at least one panel row; 16,534 origination loans have none
+  < GU                 726     0.0299%        25,040       0.0358%      12,569       2,391      10,080   rows
+  <                                                                        604         122         106   loans in role
+  < PR               9,137     0.3767%       367,907       0.5261%     156,572      38,674     172,661   rows
+  <                                                                      7,310       1,813       1,678   loans in role
+  < VI                 210     0.0087%         7,142       0.0102%       3,319         851       2,972   rows
+  <                                                                        167          43          31   loans in role
+  < GU+PR+VI        10,073     0.4153%       400,089       0.5721%     172,460      41,916     185,713   rows
+  <                                                                      8,081       1,978       1,815   loans in role
+  > GU                   0     0.0000%             0       0.0000%           0           0           0   rows
+  >                                                                          0           0           0   loans in role
+  > PR                   0     0.0000%             0       0.0000%           0           0           0   rows
+  >                                                                          0           0           0   loans in role
+  > VI                   0     0.0000%             0       0.0000%           0           0           0   rows
+  >                                                                          0           0           0   loans in role
+  > GU+PR+VI             0     0.0000%             0       0.0000%           0           0           0   rows
+  >                                                                          0           0           0   loans in role
+  < GU                  68          65          79         105          87         118         107          97           726
+  < PR               1,012       1,014         944       1,084       1,327       1,555       1,169       1,032         9,137
+  < VI                  18           8          19          23          43          62          26          11           210
+  < GU+PR+VI         1,098       1,087       1,042       1,212       1,457       1,735       1,302       1,140        10,073
+  < ALL            297,746     307,492     283,121     302,110     301,754     353,254     284,168     295,850     2,425,495
+  > GU                   0           0           0           0           0           0           0           0             0
+  > PR                   0           0           0           0           0           0           0           0             0
+  > VI                   0           0           0           0           0           0           0           0             0
+  > GU+PR+VI             0           0           0           0           0           0           0           0             0
+  > ALL            296,616     306,383     282,060     300,869     300,267     351,479     282,851     294,677     2,415,202
+  < GU               2,542       2,392       2,472       4,114       2,945       4,558       3,380       2,637        25,040
+  < PR              48,734      48,569      40,673      46,187      49,535      57,000      38,921      38,288       367,907
+  < VI                 763         405         737         862       1,601       2,067         579         128         7,142
+  < GU+PR+VI        52,039      51,366      43,882      51,163      54,081      63,625      42,880      41,053       400,089
+  < ALL         11,060,262  10,313,292   8,815,850   9,294,015   8,590,686   9,289,459   6,393,320   6,170,693    69,927,577
+  < 
+  < In the horizon harness (eligible test-split loans at the 2008-12 cut, n = 407,555):
+  > GU                   0           0           0           0           0           0           0           0             0
+  > PR                   0           0           0           0           0           0           0           0             0
+  > VI                   0           0           0           0           0           0           0           0             0
+  > GU+PR+VI             0           0           0           0           0           0           0           0             0
+  > ALL         11,007,083  10,261,159   8,771,116   9,242,175   8,535,877   9,224,837   6,349,937   6,128,528    69,520,712
+  > -------------------------------------------------------------------------------------------------------------------------
+  > 
+  > In the horizon harness (eligible test-split loans at the 2008-12 cut, n = 405,705):
+  < GU                     106     0.0260%             106     0.0262%
+  < PR                   1,672     0.4103%           1,641     0.4057%
+  < VI                      32     0.0079%              32     0.0079%
+  < GU+PR+VI             1,810     0.4441%           1,779     0.4398%
+  > GU                       0     0.0000%               0     0.0000%
+  > PR                       0     0.0000%               0     0.0000%
+  > VI                       0     0.0000%               0     0.0000%
+  > GU+PR+VI                 0     0.0000%               0     0.0000%
+  < fico <- fico                    VALID         2,423,488    69,870,671           0           0   2,423,488           0
+  < fico <- fico                    SENTINEL          2,007        56,906       2,007           0           0           0
+  > fico <- fico                    VALID         2,413,197    69,463,851           0           0   2,413,197           0
+  > fico <- fico                    SENTINEL          2,005        56,861       2,005           0           0           0
+  < ltv <- ltv                      VALID         2,425,276    69,920,802           0           0   2,425,276           0
+  < ltv <- ltv                      SENTINEL            219         6,775         219           0           0           0
+  > ltv <- ltv                      VALID         2,415,202    69,520,712           0           0   2,415,202           0
+  > ltv <- ltv                      SENTINEL              0   (no loan in this bucket)
+  < dti <- dti                      VALID         2,371,238    68,391,952           0           0   2,371,238           0
+  < dti <- dti                      SENTINEL         54,257     1,535,625      54,257           0           0           0
+  > dti <- dti                      VALID         2,361,046    67,988,447           0           0   2,361,046           0
+  > dti <- dti                      SENTINEL         54,156     1,532,265      54,156           0           0           0
+  < rate_spread <- orig_rate        VALID         2,425,494    69,927,576           0           0   2,425,494           0
+  > rate_spread <- orig_rate        VALID         2,415,202    69,520,712           0           0   2,415,202           0
+  < rate_spread <- orig_rate        MALFORMED             1             1           1           0           0           0
+  < rate_spread <- first_payment    VALID         2,425,495    69,927,577           1           0   2,425,494           0
+  > rate_spread <- orig_rate        MALFORMED             0   (no loan in this bucket)
+  > -------------------------------------------------------------------------------------------------------------------------
+  > rate_spread <- first_payment    VALID         2,415,202    69,520,712           0           0   2,415,202           0
+  < property_state <- state         VALID         2,425,494    69,927,576           0           0   2,425,494           0
+  > property_state <- state         VALID         2,415,202    69,520,712           0           0   2,415,202           0
+  < property_state <- state         MALFORMED             1             1           1           0           0           0
+  < msa <- msa  (metadata)          VALID         1,946,190    56,688,727           0           0   1,946,190           0
+  < msa <- msa  (metadata)          SENTINEL        479,305    13,238,850     479,305           0           0           0
+  > property_state <- state         MALFORMED             0   (no loan in this bucket)
+  > -------------------------------------------------------------------------------------------------------------------------
+  > msa <- msa  (metadata)          VALID         1,944,340    56,615,039           0           0   1,944,340           0
+  > msa <- msa  (metadata)          SENTINEL        470,862    12,905,673     470,862           0           0           0
+  < postal_code <- postal (meta)    VALID         2,425,487    69,927,397           0           0   2,425,487           0
+  < postal_code <- postal (meta)    SENTINEL              8           180           0           0           8           0
+  > postal_code <- postal (meta)    VALID         2,415,194    69,520,532           0           0   2,415,194           0
+  > postal_code <- postal (meta)    SENTINEL              8           180           8           0           0           0
+  < src/panel.py:267    FICO_RANGE: what counts as a valid FICO                                        FICO_RANGE = (300, 850)
+  < src/panel.py:268    the LTV / DTI 'not available' constants                                        DTI_NA = 999
+  < src/panel.py:543    num(): every numeric field is parsed with errors="coerce"                      def num(label):
+  < src/panel.py:545      ... so a non-numeric string becomes NaN, silently                            errors="coerce").to_numpy()
+  < src/panel.py:548    fico: outside 300-850 -> NaN (this also removes the 9999 sentinel)             fico[(fico < FICO_RANGE[0]) | (fico > FICO_RANGE[1]
+  < src/panel.py:550    ltv: only values >= 999 -> NaN; nothing below 999 is range-checked             ltv[ltv >= LTV_NA] = np.nan
+  < src/panel.py:552    dti: only values >= 999 -> NaN; nothing below 999 is range-checked             dti[dti >= DTI_NA] = np.nan
+  < src/panel.py:553    rate: parsed with no range check and no sentinel handling                      rate = num("orig_rate").astype(np.float32)
+  < src/panel.py:559    market: PMMS rate for the first-payment month minus one (NaN if no month)      market = lookup(pmms, orig_month)
+  < src/panel.py:560    rate_spread = rate - market: inherits any bad rate; NaN if either is NaN       spread = (rate - market).astype(np.float32)
+  < src/panel.py:517    property_state / msa / postal_code are read as text ...                        def _text(frame, col):
+  < src/panel.py:520      ... a blank becomes None (null); anything else passes through as-is          s[s == ""] = None
+  < src/panel.py:566    property_state: coded against the category list                                state_code = pd.Categorical(state, categories=categ
+  < src/panel.py:509      ... the list is every non-blank value in the files, so an invalid code would be ADDED, not rejected seen.discard("")
+  > src/panel.py:326    FICO_RANGE: what counts as a valid FICO                                        FICO_RANGE = (300, 850)
+  > src/panel.py:327    the LTV / DTI 'not available' constants                                        DTI_NA = 999
+  > src/panel.py:708    num(): every numeric field is parsed with errors="coerce"                      def num(label):
+  > src/panel.py:709      ... so a non-numeric string becomes NaN, silently                            return pd.to_numeric(text(label), errors="coerce").
+  > src/panel.py:712    fico: outside 300-850 -> NaN (this also removes the 9999 sentinel)             fico[(fico < FICO_RANGE[0]) | (fico > FICO_RANGE[1]
+  > src/panel.py:None   ltv: only values >= 999 -> NaN; nothing below 999 is range-checked             NOT FOUND: ltv\[ltv >= LTV_NA\]
+  > src/panel.py:None   dti: only values >= 999 -> NaN; nothing below 999 is range-checked             NOT FOUND: dti\[dti >= DTI_NA\]
+  > src/panel.py:None   rate: parsed with no range check and no sentinel handling                      NOT FOUND: rate = num\("orig_rate"\)
+  > src/panel.py:726    market: PMMS rate for the first-payment month minus one (NaN if no month)      market = lookup(pmms, orig_month)
+  > src/panel.py:727    rate_spread = rate - market: inherits any bad rate; NaN if either is NaN       spread = (rate - market).astype(np.float32)
+  > src/panel.py:666    property_state / msa / postal_code are read as text ...                        def _text(frame, col):
+  > src/panel.py:669      ... a blank becomes None (null); anything else passes through as-is          s[s == ""] = None
+  > src/panel.py:730    property_state: coded against the category list                                state_code = pd.Categorical(state, categories=PROPE
+  > src/panel.py:None     ... the list is every non-blank value in the files, so an invalid code would be ADDED, not rejected NOT FOUND: seen\.discard\(\"
+  < A documented sentinel code reaches a metadata string column as raw text: YES: postal_code (8 loans)
+  > A documented sentinel code reaches a metadata string column as raw text: NO
+  < data fingerprint: 3b1209189824e42f   required 3b1209189824e42f   saved nulls run 3b1209189824e42f   PASS
+  > data fingerprint: 71d85ff7fd2c5d1a   required 71d85ff7fd2c5d1a   saved nulls run 71d85ff7fd2c5d1a   PASS
+  < runtime: 65.5 s  (1.09 min)
+  < =========================================================================================================================
+  > runtime: 73.8 s  (1.23 min)
+  > =========================================================================================================================
+
+======================================================================================================================
+2b. REGENERATED BASELINE RUN: OLD vs NEW  (artifacts/horizon_baseline/, same count matrix, new universe)
+======================================================================================================================
+scores.csv   (old -> new)
+  6, fixed
+      n                                         404486  ->  402667                     (diff -1819)
+      brier                               0.3439959944  ->  0.3447202674               (diff +0.000724273)
+  6, varying
+      n                                         407298  ->  405449                     (diff -1849)
+      brier                               0.3463075338  ->  0.3470093279               (diff +0.000701794)
+  12, fixed
+      n                                         404486  ->  402667                     (diff -1819)
+      brier                               0.5096982509  ->  0.5108798737               (diff +0.00118162)
+  12, varying
+      n                                         407069  ->  405221                     (diff -1848)
+      brier                               0.5127172217  ->  0.5138530947               (diff +0.00113587)
+  24, fixed
+      n                                         404486  ->  402667                     (diff -1819)
+      brier                               0.6679180281  ->  0.6693220537               (diff +0.00140403)
+  24, varying
+      n                                         406162  ->  404319                     (diff -1843)
+      brier                               0.6692976178  ->  0.6706560758               (diff +0.00135846)
+  60, fixed
+      n                                         404486  ->  402667                     (diff -1819)
+      brier                               0.6994169295  ->  0.7000914064               (diff +0.000674477)
+  60, varying
+      n                                         404541  ->  402722                     (diff -1819)
+      brier                               0.6994531528  ->  0.7001277011               (diff +0.000674548)
+compounding.csv   (old -> new)
+  6, fixed
+      n                                         404486  ->  402667                     (diff -1819)
+      default_pred_n                       1462.218758  ->  1457.822149                (diff -4.39661)
+      default_pred_share                0.003615004618  ->  0.003620416246             (diff +5.41163e-06)
+      default_real_n                              1553  ->  1552                       (diff -1)
+      default_real_share                0.003839440673  ->  0.003854301445             (diff +1.48608e-05)
+      default_gap_pp                    -0.02244360549  ->  -0.02338851988             (diff -0.000944914)
+      prepaid_pred_n                       19459.70975  ->  19371.95435                (diff -87.7554)
+      prepaid_pred_share                 0.04810972382  ->  0.04810911833              (diff -6.05491e-07)
+      prepaid_real_n                             56274  ->  56176                      (diff -98)
+      prepaid_real_share                  0.1391247163  ->  0.1395098183               (diff +0.000385102)
+      prepaid_gap_pp                      -9.101499248  ->  -9.140069996               (diff -0.0385707)
+  6, varying
+      n                                         407298  ->  405449                     (diff -1849)
+      default_pred_n                       1581.391559  ->  1576.092571                (diff -5.29899)
+      default_pred_share                0.003882640129  ->  0.003887276995             (diff +4.63687e-06)
+      default_real_n                              1553  ->  1552                       (diff -1)
+      default_real_share                0.003812933037  ->  0.003827855045             (diff +1.4922e-05)
+      default_gap_pp                    0.006970709217  ->  0.005942195081             (diff -0.00102851)
+      prepaid_pred_n                       19585.00866  ->  19495.88341                (diff -89.1252)
+      prepaid_pred_share                 0.04808520704  ->  0.04808467505              (diff -5.31991e-07)
+      prepaid_real_n                             56274  ->  56176                      (diff -98)
+      prepaid_real_share                  0.1381641943  ->  0.1385525676               (diff +0.000388373)
+      prepaid_gap_pp                      -9.007898724  ->  -9.04678926                (diff -0.0388905)
+  12, fixed
+      n                                         404486  ->  402667                     (diff -1819)
+      default_pred_n                       2872.627043  ->  2862.924376                (diff -9.70267)
+      default_pred_share                0.007101919578  ->  0.007109905644             (diff +7.98607e-06)
+      default_real_n                              3947  ->  3946                       (diff -1)
+      default_real_share                 0.00975806332  ->  0.009799660762             (diff +4.15974e-05)
+      default_gap_pp                     -0.2656143742  ->  -0.2689755118              (diff -0.00336114)
+      prepaid_pred_n                       37900.49869  ->  37729.61384                (diff -170.885)
+      prepaid_pred_share                 0.09370039678  ->  0.09369929456              (diff -1.10223e-06)
+      prepaid_real_n                             88918  ->  88770                      (diff -148)
+      prepaid_real_share                  0.2198296109  ->  0.2204551155               (diff +0.000625505)
+      prepaid_gap_pp                      -12.61292141  ->  -12.6755821                (diff -0.0626607)
+  12, varying
+      n                                         407069  ->  405221                     (diff -1848)
+      default_pred_n                       3021.224519  ->  3010.325376                (diff -10.8991)
+      default_pred_share                0.007421897809  ->  0.007428848397             (diff +6.95059e-06)
+      default_real_n                              3947  ->  3946                       (diff -1)
+      default_real_share                 0.00969614488  ->  0.009737896111             (diff +4.17512e-05)
+      default_gap_pp                     -0.2274247071  ->  -0.2309047714              (diff -0.00348006)
+      prepaid_pred_n                       38126.67007  ->  37953.18966                (diff -173.48)
+      prepaid_pred_share                 0.09366144332  ->  0.09366047085              (diff -9.72465e-07)
+      prepaid_real_n                             88918  ->  88770                      (diff -148)
+      prepaid_real_share                  0.2184347125  ->  0.2190656457               (diff +0.000630933)
+      prepaid_gap_pp                      -12.47732692  ->  -12.54051748               (diff -0.0631906)
+  24, fixed
+      n                                         404486  ->  402667                     (diff -1819)
+      default_pred_n                       5366.291948  ->  5346.086572                (diff -20.2054)
+      default_pred_share                 0.01326694113  ->  0.01327669407              (diff +9.75295e-06)
+      default_real_n                             11354  ->  11350                      (diff -4)
+      default_real_share                 0.02807019279  ->  0.02818706276              (diff +0.00011687)
+      default_gap_pp                      -1.480325166  ->  -1.491036869               (diff -0.0107117)
+      prepaid_pred_n                       71981.51356  ->  71657.00809                (diff -324.505)
+      prepaid_pred_share                  0.1779579851  ->  0.1779559986               (diff -1.98649e-06)
+      prepaid_real_n                            147404  ->  147143                     (diff -261)
+      prepaid_real_share                  0.3644229961  ->  0.3654210551               (diff +0.000998059)
+      prepaid_gap_pp                       -18.6465011  ->  -18.74650565               (diff -0.100005)
+  24, varying
+      n                                         406162  ->  404319                     (diff -1843)
+      default_pred_n                       5435.982234  ->  5414.793495                (diff -21.1887)
+      default_pred_share                 0.01338377848  ->  0.01339237952              (diff +8.60104e-06)
+      default_real_n                             11360  ->  11356                      (diff -4)
+      default_real_share                 0.02796913547  ->  0.0280867335               (diff +0.000117598)
+      default_gap_pp                      -1.458535699  ->  -1.469435398               (diff -0.0108997)
+      prepaid_pred_n                       72271.22674  ->  71942.57622                (diff -328.651)
+      prepaid_pred_share                  0.1779369482  ->  0.1779351854               (diff -1.76277e-06)
+      prepaid_real_n                            147404  ->  147143                     (diff -261)
+      prepaid_real_share                  0.3629192293  ->  0.3639279876               (diff +0.00100876)
+      prepaid_gap_pp                      -18.49822811  ->  -18.59928022               (diff -0.101052)
+  60, fixed
+      n                                         404486  ->  402667                     (diff -1819)
+      default_pred_n                       11290.12474  ->  11243.43242                (diff -46.6923)
+      default_pred_share                 0.02791227568  ->  0.0279224084               (diff +1.01327e-05)
+      default_real_n                             30104  ->  30078                      (diff -26)
+      default_real_share                 0.07442532004  ->  0.07469695803              (diff +0.000271638)
+      default_gap_pp                      -4.651304436  ->  -4.677454963               (diff -0.0261505)
+      prepaid_pred_n                       155037.1912  ->  154338.3284                (diff -698.863)
+      prepaid_pred_share                  0.3832943321  ->  0.3832902334               (diff -4.09871e-06)
+      prepaid_real_n                            271906  ->  271218                     (diff -688)
+      prepaid_real_share                  0.6722259856  ->  0.6735540782               (diff +0.00132809)
+      prepaid_gap_pp                      -28.89316535  ->  -29.02638448               (diff -0.133219)
+  60, varying
+      n                                         404541  ->  402722                     (diff -1819)
+      default_pred_n                       11299.33513  ->  11252.64281                (diff -46.6923)
+      default_pred_share                 0.02793124833  ->  0.02794146537              (diff +1.0217e-05)
+      default_real_n                             30132  ->  30106                      (diff -26)
+      default_real_share                 0.07448441567  ->  0.07475628349              (diff +0.000271868)
+      default_gap_pp                      -4.655316734  ->  -4.681481813               (diff -0.0261651)
+      prepaid_pred_n                       155055.2324  ->  154356.3696                (diff -698.863)
+      prepaid_pred_share                  0.3832868174  ->  0.3832826853               (diff -4.13209e-06)
+      prepaid_real_n                            271906  ->  271218                     (diff -688)
+      prepaid_real_share                   0.672134592  ->  0.6734620905               (diff +0.0013275)
+      prepaid_gap_pp                      -28.88477746  ->  -29.01794052               (diff -0.133163)
+predicted_by_start.csv   (old -> new, n_loans and the six predicted probabilities)
+  6, Current
+      n_loans                                   387772  ->  386004                     (diff -1768)
+      Current                             0.9290386739  ->  0.9290386739            
+      DQ30                               0.01402761846  ->  0.01402761846           
+      DQ60                              0.003686390378  ->  0.003686390378          
+      DQ90+                             0.004619999266  ->  0.004619999266          
+      Prepaid                            0.04837626641  ->  0.04837626641           
+      Default                          0.0002510516105  ->  0.0002510516105         
+  6, DQ30
+      n_loans                                     9428  ->  9377                       (diff -51)
+      Current                             0.7554622178  ->  0.7554622178            
+      DQ30                               0.02533612435  ->  0.02533612435           
+      DQ60                               0.01527771022  ->  0.01527771022           
+      DQ90+                               0.1358594087  ->  0.1358594087            
+      Prepaid                            0.04982038777  ->  0.04982038777           
+      Default                            0.01824415115  ->  0.01824415115           
+  6, DQ60
+      n_loans                                     3376  ->  3367                       (diff -9)
+      Current                             0.4717140277  ->  0.4717140277            
+      DQ30                               0.02488391515  ->  0.02488391515           
+      DQ60                               0.02012565712  ->  0.02012565712           
+      DQ90+                               0.3618084064  ->  0.3618084064            
+      Prepaid                            0.04090486157  ->  0.04090486157           
+      Default                            0.08056313206  ->  0.08056313206           
+  6, DQ90+
+      n_loans                                     6979  ->  6957                       (diff -22)
+      Current                             0.3117035033  ->  0.3117035033            
+      DQ30                               0.02094720528  ->  0.02094720528           
+      DQ60                               0.01971329549  ->  0.01971329549           
+      DQ90+                               0.4625583802  ->  0.4625583802            
+      Prepaid                            0.03271525624  ->  0.03271525624           
+      Default                             0.1523623594  ->  0.1523623594            
+  12, Current
+      n_loans                                   387772  ->  386004                     (diff -1768)
+      Current                             0.8768891853  ->  0.8768891853            
+      DQ30                               0.01357611344  ->  0.01357611344           
+      DQ60                              0.003804375558  ->  0.003804375558          
+      DQ90+                             0.009668728347  ->  0.009668728347          
+      Prepaid                            0.09432048594  ->  0.09432048594           
+      Default                           0.001741111401  ->  0.001741111401          
+  12, DQ30
+      n_loans                                     9428  ->  9377                       (diff -51)
+      Current                             0.7705486655  ->  0.7705486655            
+      DQ30                               0.01446529912  ->  0.01446529912           
+      DQ60                              0.006157717243  ->  0.006157717243          
+      DQ90+                              0.07530289778  ->  0.07530289778           
+      Prepaid                            0.09269869282  ->  0.09269869282           
+      Default                            0.04082672749  ->  0.04082672749           
+  12, DQ60
+      n_loans                                     3376  ->  3367                       (diff -9)
+      Current                              0.579309935  ->  0.579309935             
+      DQ30                               0.01532716648  ->  0.01532716648           
+      DQ60                              0.009656569397  ->  0.009656569397          
+      DQ90+                               0.1801991748  ->  0.1801991748            
+      Prepaid                            0.07762424329  ->  0.07762424329           
+      Default                              0.137882911  ->  0.137882911             
+  12, DQ90+
+      n_loans                                     6979  ->  6957                       (diff -22)
+      Current                             0.4588895372  ->  0.4588895372            
+      DQ30                               0.01508302814  ->  0.01508302814           
+      DQ60                               0.01098437918  ->  0.01098437918           
+      DQ90+                                0.225378636  ->  0.225378636             
+      Prepaid                            0.06477699141  ->  0.06477699141           
+      Default                             0.2248874281  ->  0.2248874281            
+  24, Current
+      n_loans                                   387772  ->  386004                     (diff -1768)
+      Current                             0.7860364902  ->  0.7860364902            
+      DQ30                                0.0123052736  ->  0.0123052736            
+      DQ60                              0.003562555846  ->  0.003562555846          
+      DQ90+                              0.01236539415  ->  0.01236539415           
+      Prepaid                             0.1792092109  ->  0.1792092109            
+      Default                            0.00652107527  ->  0.00652107527           
+  24, DQ30
+      n_loans                                     9428  ->  9377                       (diff -51)
+      Current                             0.7249549472  ->  0.7249549472            
+      DQ30                               0.01190047706  ->  0.01190047706           
+      DQ60                              0.003907147738  ->  0.003907147738          
+      DQ90+                              0.02662078462  ->  0.02662078462           
+      Prepaid                              0.172074015  ->  0.172074015             
+      Default                            0.06054262837  ->  0.06054262837           
+  24, DQ60
+      n_loans                                     3376  ->  3367                       (diff -9)
+      Current                             0.6080866072  ->  0.6080866072            
+      DQ30                               0.01095244651  ->  0.01095244651           
+      DQ60                              0.004370918312  ->  0.004370918312          
+      DQ90+                              0.04910852051  ->  0.04910852051           
+      Prepaid                             0.1461081905  ->  0.1461081905            
+      Default                              0.181373317  ->  0.181373317             
+  24, DQ90+
+      n_loans                                     6979  ->  6957                       (diff -22)
+      Current                             0.5238047376  ->  0.5238047376            
+      DQ30                               0.01001586864  ->  0.01001586864           
+      DQ60                              0.004420380979  ->  0.004420380979          
+      DQ90+                              0.05834757965  ->  0.05834757965           
+      Prepaid                             0.1249098566  ->  0.1249098566            
+      Default                             0.2785015765  ->  0.2785015765            
+  60, Current
+      n_loans                                   387772  ->  386004                     (diff -1768)
+      Current                             0.5715948595  ->  0.5715948595            
+      DQ30                              0.008980686416  ->  0.008980686416          
+      DQ60                              0.002627224573  ->  0.002627224573          
+      DQ90+                             0.009887730767  ->  0.009887730767          
+      Prepaid                             0.3860503195  ->  0.3860503195            
+      Default                            0.02085917926  ->  0.02085917926           
+  60, DQ30
+      n_loans                                     9428  ->  9377                       (diff -51)
+      Current                             0.5354459179  ->  0.5354459179            
+      DQ30                               0.00841915309  ->  0.00841915309           
+      DQ60                              0.002468314259  ->  0.002468314259          
+      DQ90+                             0.009439720786  ->  0.009439720786          
+      Prepaid                             0.3658347242  ->  0.3658347242            
+      Default                            0.07839216978  ->  0.07839216978           
+  60, DQ60
+      n_loans                                     3376  ->  3367                       (diff -9)
+      Current                             0.4636800027  ->  0.4636800027            
+      DQ30                              0.007301865962  ->  0.007301865962          
+      DQ60                              0.002150032764  ->  0.002150032764          
+      DQ90+                             0.008481746765  ->  0.008481746765          
+      Prepaid                             0.3139003224  ->  0.3139003224            
+      Default                             0.2044860295  ->  0.2044860295            
+  60, DQ90+
+      n_loans                                     6979  ->  6957                       (diff -22)
+      Current                             0.4081324754  ->  0.4081324754            
+      DQ30                              0.006433585099  ->  0.006433585099          
+      DQ60                              0.001899747085  ->  0.001899747085          
+      DQ90+                             0.007643968867  ->  0.007643968867          
+      Prepaid                             0.2726016751  ->  0.2726016751            
+      Default                             0.3032885485  ->  0.3032885485            
+(the predicted probabilities differ only through the start-state mix of the loans, not the matrix.)
+
+======================================================================================================================
+2c. reports/cell_counts.csv: OLD vs NEW  (n, cell_brier, noise_inflation; max |change| over the six p_*)
+======================================================================================================================
+cohort   start      h     n old     n new   d n   cell_brier old              new  noise_infl old           new   max|d p|
+varying  Current    6   387,678   385,910 -1768     0.3026497548     0.3032077536      7.8067e-07    7.8570e-07   4.20e-04
+varying  Current   12   387,637   385,869 -1768     0.4440496182     0.4447764464      1.1455e-06    1.1527e-06   7.33e-04
+varying  Current   24   387,317   385,551 -1766     0.5576465401     0.5580779016      1.4398e-06    1.4475e-06   1.15e-03
+varying  Current   60   386,107   384,360 -1747     0.4643585487     0.4629981795      1.2027e-06    1.2046e-06   1.57e-03
+varying  DQ30       6     9,420     9,369   -51     0.7283949090     0.7284161262      7.7324e-05    7.7747e-05   1.07e-03
+varying  DQ30      12     9,407     9,356   -51     0.7386906080     0.7388512144      7.8526e-05    7.8971e-05   1.05e-03
+varying  DQ30      24     9,287     9,237   -50     0.7632067570     0.7632818383      8.2180e-05    8.2633e-05   5.80e-04
+varying  DQ30      60     9,043     8,995   -48     0.7702954206     0.7701958317      8.5181e-05    8.5625e-05   1.33e-03
+varying  DQ60       6     3,369     3,360    -9     0.6233620827     0.6229170210      1.8503e-04    1.8539e-04   9.37e-04
+varying  DQ60      12     3,359     3,350    -9     0.6600764468     0.6599745155      1.9651e-04    1.9701e-04   5.05e-04
+varying  DQ60      24     3,232     3,223    -9     0.7617145378     0.7617179847      2.3568e-04    2.3634e-04   6.90e-04
+varying  DQ60      60     3,154     3,146    -8     0.7181049399     0.7177075078      2.2768e-04    2.2813e-04   4.82e-04
+varying  DQ90+      6     6,831     6,810   -21     0.5571217148     0.5574269505      8.1558e-05    8.1854e-05   4.35e-04
+varying  DQ90+     12     6,666     6,646   -20     0.6300359559     0.6303474566      9.4515e-05    9.4846e-05   9.10e-04
+varying  DQ90+     24     6,326     6,308   -18     0.6284087301     0.6277115269      9.9337e-05    9.9510e-05   1.19e-03
+varying  DQ90+     60     6,237     6,221   -16     0.4790550910     0.4782460929      7.6809e-05    7.6876e-05   8.15e-04
+fixed    Current    6   386,093   384,346 -1747     0.3014113180     0.3019818241      7.8067e-07    7.8570e-07   4.20e-04
+fixed    Current   12   386,093   384,346 -1747     0.4422596675     0.4430184976      1.1455e-06    1.1527e-06   7.54e-04
+fixed    Current   24   386,093   384,346 -1747     0.5563984689     0.5568592958      1.4411e-06    1.4488e-06   1.17e-03
+fixed    Current   60   386,093   384,346 -1747     0.4643272519     0.4629666070      1.2026e-06    1.2046e-06   1.57e-03
+fixed    DQ30       6     9,030     8,982   -48     0.7270678396     0.7271309238      8.0517e-05    8.0954e-05   1.10e-03
+fixed    DQ30      12     9,030     8,982   -48     0.7411499015     0.7413677153      8.2076e-05    8.2539e-05   1.18e-03
+fixed    DQ30      24     9,030     8,982   -48     0.7636816616     0.7637687359      8.4572e-05    8.5033e-05   6.19e-04
+fixed    DQ30      60     9,030     8,982   -48     0.7702749173     0.7701759441      8.5302e-05    8.5747e-05   1.34e-03
+fixed    DQ60       6     3,148     3,140    -8     0.6329463938     0.6326741450      2.0106e-04    2.0149e-04   7.11e-04
+fixed    DQ60      12     3,148     3,140    -8     0.6714190168     0.6715039150      2.1328e-04    2.1385e-04   4.86e-04
+fixed    DQ60      24     3,148     3,140    -8     0.7622362437     0.7621834557      2.4213e-04    2.4273e-04   6.47e-04
+fixed    DQ60      60     3,148     3,140    -8     0.7181369265     0.7177388535      2.2812e-04    2.2858e-04   4.82e-04
+fixed    DQ90+      6     6,215     6,199   -16     0.5752124625     0.5754602792      9.2552e-05    9.2831e-05   3.74e-04
+fixed    DQ90+     12     6,215     6,199   -16     0.6354978774     0.6356162593      1.0225e-04    1.0254e-04   7.64e-04
+fixed    DQ90+     24     6,215     6,199   -16     0.6226859601     0.6219953725      1.0019e-04    1.0034e-04   1.07e-03
+fixed    DQ90+     60     6,215     6,199   -16     0.4787992614     0.4779869032      7.7039e-05    7.7107e-05   8.18e-04
+
+======================================================================================================================
+3. ELIGIBLE-LOAN RECONCILIATION  (harness universe, loan by loan)
+======================================================================================================================
+Eligibility rule (src.horizon.eligibility): a test-split loan with a condition or evaluate row is ELIGIBLE iff it is observed
+at the 2008-12 cut in a transient state; otherwise excluded for exactly one of four reasons.
+
+panel loans (pre-HPI panel kept in data/panel/_pre_hpi):   2,425,494
+panel loans now:                                  2,415,202   = 2,425,494 - 10,073 territory - 219 null-ltv (not territory)
+   (territory and null-ltv overlap: 0 loans)
+   of the 10,292 removed loans: 2,040 are test-split (have condition/evaluate rows),
+   8,252 are train-split only and were never in the harness universe.
+
+test-split loans with a panel row:  old 486,185   new 484,145   removed 2,040   added 0
+removed test-split loans, by old eligibility       territory    null-ltv     total
+  eligible                                             1,810          40     1,850
+  absorbed at or before the cut                          159           8       167
+  enters the panel after the cut                          14           0        14
+  follow-up ends before the cut                            9           0         9
+  reporting hole at the cut                                0           0         0
+  TOTAL                                                1,992          48     2,040
+removed loans in neither set: 0
+
+Eligible-loan arithmetic:
+  old harness universe            407,555
+  - eligible territory loans      1,810
+  - eligible null-ltv loans       40
+  = expected                      405,705
+  new harness universe            405,705
+  RESIDUAL                        0   (closes exactly)
+retained test-split loans whose eligibility reason changed: 0
+retained loans' harness fields (first, last, absorb_month, absorb_state, state_cut, state_h6, state_h12, state_h24, state_h60) differing old vs new: 0
+  => the eligibility rule itself is unchanged; the only effect is the removal of loans.
+
+Against the earlier figure 'N loans left the harness universe':
+  1,810 is CONSISTENT with this reconciliation as the TERRITORY-ONLY part (1,810 eligible territory loans; it was the
+  old 407,555 -> 405,745 step, before null-ltv loans were removed). It is not the whole difference: the null-ltv exclusion
+  removes 40 more, so the universe falls by 1,850 in total (407,555 -> 405,705). No discrepancy,
+  but 1,810 must not be read as the total. Diagnostic 29 (405,745) and diagnostic 30 / this report (405,705) are different
+  stages of the same change, differing by exactly the 40 null-ltv loans.
+
+======================================================================================================================
+4. FINGERPRINT SWEEP  (3b1209189824e42f, 2f304bae5613525d)
+======================================================================================================================
+file:line                                                 value               class
+../credit-migration-patches/01_oracle.msg:21              3b1209189824e42f    HISTORICAL (outside the repo: saved patch / commit message)
+../credit-migration-patches/03_diag23_validity.patch:83   3b1209189824e42f    HISTORICAL (outside the repo: saved patch / commit message)
+../credit-migration-patches/03_diag23_validity.patch:1010 3b1209189824e42f    HISTORICAL (outside the repo: saved patch / commit message)
+../credit-migration-patches/05_hardening.msg:21           3b1209189824e42f    HISTORICAL (outside the repo: saved patch / commit message)
+../credit-migration-patches/05_hardening.patch:594        3b1209189824e42f    HISTORICAL (outside the repo: saved patch / commit message)
+../credit-migration-patches/05_hardening.patch:595        3b1209189824e42f    HISTORICAL (outside the repo: saved patch / commit message)
+artifacts/horizon_nulls/nulls_report.txt:135              3b1209189824e42f    LIVE GATE (baseline line) + HISTORICAL (rest)
+artifacts/horizon_nulls/nulls_report.txt:667              3b1209189824e42f    LIVE GATE (baseline line) + HISTORICAL (rest)
+diagnostics/23_origination_validity.py:77                 3b1209189824e42f    LIVE GATE
+diagnostics/29_hpi_join_report.txt:274                    3b1209189824e42f    HISTORICAL RECORD
+diagnostics/29_hpi_join_report.txt:275                    2f304bae5613525d    HISTORICAL RECORD
+diagnostics/29_hpi_join_report.txt:276                    2f304bae5613525d    HISTORICAL RECORD
+diagnostics/29_hpi_join_report.txt:279                    3b1209189824e42f    HISTORICAL RECORD
+diagnostics/30_housekeeping.py:34                         3b1209189824e42f    REFERENCE CONSTANT, not a gate
+diagnostics/30_housekeeping.txt:116                       3b1209189824e42f    HISTORICAL RECORD
+diagnostics/30_housekeeping.txt:127                       3b1209189824e42f    HISTORICAL RECORD
+diagnostics/30_housekeeping.txt:128                       3b1209189824e42f    HISTORICAL RECORD
+diagnostics/30_housekeeping.txt:133                       3b1209189824e42f    HISTORICAL RECORD
+diagnostics/32_rebaseline.py:32                           2f304bae5613525d    REFERENCE CONSTANTS, not a gate
+diagnostics/32_rebaseline.py:32                           3b1209189824e42f    REFERENCE CONSTANTS, not a gate
+diagnostics/32_rebaseline.py:264                          2f304bae5613525d    REFERENCE CONSTANTS, not a gate
+diagnostics/32_rebaseline.py:264                          3b1209189824e42f    REFERENCE CONSTANTS, not a gate
+
+Notes on the classes:
+  diagnostics/23_origination_validity.py: LIVE GATE. WANT_FP = 71d85ff7fd2c5d1a (updated earlier; confirmed by the run); the old value appears only in a trailing comment
+  artifacts/horizon_nulls/nulls_report.txt: LIVE GATE (baseline line) + HISTORICAL (rest). the line read by saved_fingerprint() holds the new value; the old value remains in the run's prose line 'against the saved nulls run ...: <old> PASS' and in the appended NOTE, both historical. The file's tables are still the old universe's
+  diagnostics/29_hpi_join_report.txt: HISTORICAL RECORD. milestone 29 report; records the old, intermediate and new fingerprints at that stage
+  diagnostics/30_housekeeping.py: REFERENCE CONSTANT, not a gate. OLD_FP is only printed and searched for in that report; it compares nothing against a run
+  diagnostics/30_housekeeping.txt: HISTORICAL RECORD. milestone 30 report
+  diagnostics/32_rebaseline.py: REFERENCE CONSTANTS, not a gate. this script
+  ../credit-migration-patches/*: saved patches and commit messages of earlier milestones; outside the repo; untouched.
+
+Live gates still holding an old value: 0.   Live gates updated this task: none needed (both were already
+71d85ff7fd2c5d1a); diagnostic 23's was verified by running it.   Historical records left alone: all lines listed above as such.
+Two gates read the baseline through saved_fingerprint(): src/horizon_nulls.py and src/diagnostics/cell_counts.py (no literal in either).

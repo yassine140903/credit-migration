@@ -1,0 +1,183 @@
+Panel housekeeping: restore reproducibility
+committed panel: data\panel      scratch rebuild: C:/Users/benje/AppData/Local/Temp/claude/c--Users-benje-Iter-credit-migration/c0851d23-e849-4d3c-952d-8a60a65ff7be/scratchpad/panel_rebuild
+
+======================================================================================================================
+1. COUNTS REMOVED AT EACH EXCLUSION
+======================================================================================================================
+From the scratch build (src.panel), in build order:
+  exclusion                                                        loans          rows
+  1. territory loans (GU, PR, VI)                                 10,073       400,089
+  2. null-ltv loans (999 sentinel), not already territory            219         6,775
+  (named malformed loan F06Q30148547, unchanged)                       1             1
+  3. hpi_feature column dropped (100% null before)                                    
+  censoring files: territory loans removed 2,012, null-ltv loans removed 6
+  Same counts on the committed panel (one-off transform log, data/panel/_pre_housekeeping/): see appendix.
+  on record before: territory 10,073 loans / 400,089 rows; null-ltv 219 loans / 6,775 rows.   match: True
+
+======================================================================================================================
+2. FINAL ROW AND LOAN COUNTS  (committed panel)
+======================================================================================================================
+partition           rows       loans
+2006Q1        11,007,083     296,616
+2006Q2        10,261,159     306,383
+2006Q3         8,771,116     282,060
+2006Q4         9,242,175     300,869
+2007Q1         8,535,877     300,267
+2007Q2         9,224,837     351,479
+2007Q3         6,349,937     282,851
+2007Q4         6,128,528     294,677
+----------------------------------------------------------------------------------------------------------------------
+TOTAL         69,520,712   2,415,202   (manifest rows 69,520,712; validated by load_panel)
+
+======================================================================================================================
+3. FINAL COLUMNS BY GROUP  (committed panel manifest)
+======================================================================================================================
+keys (2):
+    loan_id                     string
+    from_period                 int32
+states (2):
+    from_state                  dictionary<values=string, indices=int8, ordered=0>
+    to_state                    dictionary<values=string, indices=int8, ordered=0>
+features (14):
+    run_length                  int32
+    loan_age                    int32
+    is_modified                 bool
+    months_since_modification   int32
+    fico                        float
+    ltv                         float
+    dti                         float
+    rate_spread                 float
+    unemp_level                 float
+    unemp_chg_12m               float
+    hpi_ratio                   float
+    est_ltv                     float
+    est_ltv_step                float
+    property_state              dictionary<values=string, indices=int8, ordered=0>
+metadata (6):
+    role                        dictionary<values=string, indices=int8, ordered=0>
+    post_gap                    bool
+    is_skip                     bool
+    is_fall                     bool
+    msa                         string
+    postal_code                 string
+total 24 columns; order equals src.panel.SCHEMA: True; hpi_feature present: False
+HPI features (features group, not metadata): ['hpi_ratio', 'est_ltv', 'est_ltv_step']
+
+======================================================================================================================
+4. REPRODUCIBILITY: scratch rebuild vs committed panel
+======================================================================================================================
+check                                                    committed               scratch  result
+partitions                                                       8                     8  MATCH
+rows (manifest)                                         69,520,712            69,520,712  MATCH
+  2006Q1 rows / loans                         11,007,083 / 296,616  11,007,083 / 296,616  MATCH
+  2006Q2 rows / loans                         10,261,159 / 306,383  10,261,159 / 306,383  MATCH
+  2006Q3 rows / loans                          8,771,116 / 282,060   8,771,116 / 282,060  MATCH
+  2006Q4 rows / loans                          9,242,175 / 300,869   9,242,175 / 300,869  MATCH
+  2007Q1 rows / loans                          8,535,877 / 300,267   8,535,877 / 300,267  MATCH
+  2007Q2 rows / loans                          9,224,837 / 351,479   9,224,837 / 351,479  MATCH
+  2007Q3 rows / loans                          6,349,937 / 282,851   6,349,937 / 282,851  MATCH
+  2007Q4 rows / loans                          6,128,528 / 294,677   6,128,528 / 294,677  MATCH
+rows (counted from the files)                           69,520,712            69,520,712  MATCH
+loans                                                    2,415,202             2,415,202  MATCH
+column set                                                24 items              24 items  MATCH
+column order                                              24 items              24 items  MATCH
+column types                                              24 items              24 items  MATCH
+harness fingerprint                               71d85ff7fd2c5d1a      71d85ff7fd2c5d1a  MATCH
+eligible loans in the harness universe                     405,705               405,705  MATCH
+
+Beyond what was asked: every value of every column of every partition compared (Arrow equality, schema included):
+    2006Q1  IDENTICAL
+    2006Q2  IDENTICAL
+    2006Q3  IDENTICAL
+    2006Q4  IDENTICAL
+    2007Q1  IDENTICAL
+    2007Q2  IDENTICAL
+    2007Q3  IDENTICAL
+    2007Q4  IDENTICAL
+    censoring/censor_2006Q1.parquet  IDENTICAL
+    censoring/censor_2006Q2.parquet  IDENTICAL
+    censoring/censor_2006Q3.parquet  IDENTICAL
+    censoring/censor_2006Q4.parquet  IDENTICAL
+    censoring/censor_2007Q1.parquet  IDENTICAL
+    censoring/censor_2007Q2.parquet  IDENTICAL
+    censoring/censor_2007Q3.parquet  IDENTICAL
+    censoring/censor_2007Q4.parquet  IDENTICAL
+
+Scratch build's own arithmetic identity lines:
+    identity holds                                                            yes
+    candidates - excluded (all four lines) == written                         yes
+
+RESULT: CLEAN. Every compared item matches exactly. The committed panel is what python -m src.panel produces.
+scratch build report copied to diagnostics\30_panel_build_report.txt
+
+======================================================================================================================
+5. FINGERPRINT BASELINES
+======================================================================================================================
+old fingerprint 3b1209189824e42f   new fingerprint 71d85ff7fd2c5d1a   (405705 eligible loans)
+(the old universe, recorded in diagnostics/29, had 407,555 eligible loans)
+
+file                                                  contains old  contains new
+diagnostics/23_origination_validity.py                        True          True
+artifacts/horizon_nulls/nulls_report.txt                      True          True
+diagnostics/23_origination_validity.txt                       True         False
+diagnostics/29_hpi_join_report.txt                            True         False
+src/horizon_nulls.py and src/diagnostics/cell_counts.py hold no literal: both read the baseline from artifacts/horizon_nulls/nulls_report.txt (saved_fingerprint()).
+
+FILES CHANGED (expected value only; no gate's logic touched):
+  diagnostics/23_origination_validity.py   WANT_FP   3b1209189824e42f -> 71d85ff7fd2c5d1a
+  artifacts/horizon_nulls/nulls_report.txt  the baseline line read by saved_fingerprint()   3b1209189824e42f -> 71d85ff7fd2c5d1a
+      plus a NOTE appended at the end of that file saying so and that its tables are stale until the run is repeated.
+      saved_fingerprint() now returns: 71d85ff7fd2c5d1a
+LEFT AS HISTORICAL RECORDS (outputs of earlier runs, not gates; rewriting them would misstate what was run):
+  diagnostics/23_origination_validity.txt, diagnostics/29_hpi_join_report.txt, and the prose line
+  'against the saved nulls run ...: 3b1209189824e42f   PASS' inside nulls_report.txt.
+NOT RE-RUN: diagnostic 23 (it rewrites its own .txt and its territory sections assume territories in the panel) and
+src.horizon_nulls (it compares against the saved model_comparison.csv / cell_counts.csv, computed on the old universe).
+
+======================================================================================================================
+APPENDIX. ONE-OFF TRANSFORM OF THE COMMITTED PANEL (steps 1-3; log kept in data/panel/_pre_housekeeping/)
+======================================================================================================================
+before: build 2026-10-06T15:15:05.422391  8 partitions  69,527,487 rows
+
+STEP 3 (before any change): data/panel/censoring/
+  files 8; one row per censored loan: columns ['loan_id', 'last_observed_period', 'censor_reason']
+  quarter   censored loans  GU/PR/VI  null-LTV (non-terr.)
+  2006Q1            14,744       179                     1
+  2006Q2            14,075       188                     1
+  2006Q3            13,865       197                     1
+  2006Q4            17,474       235                     0
+  2007Q1            17,874       338                     1
+  2007Q2            22,508       373                     2
+  2007Q3            17,441       270                     0
+  2007Q4            19,609       232                     0
+  TOTAL            137,590     2,012                     6
+  readers of this directory in the repo: none (only src/panel.py writes it; grep for CENSOR_DIR / censor_*.parquet).
+
+backup of the pre-housekeeping panel, manifest and censoring written to data\panel\_pre_housekeeping
+
+STEPS 1-2: null-LTV loans and hpi_feature
+  partition        rows in  loans removed  rows removed      rows out  loans out
+  2006Q1        11,008,223             32         1,140    11,007,083    296,616
+  2006Q2        10,261,926             22           767    10,261,159    306,383
+  2006Q3         8,771,967             18           851     8,771,116    282,060
+  2006Q4         9,242,852             29           677     9,242,175    300,869
+  2007Q1         8,536,605             30           728     8,535,877    300,267
+  2007Q2         9,225,834             40           997     9,224,837    351,479
+  2007Q3         6,350,440             15           503     6,349,937    282,851
+  2007Q4         6,129,640             33         1,112     6,128,528    294,677
+  TOTAL         69,527,487            219         6,775    69,520,712  2,415,202
+  null-LTV loans removed 219 / rows 6775 (on record: 219 / 6,775); null ltv remaining 0; est_ltv, est_ltv_step, hpi_ratio null rows 0 (asserted per partition)
+  hpi_feature: null on 69,527,487 of 69,527,487 rows (100%, asserted per partition); removed from the schema and the manifest
+
+panel after steps 1-2: build 2026-10-06T16:50:16.061215  8 partitions  69,520,712 rows  (validated by load_panel against the new manifest)
+
+STEP 3: censoring files rewritten without territory and null-LTV loans
+  2006Q1   14,744 ->  14,564   removed territory 179  null-LTV 1
+  2006Q2   14,075 ->  13,886   removed territory 188  null-LTV 1
+  2006Q3   13,865 ->  13,667   removed territory 197  null-LTV 1
+  2006Q4   17,474 ->  17,239   removed territory 235  null-LTV 0
+  2007Q1   17,874 ->  17,535   removed territory 338  null-LTV 1
+  2007Q2   22,508 ->  22,133   removed territory 373  null-LTV 2
+  2007Q3   17,441 ->  17,171   removed territory 270  null-LTV 0
+  2007Q4   19,609 ->  19,377   removed territory 232  null-LTV 0
+  removed in total: territory 2012, null-LTV 6; censored loans left 135,572

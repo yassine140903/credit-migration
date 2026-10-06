@@ -1,0 +1,273 @@
+State monthly HPI bridge report   (seasonally adjusted, purchase-only)
+series  data\macro\hpi_state_monthly.csv   rows 21726
+
+==============================================================================================================
+0. INPUT INSPECTION
+==============================================================================================================
+STATE FILE  C:\Users\benje\Iter\credit-migration\data\hpi_po_state.xlsx
+  shape    (7242, 6)
+  columns  ['state', 'yr', 'qtr', 'index_nsa', 'index_sa', 'Warning']
+  geography identifier 'state': 51 distinct: AK AL AR AZ CA CO CT DC DE FL GA HI IA ID IL IN KS KY LA MA MD ME MI MN MO MS MT NC ND NE NH NJ NM NV NY OH OK OR PA RI SC SD TN TX UT VA VT WA WI WV WY
+  quarters 1991Q1 .. 2026Q2
+  format   two-letter uppercase codes: True  (panel property_state is two-letter text: MATCH, no coercion needed)
+  note     index_sa vs index_nsa both present; index_sa is used
+
+DIVISION FILE  C:\Users\benje\Iter\credit-migration\data\hpi_po_monthly_hist.xlsx
+  shape    (427, 21)
+  columns  ['Month', 'East North Central (NSA)', 'East North Central (SA)', 'East South Central (NSA)', 'East South Central (SA)', 'Middle Atlantic (NSA)', 'Middle Atlantic (SA)', 'Mountain (NSA)', 'Mountain (SA)', 'New England (NSA)', 'New England (SA)', 'Pacific (NSA)', 'Pacific (SA)', 'South Atlantic (NSA)', 'South Atlantic (SA)', 'West North Central (NSA)', 'West North Central (SA)', 'West South Central (NSA)', 'West South Central (SA)', 'USA (NSA)', 'USA (SA)']
+  geography identifier (column-label prefix): 10 distinct: East North Central; East South Central; Middle Atlantic; Mountain; New England; Pacific; South Atlantic; USA; West North Central; West South Central
+  months   1991-01 .. 2026-07 (427 rows)
+  format   division NAMES, not state codes; joined to states through data/macro/census_divisions.csv
+
+PANEL-SIDE NOTE  GU, PR, VI may appear as property_state in the panel; the HPI file has none of them and the mapping must not assign them a division.
+
+Seasonal adjustment confirmed from file contents: state file has index_nsa and index_sa columns (index_sa used;
+  equal to index_nsa on 1.22% of rows); division file has an '(SA)' and '(NSA)' column per division (SA used).
+
+==============================================================================================================
+1. DIVISION MAPPING  (data/macro/census_divisions.csv)
+==============================================================================================================
+rows 51   distinct divisions 9   distinct states 51
+  New England           6   CT ME MA NH RI VT
+  Middle Atlantic       3   NJ NY PA
+  East North Central    5   IL IN MI OH WI
+  West North Central    7   IA KS MN MO NE ND SD
+  South Atlantic        9   DE DC FL GA MD NC SC VA WV
+  East South Central    4   AL KY MS TN
+  West South Central    4   AR LA OK TX
+  Mountain              8   AZ CO ID MT NV NM UT WY
+  Pacific               5   AK CA HI OR WA
+
+  state_code,division
+  CT,New England
+  ME,New England
+  MA,New England
+  NH,New England
+  RI,New England
+  VT,New England
+  NJ,Middle Atlantic
+  NY,Middle Atlantic
+  PA,Middle Atlantic
+  IL,East North Central
+  IN,East North Central
+  MI,East North Central
+  OH,East North Central
+  WI,East North Central
+  IA,West North Central
+  KS,West North Central
+  MN,West North Central
+  MO,West North Central
+  NE,West North Central
+  ND,West North Central
+  SD,West North Central
+  DE,South Atlantic
+  DC,South Atlantic
+  FL,South Atlantic
+  GA,South Atlantic
+  MD,South Atlantic
+  NC,South Atlantic
+  SC,South Atlantic
+  VA,South Atlantic
+  WV,South Atlantic
+  AL,East South Central
+  KY,East South Central
+  MS,East South Central
+  TN,East South Central
+  AR,West South Central
+  LA,West South Central
+  OK,West South Central
+  TX,West South Central
+  AZ,Mountain
+  CO,Mountain
+  ID,Mountain
+  MT,Mountain
+  NV,Mountain
+  NM,Mountain
+  UT,Mountain
+  WY,Mountain
+  AK,Pacific
+  CA,Pacific
+  HI,Pacific
+  OR,Pacific
+  WA,Pacific
+
+Territories GU/PR/VI in mapping: [] (none assigned a division, by design)
+HPI-file states without a division: []
+
+==============================================================================================================
+2. DATE COVERAGE AND ROW COUNT PER STATE
+==============================================================================================================
+state      first     last   rows  expected  missing  flag
+AK     1991-01  2026-06    426       426        0  
+AL     1991-01  2026-06    426       426        0  
+AR     1991-01  2026-06    426       426        0  
+AZ     1991-01  2026-06    426       426        0  
+CA     1991-01  2026-06    426       426        0  
+CO     1991-01  2026-06    426       426        0  
+CT     1991-01  2026-06    426       426        0  
+DC     1991-01  2026-06    426       426        0  
+DE     1991-01  2026-06    426       426        0  
+FL     1991-01  2026-06    426       426        0  
+GA     1991-01  2026-06    426       426        0  
+HI     1991-01  2026-06    426       426        0  
+IA     1991-01  2026-06    426       426        0  
+ID     1991-01  2026-06    426       426        0  
+IL     1991-01  2026-06    426       426        0  
+IN     1991-01  2026-06    426       426        0  
+KS     1991-01  2026-06    426       426        0  
+KY     1991-01  2026-06    426       426        0  
+LA     1991-01  2026-06    426       426        0  
+MA     1991-01  2026-06    426       426        0  
+MD     1991-01  2026-06    426       426        0  
+ME     1991-01  2026-06    426       426        0  
+MI     1991-01  2026-06    426       426        0  
+MN     1991-01  2026-06    426       426        0  
+MO     1991-01  2026-06    426       426        0  
+MS     1991-01  2026-06    426       426        0  
+MT     1991-01  2026-06    426       426        0  
+NC     1991-01  2026-06    426       426        0  
+ND     1991-01  2026-06    426       426        0  
+NE     1991-01  2026-06    426       426        0  
+NH     1991-01  2026-06    426       426        0  
+NJ     1991-01  2026-06    426       426        0  
+NM     1991-01  2026-06    426       426        0  
+NV     1991-01  2026-06    426       426        0  
+NY     1991-01  2026-06    426       426        0  
+OH     1991-01  2026-06    426       426        0  
+OK     1991-01  2026-06    426       426        0  
+OR     1991-01  2026-06    426       426        0  
+PA     1991-01  2026-06    426       426        0  
+RI     1991-01  2026-06    426       426        0  
+SC     1991-01  2026-06    426       426        0  
+SD     1991-01  2026-06    426       426        0  
+TN     1991-01  2026-06    426       426        0  
+TX     1991-01  2026-06    426       426        0  
+UT     1991-01  2026-06    426       426        0  
+VA     1991-01  2026-06    426       426        0  
+VT     1991-01  2026-06    426       426        0  
+WA     1991-01  2026-06    426       426        0  
+WI     1991-01  2026-06    426       426        0  
+WV     1991-01  2026-06    426       426        0  
+WY     1991-01  2026-06    426       426        0  
+
+states with gaps: none
+required window 2004-01..2014-12 covered by every state: True
+states: 51   total rows: 21726   duplicate state-months: 0
+
+==============================================================================================================
+3. ANCHOR VERIFICATION  (mean of three months == quarterly anchor)
+==============================================================================================================
+state-quarters in quarterly file: 7242   in output: 7242
+state-quarters without exactly 3 months: 0   in quarterly file but not output: 0   in output but not file: 0
+tolerance: relative 1e-09
+  hpi_disagg  checked 7242   max relative error 3.954e-16   FAILURES 0
+  hpi_step    checked 7242   max relative error 1.665e-16   FAILURES 0
+  hpi_step constant within every quarter: True
+  hpi_step == same-quarter anchor on every month (no lag): True
+
+==============================================================================================================
+4. |hpi_disagg - hpi_step|  DISTRIBUTION  (all state-months)
+==============================================================================================================
+  absolute gap (index points)                     mean=    0.9813  median=    0.6023     p90=    2.3209     p99=    5.7989     max=   15.7593  index pts
+  absolute gap, % of index level (hpi_step)       mean=    0.4226  median=    0.3180     p90=    0.9222     p99=    1.8121     max=    2.9476  % of level
+  mean signed gap +0.000000 index pts  (should be ~0: months average to the anchor)
+
+==============================================================================================================
+5. 20 LARGEST GAPS  (by absolute gap, index points)
+==============================================================================================================
+quarter move = state quarterly value vs the previous quarter, %; blank for a state's first quarter
+ # state month      hpi_step  hpi_disagg      gap   gap %  qtr move %
+ 1 UT    2021-06     584.390     600.149  +15.759   2.697       +7.32
+ 2 CO    2021-06     581.510     597.192  +15.682   2.697       +5.84
+ 3 MT    2021-06     527.860     542.095  +14.235   2.697       +4.97
+ 4 ID    2021-06     525.950     540.133  +14.183   2.697       +8.77
+ 5 UT    2021-04     584.390     570.289  -14.101   2.413       +7.32
+ 6 UT    2022-03     685.950     700.047  +14.097   2.055       +5.42
+ 7 CO    2021-04     581.510     567.478  -14.032   2.413       +5.84
+ 8 CO    2022-03     663.440     677.075  +13.635   2.055       +6.12
+ 9 MT    2022-03     626.310     639.182  +12.872   2.055       +5.40
+10 MT    2021-04     527.860     515.123  -12.737   2.413       +4.97
+11 ID    2021-04     525.950     513.259  -12.691   2.413       +8.77
+12 DC    2021-06     618.560     631.204  +12.644   2.044       +3.17
+13 UT    2022-01     685.950     673.520  -12.430   1.812       +5.42
+14 ID    2022-03     603.360     615.760  +12.400   2.055       +4.17
+15 CO    2022-01     663.440     651.418  -12.022   1.812       +6.12
+16 AZ    2021-06     442.960     454.905  +11.945   2.697       +6.88
+17 DC    2021-04     618.560     606.752  -11.808   1.909       +3.17
+18 MT    2022-01     626.310     614.960  -11.350   1.812       +5.40
+19 UT    2021-10     650.710     639.415  -11.295   1.736       +4.63
+20 WY    2021-06     414.010     425.175  +11.165   2.697       +3.68
+
+==============================================================================================================
+6. GAP BY CALENDAR YEAR  (2008-2009 marked)
+==============================================================================================================
+year     rows  mean |gap|   median      p90      p99      max  mean % lvl  max % lvl
+1991      612      0.3334   0.2526   0.7431   1.2539   1.3472      0.3322     1.3345
+1992      612      0.3197   0.2603   0.6251   1.0738   1.1343      0.3090     1.1274
+1993      612      0.3632   0.2708   0.7774   1.2748   1.4102      0.3335     1.0751
+1994      612      0.3317   0.2414   0.7270   1.3519   1.4691      0.2900     1.0687
+1995      612      0.3120   0.2466   0.6584   0.9984   1.0626      0.2598     0.8621
+1996      612      0.2495   0.2244   0.5241   0.8495   0.9391      0.2081     0.6842
+1997      612      0.2894   0.2958   0.5479   0.7074   1.2045      0.2362     0.7262
+1998      612      0.5132   0.5126   0.9587   1.5525   2.1373      0.4109     1.9022
+1999      612      0.4991   0.4524   0.9784   1.3755   1.6319      0.3704     1.2047
+2000      612      0.5481   0.5129   1.1475   1.6974   2.0127      0.3922     1.3181
+2001      612      0.6017   0.4999   1.2352   1.8096   2.0244      0.4024     1.1800
+2002      612      0.7314   0.6755   1.4143   2.1431   2.7771      0.4538     1.4038
+2003      612      0.8087   0.7249   1.7686   2.9518   3.3327      0.4601     1.5526
+2004      612      1.1828   0.8834   2.5841   4.5485   5.4404      0.6071     2.3544
+2005      612      1.3094   0.9283   3.2714   4.3881   4.7506      0.5980     1.8537
+2006      612      0.5305   0.3987   1.0462   2.2686   2.7207      0.2327     0.8668
+2007      612      0.8964   0.5678   2.1056   4.9206   6.7314      0.3751     2.0554
+2008      612      1.6009   1.0467   3.7759   6.4555   9.4876      0.7251     2.9476  <-- 2008-09 window
+2009      612      0.9651   0.8071   2.0186   4.4018   6.3079      0.4597     2.0663  <-- 2008-09 window
+2010      612      0.9463   0.7451   1.9015   3.8784   4.3662      0.4700     1.5031
+2011      612      0.9220   0.6786   2.0839   3.9089   5.6992      0.4807     2.0431
+2012      612      0.8944   0.5275   2.1852   4.2337   4.7214      0.4429     1.6823
+2013      612      0.9392   0.7316   1.9907   3.8334   4.6852      0.4466     1.5380
+2014      612      0.7244   0.5824   1.5803   2.6971   3.4617      0.3260     1.0725
+2015      612      0.8816   0.7258   1.7007   3.0120   4.5207      0.3848     1.1911
+2016      612      0.9853   0.8698   1.9567   2.9026   3.4242      0.4104     0.9729
+2017      612      1.0635   0.8813   2.3299   3.4255   4.2978      0.4134     1.3256
+2018      612      0.9585   0.7959   2.0154   3.5822   4.6718      0.3548     1.1751
+2019      612      1.0729   0.9088   2.0853   3.9829   5.3130      0.3830     1.1120
+2020      612      2.2023   1.3703   5.3527   9.0705  10.0181      0.7148     2.2044
+2021      612      3.5602   3.2337   7.1809  12.7319  15.7593      0.9910     2.6967
+2022      612      2.0475   1.1717   4.6843  11.3038  14.0972      0.5059     2.0551
+2023      612      1.7110   1.4334   3.3772   5.3344   7.8694      0.4229     1.3795
+2024      612      1.6560   1.2964   3.5913   6.1624   7.0574      0.3802     1.4089
+2025      612      1.3257   1.1247   2.6969   4.1129   4.6609      0.2967     1.0953
+2026      306      1.1209   0.9291   2.2819   4.4293   5.0491      0.2405     0.6804
+
+2008-2009 vs all other years, mean |gap| % of level: 0.5924 vs 0.4124   (ratio 1.44x)
+
+==============================================================================================================
+7. QUARTER-BOUNDARY DISCONTINUITY IN hpi_disagg
+==============================================================================================================
+Boundary move = log change from the last month of a quarter to the first month of the next, |%|.
+Within move   = |log change| between consecutive months inside a quarter (m1->m2, m2->m3).
+Division move = the same boundary change in the division's own SA series (what a faithful path does).
+Artificial    = |disagg boundary change - division boundary change|: the jump the method adds.
+boundaries measured 7191   within-quarter month pairs 14484
+
+ALL YEARS   (boundaries 7191, within pairs 14484)
+  within-quarter |month move|, disagg             mean=    0.6056  median=    0.4977     p90=    1.2446     p99=    2.2052     max=    3.1024  % per month
+  boundary |move|, disagg                         mean=    0.9558  median=    0.6948     p90=    2.0684     p99=    4.6667     max=   11.1125  % per month
+  boundary |move|, division (reference)           mean=    0.5999  median=    0.4954     p90=    1.2418     p99=    2.0044     max=    2.8188  % per month
+  boundary |artificial jump|                      mean=    0.8157  median=    0.5355     p90=    1.8633     p99=    4.6034     max=   11.3973  % per month
+  boundary |move|, step (reference)               mean=    1.5781  median=    1.2647     p90=    3.2973     p99=    6.0387     max=   11.5729  % per month
+  median boundary |move| / median within |move| (disagg): 1.40x;   artificial jump / median within |move|: 1.08x (median), 2.09x (p99 vs p99)
+  share of boundaries whose artificial jump exceeds the median within-quarter move: 52.4%
+
+2008-2009 only   (boundaries 408, within pairs 816)
+  within-quarter |month move|, disagg             mean=    0.8929  median=    0.7334     p90=    2.0445     p99=    2.7603     max=    3.1024  % per month
+  boundary |move|, disagg                         mean=    1.4904  median=    1.0600     p90=    3.4212     p99=    6.4964     max=    8.9449  % per month
+  boundary |move|, division (reference)           mean=    0.8135  median=    0.6445     p90=    1.7384     p99=    2.4770     max=    2.4770  % per month
+  boundary |artificial jump|                      mean=    1.5002  median=    1.0531     p90=    3.6563     p99=    6.0839     max=    8.9675  % per month
+  boundary |move|, step (reference)               mean=    1.8018  median=    1.3081     p90=    3.9366     p99=    8.6918     max=   11.5729  % per month
+  median boundary |move| / median within |move| (disagg): 1.45x;   artificial jump / median within |move|: 1.44x (median), 2.20x (p99 vs p99)
+  share of boundaries whose artificial jump exceeds the median within-quarter move: 61.8%
+
+Read: 'artificial' is the departure of the bridged boundary step from the division's own
+boundary step. The method forces each quarter to average to the anchor, so the level of one
+quarter's last month and the next quarter's first month are scaled by different anchors.

@@ -1,0 +1,344 @@
+HPI state file: Warning column
+file C:\Users\benje\Iter\credit-migration\data\hpi_po_state.xlsx   shape (7242, 7)
+
+==============================================================================================================
+1. WHAT IS IN THE WARNING COLUMN  (whole file, values verbatim via repr)
+==============================================================================================================
+  count    share  value
+   6248   86.27%  None
+    994   13.73%  '* Note that this state has fewer than 15,000 transactions over the latest ten years'
+
+distinct values (null counted as a value): 2   distinct non-null: 1
+blank/null: 6248 of 7242 = 86.27%   (null = empty cell; whitespace-only strings also counted as blank: 0)
+non-blank: 994 = 13.73%
+
+==============================================================================================================
+2. DOCUMENTATION INSIDE THE WORKBOOK
+==============================================================================================================
+sheets in workbook: ['HPI_PO_state']
+package parts: [Content_Types].xml, _rels/.rels, xl/workbook.xml, xl/_rels/workbook.xml.rels, xl/worksheets/sheet1.xml, xl/theme/theme1.xml, xl/styles.xml, xl/sharedStrings.xml, xl/worksheets/_rels/sheet1.xml.rels, xl/printerSettings/printerSettings1.bin, docProps/core.xml, docProps/app.xml
+comment/drawing/note parts: none
+defined names: ['IQ_CH', 'IQ_CQ', 'IQ_CY', 'IQ_DAILY', 'IQ_FH', 'IQ_FQ', 'IQ_FWD_CY', 'IQ_FWD_CY1', 'IQ_FWD_CY2', 'IQ_FWD_FY', 'IQ_FWD_FY1', 'IQ_FWD_FY2', 'IQ_FWD_Q', 'IQ_FWD_Q1', 'IQ_FWD_Q2', 'IQ_FY', 'IQ_LATESTK', 'IQ_LATESTQ', 'IQ_LTM', 'IQ_LTMMONTH', 'IQ_MONTH', 'IQ_NTM', 'IQ_TODAY', 'IQ_WEEK', 'IQ_YTD', 'IQ_YTDMONTH']
+sheet rows 7243; header ['state', 'yr', 'qtr', 'index_nsa', 'index_sa', 'Warning']; rows with data beyond column F: none
+rows whose first cell is not a two-letter state code (possible notes/footer rows): none
+header/footer text in the sheet: none (headerFooter element is empty or absent)
+defined names above are bare names (IQ_*); they carry no explanatory text
+every string stored in the workbook (58):
+    'state'
+    'yr'
+    'qtr'
+    'index_nsa'
+    'index_sa'
+    'Warning'
+    'AK'
+    'AL'
+    'AR'
+    'AZ'
+    'CA'
+    'CO'
+    'CT'
+    'DC'
+    'DE'
+    'FL'
+    'GA'
+    'HI'
+    'IA'
+    'ID'
+    'IL'
+    'IN'
+    'KS'
+    'KY'
+    'LA'
+    'MA'
+    'MD'
+    'ME'
+    'MI'
+    'MN'
+    'MO'
+    'MS'
+    'MT'
+    'NC'
+    'ND'
+    'NE'
+    'NH'
+    'NJ'
+    'NM'
+    'NV'
+    'NY'
+    'OH'
+    'OK'
+    'OR'
+    'PA'
+    'RI'
+    'SC'
+    'SD'
+    'TN'
+    'TX'
+    'UT'
+    'VA'
+    'VT'
+    'WA'
+    'WI'
+    'WV'
+    'WY'
+    '* Note that this state has fewer than 15,000 transactions over the latest ten years'
+
+RESULT: the workbook has NO notes, legend or readme sheet and no comments; the only explanatory text anywhere in it is
+the Warning cell value(s) quoted in section 1. No further definition of the flag is present, and none is inferred here.
+
+==============================================================================================================
+3. WINDOW 2004-01 .. 2014-12  (2004Q1 .. 2014Q4)
+==============================================================================================================
+window: state-quarters 2244   warned 308   13.73%   states warned 7 of 51
+
+Per state, worst first (percentage of that state's quarters in the window):
+state    warned  quarters      pct
+AK           44        44   100.0%
+DC           44        44   100.0%
+DE           44        44   100.0%
+HI           44        44   100.0%
+VT           44        44   100.0%
+WV           44        44   100.0%
+WY           44        44   100.0%
+AL            0        44     0.0%
+AR            0        44     0.0%
+AZ            0        44     0.0%
+CA            0        44     0.0%
+CO            0        44     0.0%
+CT            0        44     0.0%
+FL            0        44     0.0%
+GA            0        44     0.0%
+IA            0        44     0.0%
+ID            0        44     0.0%
+IL            0        44     0.0%
+IN            0        44     0.0%
+KS            0        44     0.0%
+KY            0        44     0.0%
+LA            0        44     0.0%
+MA            0        44     0.0%
+MD            0        44     0.0%
+ME            0        44     0.0%
+MI            0        44     0.0%
+MN            0        44     0.0%
+MO            0        44     0.0%
+MS            0        44     0.0%
+MT            0        44     0.0%
+NC            0        44     0.0%
+ND            0        44     0.0%
+NE            0        44     0.0%
+NH            0        44     0.0%
+NJ            0        44     0.0%
+NM            0        44     0.0%
+NV            0        44     0.0%
+NY            0        44     0.0%
+OH            0        44     0.0%
+OK            0        44     0.0%
+OR            0        44     0.0%
+PA            0        44     0.0%
+RI            0        44     0.0%
+SC            0        44     0.0%
+SD            0        44     0.0%
+TN            0        44     0.0%
+TX            0        44     0.0%
+UT            0        44     0.0%
+VA            0        44     0.0%
+WA            0        44     0.0%
+WI            0        44     0.0%
+
+Per year, warned quarters across all states:
+year    warned  quarters      pct  states warned
+2004        28       204    13.7%              7
+2005        28       204    13.7%              7
+2006        28       204    13.7%              7
+2007        28       204    13.7%              7
+2008        28       204    13.7%              7
+2009        28       204    13.7%              7
+2010        28       204    13.7%              7
+2011        28       204    13.7%              7
+2012        28       204    13.7%              7
+2013        28       204    13.7%              7
+2014        28       204    13.7%              7
+
+==============================================================================================================
+4. CONCENTRATION IN THE WINDOW  (warned quarters of each warned state)
+==============================================================================================================
+7 state(s) carry at least one warning in the window.
+AK  (44 warned quarters)
+    2004Q1  2004Q2  2004Q3  2004Q4  2005Q1  2005Q2  2005Q3  2005Q4  2006Q1  2006Q2  2006Q3  2006Q4
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4  2011Q1  2011Q2  2011Q3  2011Q4  2012Q1  2012Q2  2012Q3  2012Q4
+    2013Q1  2013Q2  2013Q3  2013Q4  2014Q1  2014Q2  2014Q3  2014Q4
+DC  (44 warned quarters)
+    2004Q1  2004Q2  2004Q3  2004Q4  2005Q1  2005Q2  2005Q3  2005Q4  2006Q1  2006Q2  2006Q3  2006Q4
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4  2011Q1  2011Q2  2011Q3  2011Q4  2012Q1  2012Q2  2012Q3  2012Q4
+    2013Q1  2013Q2  2013Q3  2013Q4  2014Q1  2014Q2  2014Q3  2014Q4
+DE  (44 warned quarters)
+    2004Q1  2004Q2  2004Q3  2004Q4  2005Q1  2005Q2  2005Q3  2005Q4  2006Q1  2006Q2  2006Q3  2006Q4
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4  2011Q1  2011Q2  2011Q3  2011Q4  2012Q1  2012Q2  2012Q3  2012Q4
+    2013Q1  2013Q2  2013Q3  2013Q4  2014Q1  2014Q2  2014Q3  2014Q4
+HI  (44 warned quarters)
+    2004Q1  2004Q2  2004Q3  2004Q4  2005Q1  2005Q2  2005Q3  2005Q4  2006Q1  2006Q2  2006Q3  2006Q4
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4  2011Q1  2011Q2  2011Q3  2011Q4  2012Q1  2012Q2  2012Q3  2012Q4
+    2013Q1  2013Q2  2013Q3  2013Q4  2014Q1  2014Q2  2014Q3  2014Q4
+VT  (44 warned quarters)
+    2004Q1  2004Q2  2004Q3  2004Q4  2005Q1  2005Q2  2005Q3  2005Q4  2006Q1  2006Q2  2006Q3  2006Q4
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4  2011Q1  2011Q2  2011Q3  2011Q4  2012Q1  2012Q2  2012Q3  2012Q4
+    2013Q1  2013Q2  2013Q3  2013Q4  2014Q1  2014Q2  2014Q3  2014Q4
+WV  (44 warned quarters)
+    2004Q1  2004Q2  2004Q3  2004Q4  2005Q1  2005Q2  2005Q3  2005Q4  2006Q1  2006Q2  2006Q3  2006Q4
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4  2011Q1  2011Q2  2011Q3  2011Q4  2012Q1  2012Q2  2012Q3  2012Q4
+    2013Q1  2013Q2  2013Q3  2013Q4  2014Q1  2014Q2  2014Q3  2014Q4
+WY  (44 warned quarters)
+    2004Q1  2004Q2  2004Q3  2004Q4  2005Q1  2005Q2  2005Q3  2005Q4  2006Q1  2006Q2  2006Q3  2006Q4
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4  2011Q1  2011Q2  2011Q3  2011Q4  2012Q1  2012Q2  2012Q3  2012Q4
+    2013Q1  2013Q2  2013Q3  2013Q4  2014Q1  2014Q2  2014Q3  2014Q4
+
+==============================================================================================================
+5. CRISIS WINDOW 2007-01 .. 2010-12  (2007Q1 .. 2010Q4)
+==============================================================================================================
+crisis window: state-quarters 816   warned 112   13.73%   states warned 7 of 51
+
+Per state, worst first:
+state    warned  quarters      pct
+AK           16        16   100.0%
+DC           16        16   100.0%
+DE           16        16   100.0%
+HI           16        16   100.0%
+VT           16        16   100.0%
+WV           16        16   100.0%
+WY           16        16   100.0%
+AL            0        16     0.0%
+AR            0        16     0.0%
+AZ            0        16     0.0%
+CA            0        16     0.0%
+CO            0        16     0.0%
+CT            0        16     0.0%
+FL            0        16     0.0%
+GA            0        16     0.0%
+IA            0        16     0.0%
+ID            0        16     0.0%
+IL            0        16     0.0%
+IN            0        16     0.0%
+KS            0        16     0.0%
+KY            0        16     0.0%
+LA            0        16     0.0%
+MA            0        16     0.0%
+MD            0        16     0.0%
+ME            0        16     0.0%
+MI            0        16     0.0%
+MN            0        16     0.0%
+MO            0        16     0.0%
+MS            0        16     0.0%
+MT            0        16     0.0%
+NC            0        16     0.0%
+ND            0        16     0.0%
+NE            0        16     0.0%
+NH            0        16     0.0%
+NJ            0        16     0.0%
+NM            0        16     0.0%
+NV            0        16     0.0%
+NY            0        16     0.0%
+OH            0        16     0.0%
+OK            0        16     0.0%
+OR            0        16     0.0%
+PA            0        16     0.0%
+RI            0        16     0.0%
+SC            0        16     0.0%
+SD            0        16     0.0%
+TN            0        16     0.0%
+TX            0        16     0.0%
+UT            0        16     0.0%
+VA            0        16     0.0%
+WA            0        16     0.0%
+WI            0        16     0.0%
+
+Per year:
+year    warned  quarters      pct  states warned
+2007        28       204    13.7%              7
+2008        28       204    13.7%              7
+2009        28       204    13.7%              7
+2010        28       204    13.7%              7
+
+AK  (16 warned quarters)
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4
+DC  (16 warned quarters)
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4
+DE  (16 warned quarters)
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4
+HI  (16 warned quarters)
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4
+VT  (16 warned quarters)
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4
+WV  (16 warned quarters)
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4
+WY  (16 warned quarters)
+    2007Q1  2007Q2  2007Q3  2007Q4  2008Q1  2008Q2  2008Q3  2008Q4  2009Q1  2009Q2  2009Q3  2009Q4
+    2010Q1  2010Q2  2010Q3  2010Q4
+
+==============================================================================================================
+6. WHOLE-SERIES CONTEXT  (1991Q1 .. 2026Q2)
+==============================================================================================================
+whole file: state-quarters 7242   warned 994   13.73%   states warned 7 of 51
+
+year    warned  quarters      pct  states warned
+1991        28       204    13.7%              7
+1992        28       204    13.7%              7
+1993        28       204    13.7%              7
+1994        28       204    13.7%              7
+1995        28       204    13.7%              7
+1996        28       204    13.7%              7
+1997        28       204    13.7%              7
+1998        28       204    13.7%              7
+1999        28       204    13.7%              7
+2000        28       204    13.7%              7
+2001        28       204    13.7%              7
+2002        28       204    13.7%              7
+2003        28       204    13.7%              7
+2004        28       204    13.7%              7
+2005        28       204    13.7%              7
+2006        28       204    13.7%              7
+2007        28       204    13.7%              7
+2008        28       204    13.7%              7
+2009        28       204    13.7%              7
+2010        28       204    13.7%              7
+2011        28       204    13.7%              7
+2012        28       204    13.7%              7
+2013        28       204    13.7%              7
+2014        28       204    13.7%              7
+2015        28       204    13.7%              7
+2016        28       204    13.7%              7
+2017        28       204    13.7%              7
+2018        28       204    13.7%              7
+2019        28       204    13.7%              7
+2020        28       204    13.7%              7
+2021        28       204    13.7%              7
+2022        28       204    13.7%              7
+2023        28       204    13.7%              7
+2024        28       204    13.7%              7
+2025        28       204    13.7%              7
+2026        14       102    13.7%              7
+
+states warned in EVERY quarter (7): AK DC DE HI VT WV WY
+states warned in SOME but not all quarters (0): none
+states never warned (44): AL AR AZ CA CO CT FL GA IA ID IL IN KS KY LA MA MD ME MI MN MO MS MT NC ND NE NH NJ NM NV NY OH OK OR PA RI SC SD TN TX UT VA WA WI
+
+first and last warned quarter, per warned state:
+    AK  1991Q1 .. 2026Q2
+    DC  1991Q1 .. 2026Q2
+    DE  1991Q1 .. 2026Q2
+    HI  1991Q1 .. 2026Q2
+    VT  1991Q1 .. 2026Q2
+    WV  1991Q1 .. 2026Q2
+    WY  1991Q1 .. 2026Q2

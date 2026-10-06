@@ -1,0 +1,277 @@
+=========================================================================================================================
+16_panel_build_report - transition panel, Freddie Mac SFLLD 2006-2007
+=========================================================================================================================
+builder     : src/panel.py
+panel out   : C:/Users/benje/AppData/Local/Temp/claude/c--Users-benje-Iter-credit-migration/c0851d23-e849-4d3c-952d-8a60a65ff7be/scratchpad/panel_rebuild/panel_<quarter>.parquet
+censor out  : C:/Users/benje/AppData/Local/Temp/claude/c--Users-benje-Iter-credit-migration/c0851d23-e849-4d3c-952d-8a60a65ff7be/scratchpad/panel_rebuild\censoring/censor_<quarter>.parquet
+chunksize   : 2,000,000
+split       : 80/20 over loans, keyed BLAKE2b of loan_id, seed 'credit-migration/2006-2007/v1'
+cut         : from month <= 2008-12 is the fit window
+
+RESOLVED COLUMN INDICES   (0-based index = published position - 1)
+-------------------------------------------------------------------------------------------------------------------------
+file            role        position   index   attribute name
+-------------------------------------------------------------------------------------------------------------------------
+performance     loan               1       0   Loan Identifier
+performance     period             2       1   Period
+performance     status             4       3   Current Loan Delinquency Status
+performance     loan_age           5       4   Loan Age
+performance     zero_balance         9       8   Zero Balance Code
+performance     mod                8       7   Modification Flag
+origination     fico               1       0   Classic FICO®
+origination     first_payment         2       1   First Payment Date
+origination     dti               10       9   Original Debt-to-Income (DTI) Ratio
+origination     ltv               12      11   Original Loan-to-Value (LTV)
+origination     orig_rate         13      12   Original Interest Rate
+origination     loan              20      19   Loan Identifier
+origination     property_state        17      16   Property State
+origination     msa                5       4   Metropolitan Statistical Area (MSA) Or Metropolitan Division
+origination     postal_code        19      18   Postal Code
+-------------------------------------------------------------------------------------------------------------------------
+performance sheet: xl/worksheets/sheet2.xml      origination sheet: xl/worksheets/sheet1.xml
+indices 0, 1 and 3 asserted against the values the project already
+uses; a mismatch stops the run before any file is read.
+
+LOAN-TO-FILE CONTAINMENT   (checked before any write)
+-------------------------------------------------------------------------------------------------------------------------
+prefix check: PASS - 8 perf files checked, 8 distinct prefixes
+    perf_2006Q1.txt         F06Q1
+    perf_2006Q2.txt         F06Q2
+    perf_2006Q3.txt         F06Q3
+    perf_2006Q4.txt         F06Q4
+    perf_2007Q1.txt         F07Q1
+    perf_2007Q2.txt         F07Q2
+    perf_2007Q3.txt         F07Q3
+    perf_2007Q4.txt         F07Q4
+Distinct prefixes here, plus the per-file single-prefix check during
+the build, mean no loan spans two files, so run_length never resets
+at a file boundary.
+
+MACRO SERIES
+-------------------------------------------------------------------------------------------------------------------------
+UNRATE         cache        194801 -> 202608
+    data\macro\UNRATE.csv  (943 months, cached at 2026-09-20 00:47:22)
+MORTGAGE30US   cache        197104 -> 202609
+    data\macro\MORTGAGE30US.csv  (666 months, cached at 2026-09-23 16:18:32)
+
+unemp_level / unemp_chg_12m are joined on the FROM month.
+rate_spread is the note rate minus the PMMS 30-year fixed rate in the
+origination month, taken as the first payment month minus one.
+
+PER-QUARTER BUILD
+-------------------------------------------------------------------------------------------------------------------------
+quarter         rows written   seconds
+-------------------------------------------------------------------------------------------------------------------------
+2006Q1            11,007,083     143.6
+2006Q2            10,261,159     129.6
+2006Q3             8,771,116     112.0
+2006Q4             9,242,175     124.2
+2007Q1             8,535,877     122.2
+2007Q2             9,224,837     139.2
+2007Q3             6,349,937      97.5
+2007Q4             6,128,528      96.0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL             69,520,712     967.8
+
+=========================================================================================================================
+ROWS IN, ROWS OUT
+=========================================================================================================================
+Two stages. The first is pure pair arithmetic and must balance exactly.
+The second is the role filter of R6, which deliberately discards rows.
+
+performance rows read                                             150,967,486
+rows rejected (unparseable period or loan id)                               0
+loans                                                               2,431,736
+gap-spanning pairs dropped (R3)                                         1,566
+duplicate-period pairs                                                      0
+pairs with an absorbing from-state, suppressed (R1)                   851,739
+-------------------------------------------------------------------------------------------------------------------------
+perf_rows - rejected - loans - gaps - dups - suppressed           147,682,445
+candidate pairs built                                             147,682,445
+identity holds                                                            yes
+-------------------------------------------------------------------------------------------------------------------------
+candidate pairs                                                   147,682,445    100.0000%
+excluded: train-split loan, from month after the cut               77,754,868     52.6500%
+excluded: malformed origination record (named loan)                         1      0.0000%
+excluded: territory loans (GU, PR, VI)                                400,089      0.2709%
+excluded: null-ltv loans (999 sentinel)                                 6,775      0.0046%
+PANEL ROWS WRITTEN                                                 69,520,712     47.0745%
+candidates - excluded (all four lines) == written                         yes
+    F06Q30148547  origination record malformed: interest rate '.' (does not parse) and a blank property state. Its one panel row is a train-split fit row (Current -> Current); the loan is not in the test split, so it is outside the horizon universe and the data fingerprint.
+
+=========================================================================================================================
+EXCLUSIONS AND HPI JOIN
+=========================================================================================================================
+Loan-level, all rows, all roles; territory first, then null ltv (as in the docstring).
+                                                                        loans               rows
+territory (GU, PR, VI)                                                 10,073            400,089
+null ltv (not already a territory loan)                                   219              6,775
+removed from data/panel/censoring/: territory                           2,012                   
+removed from data/panel/censoring/: null ltv                                6                   
+Rows of GU/PR/VI in the written panel: 0; rows with a null ltv: 0 (asserted per quarter).
+HPI series: data\macro\hpi_state_monthly.csv   21,726 rows, 51 states, 1991-01 .. 2026-06
+hpi_ratio, est_ltv, est_ltv_step null on 0 rows (asserted per quarter); hpi_ratio > 0 on every row; hpi_ratio range 0.3998 .. 3.0056
+
+=========================================================================================================================
+LOAN AGE AND MODIFICATION (R7)
+=========================================================================================================================
+loans with Y or P on any row (unit: loans)                            135,929      5.5898%
+loans modified by age reset only, no flag (loans)                          22      0.0009%
+panel rows at or after first modification                           1,983,269      2.8528%
+panel rows whose loan_age differs from Freddie's                    1,982,192      2.8512%
+median correction (new loan_age - Freddie's)                       +52 months
+panel rows with a negative loan_age                                       172
+
+loan_age = from month - (first payment month - 1). Freddie's reported
+age restarts at modification; this does not. Unflagged loans have
+each age reset treated as a modification:
+    F06Q10078255  F06Q10174737  F06Q10282004  F06Q10301421  F06Q20010801  F06Q20199484
+    F06Q30256584  F06Q40178436  F06Q40360368  F07Q10038033  F07Q10199459  F07Q10201793
+    F07Q10373790  F07Q20466175  F07Q30324769  F07Q40009415  F07Q40175169  F07Q40212539
+    F07Q40297250  F07Q40310164  F07Q40340297  F07Q40408255
+
+=========================================================================================================================
+COUNTS BY ROLE, FROM STATE AND TO STATE
+=========================================================================================================================
+Unit: panel rows (69,520,712).
+
+role                                rows       share
+-------------------------------------------------------------------------------------------------------------------------
+fit                           40,210,036    57.8389%
+condition                     10,064,498    14.4770%
+evaluate                      19,246,178    27.6841%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                         69,520,712   100.0000%
+
+state                      as from_state       share       as to_state       share
+-------------------------------------------------------------------------------------------------------------------------
+Current                       66,231,461    95.2687%        65,345,420    93.9942%
+DQ30                           1,392,716     2.0033%         1,431,429     2.0590%
+DQ60                             429,460     0.6177%           444,367     0.6392%
+DQ90+                          1,467,075     2.1103%         1,503,780     2.1631%
+Prepaid                                0     0.0000%           748,879     1.0772%
+Default                                0     0.0000%            46,837     0.0674%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                         69,520,712   100.0000%        69,520,712   100.0000%
+
+Prepaid and Default never appear as a from_state: R1 suppresses those rows.
+
+=========================================================================================================================
+TRANSITION COUNTS, FIT ROWS ONLY   (unit: panel rows with role = fit)
+=========================================================================================================================
+Descriptive only - no rates, no estimation.
+
+from \ to                 rows        Current           DQ30           DQ60          DQ90+        Prepaid        Default
+-------------------------------------------------------------------------------------------------------------------------
+Current             39,360,874     38,697,062        335,367          2,832          1,429        324,110             74
+DQ30                   523,364        212,900        204,213        100,056            839          5,306             50
+DQ60                   124,006         16,795         18,359         30,974         56,818            993             67
+DQ90+                  201,792         12,365          2,634          3,882        174,837          1,083          6,991
+Prepaid                      0              0              0              0              0              0              0
+Default                      0              0              0              0              0              0              0
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL into          40,210,036     38,939,122        560,573        137,744        233,923        331,492          7,182
+
+=========================================================================================================================
+DROPPED PAIRS AND FLAGGED ROWS
+=========================================================================================================================
+gap-spanning pairs dropped (R3)                                         1,566      0.0011%
+rows flagged post_gap                                                     288      0.0004%
+rows flagged is_skip                                                   17,430      0.0251%
+rows flagged is_fall                                                  130,213      0.1873%
+
+Skips and falls are kept as ordinary transitions (R4). The counts above
+are over WRITTEN rows, so they sit below the panel-wide figures in
+diagnostics 14 and 15 by exactly the rows the R6 role filter removed.
+
+=========================================================================================================================
+CENSORED LOANS BY REASON   (unit: loans)
+=========================================================================================================================
+Written per quarter to C:/Users/benje/AppData/Local/Temp/claude/c--Users-benje-Iter-credit-migration/c0851d23-e849-4d3c-952d-8a60a65ff7be/scratchpad/panel_rebuild\censoring. Censoring is recorded here and never
+appears in to_state (R2).
+
+censor_reason                                        loans of censored    of loans
+-------------------------------------------------------------------------------------------------------------------------
+code_15                                             10,498     7.6299%     0.4317%
+code_16                                             51,469    37.4075%     2.1166%
+code_96                                             18,626    13.5373%     0.7660%
+no_further_observation                              56,997    41.4252%     2.3439%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL censored                                     137,590   100.0000%     5.6581%
+terminated (01/02/03/09, not censored)           2,294,146                94.3419%
+censored + terminated                            2,431,736
+loans                                            2,431,736
+Counts above are over the raw performance files. Removed from the censoring files by the
+loan-level exclusions: 2,012 territory, 6 null-ltv; censored loans written: 135,572.
+
+=========================================================================================================================
+LOANS WITH ZERO EMITTED ROWS   (unit: loans)
+=========================================================================================================================
+reason                                                                 loans    of loans
+-------------------------------------------------------------------------------------------------------------------------
+all pairs removed by the R6 role filter (train, after cut)             4,212     0.1732%
+every pair dropped by R3 (gap) or R1 (absorbing from-state)                 0     0.0000%
+every pair removed by the explicit exclusion list                          1     0.0000%
+every pair removed by the territory / null-ltv exclusion              10,292     0.4232%
+single observation, no pair possible                                   2,029     0.0834%
+-------------------------------------------------------------------------------------------------------------------------
+TOTAL                                                                 16,534     0.6799%
+
+loans contributing at least one row                                2,415,202
+train-split loans                                                  1,945,166    79.9908%
+test-split loans                                                     486,570    20.0092%
+
+panel rows matched to an origination record                       69,520,712   100.0000%
+panel rows with no origination match                                       0
+
+=========================================================================================================================
+ORIGINATION VALIDATION   (hard checks on loans that reach the panel)
+=========================================================================================================================
+Rejected = MALFORMED: a build that finds any stops, so a finished build
+always shows 0. Null = the documented sentinel, stored as null.
+Tallied BEFORE the exclusions, so the territory rows count here and the null-ltv rows show as null.
+check           valid / sentinel                        valid rows   null rows  rejected   valid loans  null loans
+-------------------------------------------------------------------------------------------------------------------------
+ltv             6-105 / 999                             69,920,801       6,775         0     2,425,275         219
+dti             0-65 / 999                              68,391,951   1,535,625         0     2,371,237      54,257
+orig_rate       0 < r <= 25 / none                      69,927,576           0         0     2,425,494           0
+property_state  54-code whitelist / none                69,927,576           0         0     2,425,494           0
+postal_code     any / 000                               69,927,396         180         0     2,425,486           8
+-------------------------------------------------------------------------------------------------------------------------
+
+=========================================================================================================================
+NULLS PER COLUMN   (unit: panel rows, of 69,520,712)
+=========================================================================================================================
+column                      group                      nulls       share
+-------------------------------------------------------------------------------------------------------------------------
+loan_id                     keys                           0     0.0000%
+from_period                 keys                           0     0.0000%
+from_state                  states                         0     0.0000%
+to_state                    states                         0     0.0000%
+run_length                  features                       0     0.0000%
+loan_age                    features                       0     0.0000%
+is_modified                 features                       0     0.0000%
+months_since_modification   features              67,537,443    97.1472%
+fico                        features                  56,861     0.0818%
+ltv                         features                       0     0.0000%
+dti                         features               1,532,265     2.2040%
+rate_spread                 features                       0     0.0000%
+unemp_level                 features                  11,525     0.0166%
+unemp_chg_12m               features                  11,525     0.0166%
+hpi_ratio                   features                       0     0.0000%
+est_ltv                     features                       0     0.0000%
+est_ltv_step                features                       0     0.0000%
+property_state              features                       0     0.0000%
+role                        metadata                       0     0.0000%
+post_gap                    metadata                       0     0.0000%
+is_skip                     metadata                       0     0.0000%
+is_fall                     metadata                       0     0.0000%
+msa                         metadata              12,905,673    18.5638%
+postal_code                 metadata                     180     0.0003%
+
+hpi_ratio, est_ltv and est_ltv_step are never null: the territory and null-ltv loans, the only
+rows where they could be undefined, are excluded (see EXCLUSIONS AND HPI JOIN).
+
+=========================================================================================================================
+runtime: 967.8 s  (16.13 min)
+=========================================================================================================================

@@ -74,7 +74,7 @@ from src.panel_io import load_panel, read_manifest, validate          # noqa: E4
 
 OUT = os.path.join("diagnostics", "23_origination_validity.txt")
 RULE_W = 121
-WANT_FP = "3b1209189824e42f"
+WANT_FP = "71d85ff7fd2c5d1a"            # re-baselined (was 3b1209189824e42f): territory and null-ltv loans left the panel
 V, S, M = 0, 1, 2
 BUCKET = ["VALID", "SENTINEL", "MALFORMED"]
 TERRITORIES = ["GU", "PR", "VI"]

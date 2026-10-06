@@ -131,7 +131,7 @@ h    cohort           Current           DQ30           DQ60          DQ90+      
 all five scored on identical n and realised counts, per cohort and per
 start-state cell: PASS
 fingerprint (eligible ids, start state, realised per h, fixed cohort):
-    3b1209189824e42f
+    71d85ff7fd2c5d1a
 against the saved nulls run (artifacts\horizon_nulls\nulls_report.txt): 3b1209189824e42f   PASS
 
 Against the saved baseline run (artifacts\horizon_baseline):
@@ -662,3 +662,9 @@ OUTPUTS
 runtime    : 25.0 s  (0.42 min)
 peak memory: 1767 MB  (peak working set (psutil))
 ==========================================================================================================================================================
+
+NOTE (panel housekeeping, 2026-10-06): the baseline fingerprint above (the line read by saved_fingerprint()) was
+re-baselined from 3b1209189824e42f to 71d85ff7fd2c5d1a, the fingerprint of the panel after the territory (GU, PR, VI)
+and null-ltv loans were removed. ONLY that value was changed. Every table, count and Brier score in this report and in
+model_comparison.csv / compounding_all.csv was computed on the earlier universe (407,555 eligible loans; the new one has
+405,705) and is stale until this run is repeated. Gates that compare a new run's numbers to these files will fail until then.

@@ -215,6 +215,7 @@ def make_frame(quarter, n):
         "to_state": pd.Categorical.from_codes(np.zeros(n, np.int8),
                                                 categories=panel.STATES),
         "run_length": np.ones(n, dtype=np.int32),
+        "run_length_censored": np.zeros(n, dtype=bool),
         "loan_age": pd.array(np.arange(n, dtype=np.int32), dtype="Int32"),
         "is_modified": np.arange(n) >= 1,
         "months_since_modification": pd.array(
@@ -225,7 +226,9 @@ def make_frame(quarter, n):
         "rate_spread": np.zeros(n, dtype=np.float32),
         "unemp_level": np.full(n, 5, dtype=np.float32),
         "unemp_chg_12m": np.zeros(n, dtype=np.float32),
-        "hpi_feature": np.full(n, np.nan, dtype=np.float32),
+        "hpi_ratio": np.ones(n, dtype=np.float32),
+        "est_ltv": np.full(n, 80, dtype=np.float32),
+        "est_ltv_step": np.full(n, 80, dtype=np.float32),
         "property_state": pd.Categorical.from_codes(
             np.where(np.arange(n) == 1, -1, 0).astype(np.int8),
             categories=["CA", "TX"]),

@@ -23,6 +23,11 @@ states                       categorical over the six-state space
 features                     everything the model is allowed to read
     run_length      int32    consecutive months in from_state as of month t,
                              counting t itself as 1 (R5)
+    run_length_censored
+                    bool     run_length was counted from an artificial start (an
+                             entry after origination, or a gap) and not from an
+                             observed state change; true until the first
+                             genuinely observed change (R5)
     loan_age        int32    months from the origination month (first payment
                              month minus one) to month t. NOT Freddie's reported
                              loan age, which restarts at modification (R7)
@@ -39,9 +44,14 @@ features                     everything the model is allowed to read
                              market rate prevailing in the origination month
     unemp_level     float32  national unemployment rate at month t
     unemp_chg_12m   float32  that rate minus its value twelve months earlier
-    hpi_feature     float32  PLACEHOLDER, emitted as all-null. The encoding is
-                             not yet decided; the column exists so the join can
-                             be added later without rebuilding the panel.
+    hpi_ratio       float32  state house-price index at month t divided by the
+                             same index at the loan's origination month (first
+                             payment month minus one), hpi_disagg series of
+                             data/macro/hpi_state_monthly.csv. Never null.
+    est_ltv         float32  ltv / hpi_ratio: the loan-to-value re-based to month
+                             t's house prices. Never null.
+    est_ltv_step    float32  the same from the hpi_step series, carried as a
+                             sensitivity column. Never null.
     property_state  category Freddie "Property State", the two-letter code, from
                              the origination file. A parquet dictionary of
                              strings (dictionary<values=string, indices=int8>),
@@ -49,9 +59,37 @@ features                     everything the model is allowed to read
                              explicit whitelist PROPERTY_STATES (50 states, DC,
                              GU, PR, VI), so every partition carries the same
                              dictionary. A code outside it, or a blank, FAILS the
-                             build; no value is imputed. Added so a state-level
-                             house-price index can be joined later; no such join
-                             exists yet and hpi_feature is untouched.
+                             build; no value is imputed. The territories are
+                             excluded from the panel (see EXCLUSIONS), so no row
+                             carries GU, PR or VI; the dictionary keeps them.
+
+    ltv, hpi_ratio, est_ltv and est_ltv_step are features, not metadata.
+
+=============================== EXCLUSIONS ==============================
+Two loan-level exclusions, applied in this order to every loan that reaches the
+panel, after the role filter and the origination checks, before the HPI join.
+Each drops ALL of a loan's rows, in all roles, and is a named line of the build
+report's arithmetic identity:
+    territory    property_state is GU, PR or VI. A state-level house-price
+                 index covers the 50 states and DC only. Not imputed.
+    null ltv     ltv is null: Freddie's documented 999 "not available". est_ltv
+                 is undefined without it. (A malformed ltv fails the build before
+                 this point.)
+The same loans are removed from data/panel/censoring/, so the exclusions are
+uniform across every panel artefact. That directory is classified from the
+ORIGINATION record, which also catches censored loans with no panel row.
+After the exclusions no panel row has a null ltv, est_ltv, est_ltv_step or
+hpi_ratio; the build asserts it.
+
+=============================== HPI JOIN ================================
+data/macro/hpi_state_monthly.csv (built by src/hpi_state_monthly.py from FHFA's
+seasonally adjusted purchase-only indexes) must cover every state and month the
+panel touches; a gap is a hard failure and nothing is filled. Per row:
+    hpi_ratio    = hpi_disagg[state, from month] / hpi_disagg[state, origination month]
+    est_ltv      = ltv / hpi_ratio
+    est_ltv_step = ltv / (hpi_step[state, from month] / hpi_step[state, origination month])
+No lag. A quarter's anchor averages its three months, so a row's level uses
+information from later months of the same quarter.
 
 metadata                     bookkeeping - NEVER a model input
     role            category fit / condition / evaluate (R6)
@@ -121,6 +159,22 @@ R5  RUN LENGTH. Consecutive months the loan has held its current MAPPED state as
     of the from month, counting the from month as 1, computed over the loan's
     FULL observed history before any role filtering, and reset by a state change
     or a gap.
+    run_length_censored marks the rows whose run_length was counted from an
+    ARTIFICIAL start rather than from an observed state change. A run starts
+    artificially in two ways: ENTRY, the loan's first observed row when that row
+    is not its origination (loan_age at the first row > 1, so the time already
+    spent in the state is unobservable), and GAP, the row after an interior
+    reporting hole (run_length resets to 1 there although the true start is
+    unobservable). A loan observed from its origination is NOT censored at
+    entry: its run_length 1 is true. The flag is true from the artificial start
+    until the loan's first genuinely observed state change and false for every
+    row after, so it is neither a single-row marker nor loan-level. It is
+    distinct from post_gap, which marks only the first row after a gap. Computed
+    at the same stage as run_length, so condition rows carry it correctly. It is
+    a feature: a function of the loan's own history up to month t, not of to_state.
+    Hard failures: a first row that disagrees with loan_age at entry; the flag
+    changing inside a run; false then true with no gap between; a post_gap row not
+    flagged.
 
 R6  ROLE. Grouped-temporal split, cut at 2008-12.
         fit        train-split loan, from month <= 2008-12
@@ -152,10 +206,12 @@ Load-bearing, and implemented in this order inside build_quarter():
     2 detect gaps, mark them                  6 join origination on loan_id,
     3 run_length and modification events        and compute loan_age from it
       over the full history                   7 emit pairs, applying R1 and R2
-    4 assign role
+    4 assign role                             8 exclusions (territory, then null
+                                                ltv), then the HPI join
 Step 3 precedes step 4 so that run_length and the modification columns are
 properties of the loan's observed history and not of the window a row happens
-to land in.
+to land in. Step 8 follows 6: it needs the origination state, ltv and month, and
+precedes every row-level tally, so the report describes the panel as written.
 
 ============================ COLUMN INDICES ============================
 Every index is resolved at run time from docs/file_layout_july_2026.xlsx by
@@ -206,6 +262,7 @@ LAYOUT = os.path.join("docs", "file_layout_july_2026.xlsx")
 PANEL_DIR = os.path.join("data", "panel")
 CENSOR_DIR = os.path.join(PANEL_DIR, "censoring")
 MACRO_DIR = os.path.join("data", "macro")
+HPI_CSV = os.path.join(MACRO_DIR, "hpi_state_monthly.csv")
 REPORT = os.path.join("diagnostics", "16_panel_build_report.txt")
 PANEL_FILE = "panel_%s.parquet"                 # % quarter
 MANIFEST_NAME = "panel_manifest.json"
@@ -242,9 +299,12 @@ CENSOR_REASONS = ["code_15", "code_16", "code_96", "no_further_observation"]
 # ---- schema, in written column order ------------------------------------
 KEYS = ["loan_id", "from_period"]
 STATE_COLS = ["from_state", "to_state"]
-FEATURES = ["run_length", "loan_age", "is_modified", "months_since_modification",
+FEATURES = ["run_length", "run_length_censored", "loan_age", "is_modified", "months_since_modification",
             "fico", "ltv", "dti", "rate_spread",
-            "unemp_level", "unemp_chg_12m", "hpi_feature", "property_state"]
+            "unemp_level", "unemp_chg_12m",
+            "hpi_ratio", "est_ltv", "est_ltv_step", "property_state"]
+HPI_FEATURES = ["hpi_ratio", "est_ltv", "est_ltv_step"]
+EXCLUDED_STATES = ("GU", "PR", "VI")    # territories: no state-level HPI, no division
 METADATA = ["role", "post_gap", "is_skip", "is_fall", "msa", "postal_code"]
 SCHEMA = KEYS + STATE_COLS + FEATURES + METADATA
 
@@ -526,6 +586,84 @@ def lookup(table, months):
 
 
 # ==========================================================================
+# state house-price index
+# ==========================================================================
+class HpiError(RuntimeError):
+    """The HPI series cannot serve a panel row. Nothing is filled."""
+
+
+class Hpi(object):
+    """Dense [state, month] matrices of the hpi_disagg and hpi_step series."""
+
+    def __init__(self, path=HPI_CSV):
+        if not os.path.exists(path):
+            raise HpiError("%s not found: build it with python -m src.hpi_state_monthly" % path)
+        h = pd.read_csv(path, dtype={"state_code": str}, parse_dates=["month"])
+        if list(h.columns) != ["state_code", "month", "hpi_step", "hpi_disagg"]:
+            raise HpiError("%s: unexpected columns %s" % (path, list(h.columns)))
+        dup = h.duplicated(["state_code", "month"])
+        if dup.any():
+            raise HpiError("%d duplicate (state_code, month) rows in %s: %s"
+                           % (int(dup.sum()), path, h[dup].head(10).to_dict("records")))
+        if not (h["month"].dt.day == 1).all():
+            raise HpiError("%s: months are not all first-of-month" % path)
+        self.path, self.n_rows = path, len(h)
+        self.states = sorted(h["state_code"].unique())
+        self.index = {s: i for i, s in enumerate(self.states)}
+        month = (h["month"].dt.year * 12 + h["month"].dt.month - 1).to_numpy()
+        self.m0, self.m1 = int(month.min()), int(month.max())
+        self.width = self.m1 - self.m0 + 1
+        row = np.array([self.index[s] for s in h["state_code"]])
+        for col in ("hpi_step", "hpi_disagg"):
+            v = h[col].to_numpy(dtype=np.float64)
+            if not np.isfinite(v).all() or (v <= 0).any():
+                raise HpiError("%s: %s has a non-finite or non-positive value" % (path, col))
+            mat = np.full((len(self.states), self.width), np.nan)
+            mat[row, month - self.m0] = v
+            if np.isnan(mat).any():
+                s, k = np.argwhere(np.isnan(mat))[0]
+                raise HpiError("%s: %s has no value for %s in %d-%02d; nothing is filled"
+                               % (path, col, self.states[s], (self.m0 + k) // 12,
+                                  (self.m0 + k) % 12 + 1))
+            setattr(self, col, mat)
+
+
+def hpi_features(hpi, quarter, prefix, tails, state_code, categories, from_month,
+                 orig_month, ltv):
+    """hpi_ratio, est_ltv and est_ltv_step for rows, as float32 arrays.
+
+    state_code indexes `categories`; from_month and orig_month are contiguous
+    month indices. Any state, from month or origination month the series does not
+    cover fails, naming loans; est_* are null exactly where ltv is.
+    """
+    amap = np.array([hpi.index.get(c, -1) for c in categories])
+    s = amap[state_code]
+    t, o = from_month - hpi.m0, orig_month - hpi.m0
+    bad = (s < 0) | (t < 0) | (t >= hpi.width) | (o < 0) | (o >= hpi.width)
+    if bad.any():
+        loans = ["%s%07d" % (prefix, x) for x in np.unique(tails[bad])[:20]]
+        raise HpiError("%s: %d rows have a state or month outside the HPI series "
+                       "(%d-%02d .. %d-%02d); loans %s"
+                       % (quarter, int(bad.sum()), hpi.m0 // 12, hpi.m0 % 12 + 1,
+                          hpi.m1 // 12, hpi.m1 % 12 + 1, loans))
+    ratio = hpi.hpi_disagg[s, t] / hpi.hpi_disagg[s, o]
+    ratio_step = hpi.hpi_step[s, t] / hpi.hpi_step[s, o]
+    x = ltv.astype(np.float64)
+    return {"hpi_ratio": ratio.astype(np.float32),
+            "est_ltv": (x / ratio).astype(np.float32),
+            "est_ltv_step": (x / ratio_step).astype(np.float32)}
+
+
+def set_output_dir(root):
+    """Redirect every build output under `root` (a scratch build). Outputs are the
+    panel partitions, the manifest, the censoring files and the build report."""
+    global PANEL_DIR, CENSOR_DIR, REPORT
+    PANEL_DIR = root
+    CENSOR_DIR = os.path.join(root, "censoring")
+    REPORT = os.path.join(root, "build_report.txt")
+
+
+# ==========================================================================
 # loan split
 # ==========================================================================
 def split_flags(loan_ids):
@@ -657,6 +795,61 @@ def join_origination(orig, tails):
     return out, int(hit.sum())
 
 
+def run_length_censored(quarter, prefix, tail, period, dp, is_first, new_run, run_start,
+                        gap_start, orig):
+    """(censored, kind, entry_loan_tails) per performance row, over each loan's FULL
+    observed history. kind: 0 uncensored, 1 run started at an entry that is not
+    the origination, 2 run started after a gap. Hard failures on any broken
+    invariant, naming loans."""
+    n = len(tail)
+    first_idx = np.nonzero(is_first)[0]
+    pos = np.searchsorted(orig["tail"], tail[first_idx])
+    safe = np.clip(pos, 0, max(orig["n"] - 1, 0))
+    known = (orig["n"] > 0) & (orig["tail"][safe] == tail[first_idx])         & (orig["orig_month"][safe] >= 0)
+    entry_age = period[first_idx].astype(np.int64) - orig["orig_month"][safe]
+    seasoned = known & (entry_age > 1)
+    start_kind = np.zeros(n, dtype=np.int8)
+    start_kind[gap_start] = 2
+    start_kind[first_idx[seasoned]] = 1
+    kind = start_kind[run_start]
+    censored = kind > 0
+
+    def fail(what, rows):
+        ids = ["%s%07d" % (prefix, t) for t in np.unique(tail[rows])[:10]]
+        raise RuntimeError("%s: run_length_censored: %s on %d rows, e.g. loans %s"
+                           % (quarter, what, int(len(rows)), ids))
+
+    # entering at the origination: false on the first row; entering later: true
+    bad = first_idx[known & (censored[first_idx] != (entry_age > 1))]
+    if len(bad):
+        fail("a loan's first row disagrees with its loan_age at entry", bad)
+    # inside a run the flag is constant, so it can never go false and then true
+    # again within one uninterrupted run
+    inside = np.nonzero(~new_run)[0]
+    bad = inside[censored[inside] != censored[inside - 1]]
+    if len(bad):
+        fail("the flag changes inside a run", bad)
+    same = ~is_first
+    steady = np.nonzero(same & (dp == 1))[0]
+    bad = steady[censored[steady] & ~censored[steady - 1]]
+    if len(bad):
+        fail("the flag goes false then true with no gap in between", bad)
+    # a row after a gap starts a run at an artificial point: always flagged
+    gap_rows = np.nonzero(same & (dp > 1))[0]
+    bad = gap_rows[~censored[gap_rows]]
+    if len(bad):
+        fail("a row after a gap is not flagged", bad)
+    return censored, kind, tail[first_idx[seasoned]]
+
+
+def exclusion_tails(orig):
+    """Tails of the loans the loan-level exclusions remove, from the origination
+    record: (territory loans, null-ltv loans that are not territory loans)."""
+    codes = [orig["state_categories"].index(s) for s in EXCLUDED_STATES]
+    in_terr = np.isin(orig["property_state"], codes)
+    return orig["tail"][in_terr], orig["tail"][np.isnan(orig["ltv"]) & ~in_terr]
+
+
 class OriginationError(RuntimeError):
     """An origination value is neither valid nor a documented sentinel."""
 
@@ -777,6 +970,22 @@ class Report(object):
         self.terminated = 0
         self.nulls = {c: 0 for c in SCHEMA}
         self.excluded_malformed = 0     # rows of EXCLUDED_LOANS, a named reason
+        self.excluded_territory_rows = 0    # rows / loans of GU, PR, VI loans
+        self.excluded_territory_loans = 0
+        self.excluded_null_ltv_rows = 0     # rows / loans with a null ltv (not territory)
+        self.excluded_null_ltv_loans = 0
+        self.censor_excl_territory = 0      # censoring records removed, by the same rules
+        self.censor_excl_null_ltv = 0
+        self.rlc_rows = 0                   # panel rows with run_length_censored, and by cause
+        self.rlc_entry_rows = 0
+        self.rlc_gap_rows = 0
+        self.rlc_loans = 0                  # loans with a flagged panel row, and by cause
+        self.rlc_entry_loans = 0
+        self.rlc_gap_loans = 0
+        self.rlc_both_loans = 0
+        self.rlc_entry_seasoned_loans = 0   # panel loans first observed after origination
+        self.hpi = None                     # the Hpi used
+        self.ratio_min, self.ratio_max = np.inf, -np.inf
         self.validation = {f: np.zeros(4, dtype=np.int64)
                            for f in CHECKED + ("postal_code",)}
         self.zero_row_loans = {}
@@ -972,7 +1181,7 @@ def write_manifest(rep, panel_dir=PANEL_DIR):
 
 def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     """Build, filter and write one quarter. Returns the written row count."""
-    unrate, unchg, pmms = macro
+    unrate, unchg, pmms, hpi = macro
     t0 = time.time()
 
     # ---- 1. read and sort by (loan_id, period) --------------------------
@@ -1017,7 +1226,11 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     new_run[1:] = is_first[1:] | (dp[1:] != 1) | (state[1:] != state[:-1])
     run_start = np.maximum.accumulate(np.where(new_run, ar, 0))
     run_length = (ar - run_start + 1).astype(np.int32)
-    del ar, new_run, run_start
+    # a run that starts at a gap row (or a repeated period) starts at an artificial
+    # point: its true start is unobservable (kept for 3c, below)
+    gap_start = np.zeros(n, dtype=bool)
+    gap_start[1:] = ~is_first[1:] & (dp[1:] != 1)
+    del ar
 
     # ---- 3b. modification events over the FULL history (R7) --------------
     is_mod_row, months_since_row, unflagged = modification_columns(
@@ -1052,6 +1265,31 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     if not found:
         raise SystemExit("cannot read a quarter name from %r" % perf_path)
     quarter = found.group(1)
+    # The origination file is read here, not at the join below: the censoring
+    # records get the same loan-level exclusions as the panel, and are classified
+    # from the origination record so that a censored loan with no panel row is
+    # caught as well.
+    orig = load_origination(orig_path, oidx, pmms)
+
+    # ---- 3c. run_length_censored over the FULL history, before role assignment --
+    # A run is CENSORED when it starts at an artificial point: the loan's first
+    # observed row, if that row is not the loan's origination (entry), or the row
+    # after an interior gap (gap). The flag holds from that start until the loan's
+    # first genuinely observed state change, which starts an uncensored run.
+    # Entry: loan_age at the first observed row > 1. loan_age 1 is the first payment
+    # month, 0 and below are at or before it, so those loans enter at origination
+    # and their run_length 1 is true (the rule of diagnostic 24's 'seasoned').
+    censored, rl_kind, entry_loans = run_length_censored(
+        quarter, prefix, tail, period, dp, is_first, new_run, run_start,
+        gap_start, orig)
+    del new_run, run_start, gap_start
+    terr_tails, null_ltv_tails = exclusion_tails(orig)
+    c_tails = tail[last_idx][is_censored]
+    c_terr = np.isin(c_tails, terr_tails)
+    c_ltv = np.isin(c_tails, null_ltv_tails) & ~c_terr
+    rep.censor_excl_territory += int(c_terr.sum())
+    rep.censor_excl_null_ltv += int(c_ltv.sum())
+    censor_frame = censor_frame[~(c_terr | c_ltv)].reset_index(drop=True)
     censor_frame.to_parquet(os.path.join(CENSOR_DIR, "censor_%s.parquet" % quarter),
                             engine="pyarrow", index=False, compression="snappy")
 
@@ -1098,12 +1336,65 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     if m == 0:
         return 0, quarter, time.time() - t0
 
+    # ---- 6. join origination on loan_id ----------------------------------
+    # (the file itself was read above, before the censoring write)
+    feats, matched = join_origination(orig, tail[from_idx])
+    check_origination(quarter, prefix, orig, tail[from_idx], feats["status"])
+    tally_validation(rep, tail[from_idx], feats["status"])
+    if np.any(feats["orig_month"] < 0):
+        raise RuntimeError(
+            "%s: %d panel rows belong to loans with no usable first payment "
+            "date, so loan_age cannot be computed" % (quarter,
+                                                      int((feats["orig_month"] < 0).sum())))
+
+    # ---- 8. exclusions: territory first, then null ltv (loan level) ------
+    # State and ltv are origination fields, constant per loan, so a row mask
+    # drops every row of every affected loan, in all roles.
+    t_codes = [orig["state_categories"].index(s) for s in EXCLUDED_STATES]
+    is_terr = np.isin(feats["property_state"], t_codes)
+    is_nl = np.isnan(feats["ltv"]) & ~is_terr
+    dropped_new = is_terr | is_nl
+    rep.excluded_territory_rows += int(is_terr.sum())
+    rep.excluded_territory_loans += len(np.unique(tail[from_idx][is_terr]))
+    rep.excluded_null_ltv_rows += int(is_nl.sum())
+    rep.excluded_null_ltv_loans += len(np.unique(tail[from_idx][is_nl]))
+    dropped_new_tails = np.unique(tail[from_idx][dropped_new])
+    rep.orig_matched += matched - int(dropped_new.sum())
+    if dropped_new.any():
+        keep2 = ~dropped_new
+        to_idx, from_idx = to_idx[keep2], from_idx[keep2]
+        from_state, to_state = from_state[keep2], to_state[keep2]
+        from_month, role = from_month[keep2], role[keep2]
+        for k in ("fico", "ltv", "dti", "rate_spread", "orig_month", "property_state",
+                  "msa", "postal_code"):
+            feats[k] = feats[k][keep2]
+        m = len(from_idx)
+        if m == 0:
+            return 0, quarter, time.time() - t0
+    if (np.isin(feats["property_state"], t_codes).any() or np.isnan(feats["ltv"]).any()):
+        raise RuntimeError("%s: an excluded loan survived the exclusions" % quarter)
+    orig_month = feats["orig_month"]
+
     # ---- R4 flags, on the RAW status, both ends numeric ------------------
     a_raw, b_raw = st[from_idx].astype(np.int32), st[to_idx].astype(np.int32)
     both_numeric = (a_raw >= 0) & (b_raw >= 0)
     is_skip = both_numeric & ((b_raw - a_raw) >= 2)
     is_fall = both_numeric & ((a_raw - b_raw) >= 2)
     post_gap = gap_row[from_idx]
+    rlc = censored[from_idx]
+    kind_row = rl_kind[from_idx]
+    if not rlc[post_gap].all():
+        raise RuntimeError("%s: %d post_gap rows are not run_length_censored"
+                           % (quarter, int((post_gap & ~rlc).sum())))
+    row_tails = tail[from_idx]
+    rep.rlc_rows += int(rlc.sum())
+    rep.rlc_entry_rows += int((kind_row == 1).sum())
+    rep.rlc_gap_rows += int((kind_row == 2).sum())
+    rep.rlc_loans += len(np.unique(row_tails[rlc]))
+    rep.rlc_entry_loans += len(np.unique(row_tails[kind_row == 1]))
+    rep.rlc_gap_loans += len(np.unique(row_tails[kind_row == 2]))
+    rep.rlc_both_loans += len(np.intersect1d(row_tails[kind_row == 1], row_tails[kind_row == 2]))
+    rep.rlc_entry_seasoned_loans += len(np.unique(row_tails[np.isin(row_tails, entry_loans)]))
     rep.skips += int(is_skip.sum())
     rep.falls += int(is_fall.sum())
     rep.post_gap += int(post_gap.sum())
@@ -1112,20 +1403,18 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     unemp_level = lookup(unrate, from_month)
     unemp_chg = lookup(unchg, from_month)
 
-    # ---- 6. join origination on loan_id ----------------------------------
-    orig = load_origination(orig_path, oidx, pmms)
-    feats, matched = join_origination(orig, tail[from_idx])
-    rep.orig_matched += matched
-    check_origination(quarter, prefix, orig, tail[from_idx], feats["status"])
-    tally_validation(rep, tail[from_idx], feats["status"])
+    # ---- HPI join: state index at the from month over the origination month
+    hf = hpi_features(hpi, quarter, prefix, tail[from_idx], feats["property_state"],
+                      orig["state_categories"], from_month, orig_month, feats["ltv"])
+    for col in HPI_FEATURES:
+        if np.isnan(hf[col]).any():
+            raise HpiError("%s: null %s after the join" % (quarter, col))
+    if not (hf["hpi_ratio"] > 0).all():
+        raise HpiError("%s: hpi_ratio is not strictly positive" % quarter)
+    rep.ratio_min = min(rep.ratio_min, float(hf["hpi_ratio"].min()))
+    rep.ratio_max = max(rep.ratio_max, float(hf["hpi_ratio"].max()))
 
     # loan_age from the origination month, not Freddie's reported age (R7)
-    orig_month = feats["orig_month"]
-    if np.any(orig_month < 0):
-        raise RuntimeError(
-            "%s: %d panel rows belong to loans with no usable first payment "
-            "date, so loan_age cannot be computed" % (quarter,
-                                                      int((orig_month < 0).sum())))
     true_age = (from_month - orig_month).astype(np.int32)
     reported = age[from_idx]
     changed = (reported != -9999) & (true_age != reported)
@@ -1148,6 +1437,7 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
         "from_state": pd.Categorical.from_codes(from_state, categories=STATES),
         "to_state": pd.Categorical.from_codes(to_state, categories=STATES),
         "run_length": run_length[from_idx],
+        "run_length_censored": rlc,
         "loan_age": loan_age,
         "is_modified": is_modified,
         "months_since_modification": months_since,
@@ -1157,7 +1447,9 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
         "rate_spread": feats["rate_spread"],
         "unemp_level": unemp_level,
         "unemp_chg_12m": unemp_chg,
-        "hpi_feature": np.full(m, np.nan, dtype=np.float32),
+        "hpi_ratio": hf["hpi_ratio"],
+        "est_ltv": hf["est_ltv"],
+        "est_ltv_step": hf["est_ltv_step"],
         "property_state": pd.Categorical.from_codes(
             feats["property_state"], categories=orig["state_categories"]),
         "role": pd.Categorical.from_codes(role, categories=ROLES),
@@ -1203,7 +1495,8 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
     single = silent & (rows_per_loan == 1)
     no_candidate = silent & (rows_per_loan > 1) & ~has_candidate
     excl_loan = silent & np.isin(uniq_tail, excl)
-    role_only = silent & has_candidate & ~excl_loan
+    excl_new = silent & np.isin(uniq_tail, dropped_new_tails)
+    role_only = silent & has_candidate & ~excl_loan & ~excl_new
     rep.bump_zero("single observation, no pair possible", int(single.sum()))
     rep.bump_zero("every pair dropped by R3 (gap) or R1 (absorbing from-state)",
                   int(no_candidate.sum()))
@@ -1211,6 +1504,8 @@ def build_quarter(perf_path, orig_path, pidx, oidx, macro, rep):
                   int(role_only.sum()))
     rep.bump_zero("every pair removed by the explicit exclusion list",
                   int(excl_loan.sum()))
+    rep.bump_zero("every pair removed by the territory / null-ltv exclusion",
+                  int(excl_new.sum()))
 
     os.makedirs(PANEL_DIR, exist_ok=True)
     rep.schemas[quarter] = write_partition(
@@ -1331,13 +1626,40 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
     emit("%-58s %18s %12s" % ("excluded: malformed origination record (named loan)",
                               fmt(rep.excluded_malformed),
                               pct(rep.excluded_malformed, rep.candidates)))
+    emit("%-58s %18s %12s" % ("excluded: territory loans (GU, PR, VI)",
+                              fmt(rep.excluded_territory_rows),
+                              pct(rep.excluded_territory_rows, rep.candidates)))
+    emit("%-58s %18s %12s" % ("excluded: null-ltv loans (999 sentinel)",
+                              fmt(rep.excluded_null_ltv_rows),
+                              pct(rep.excluded_null_ltv_rows, rep.candidates)))
     emit("%-58s %18s %12s" % ("PANEL ROWS WRITTEN", fmt(rep.panel_rows),
                               pct(rep.panel_rows, rep.candidates)))
-    emit("%-58s %18s" % ("candidates - excluded - excluded (named) == written",
+    emit("%-58s %18s" % ("candidates - excluded (all four lines) == written",
                          "yes" if rep.candidates - rep.excluded_train_late
-                         - rep.excluded_malformed == rep.panel_rows else "NO"))
+                         - rep.excluded_malformed - rep.excluded_territory_rows
+                         - rep.excluded_null_ltv_rows == rep.panel_rows else "NO"))
     for loan, why in EXCLUDED_LOANS.items():
         emit("    %s  %s" % (loan, why))
+    emit()
+    rule("=")
+    emit("EXCLUSIONS AND HPI JOIN")
+    rule("=")
+    emit("Loan-level, all rows, all roles; territory first, then null ltv (as in the docstring).")
+    emit("%-58s %18s %18s" % ("", "loans", "rows"))
+    emit("%-58s %18s %18s" % ("territory (GU, PR, VI)", fmt(rep.excluded_territory_loans),
+                              fmt(rep.excluded_territory_rows)))
+    emit("%-58s %18s %18s" % ("null ltv (not already a territory loan)",
+                              fmt(rep.excluded_null_ltv_loans), fmt(rep.excluded_null_ltv_rows)))
+    emit("%-58s %18s %18s" % ("removed from data/panel/censoring/: territory",
+                              fmt(rep.censor_excl_territory), ""))
+    emit("%-58s %18s %18s" % ("removed from data/panel/censoring/: null ltv",
+                              fmt(rep.censor_excl_null_ltv), ""))
+    emit("Rows of GU/PR/VI in the written panel: 0; rows with a null ltv: 0 (asserted per quarter).")
+    emit("HPI series: %s   %s rows, %d states, %d-%02d .. %d-%02d" % (
+        rep.hpi.path, fmt(rep.hpi.n_rows), len(rep.hpi.states), rep.hpi.m0 // 12,
+        rep.hpi.m0 % 12 + 1, rep.hpi.m1 // 12, rep.hpi.m1 % 12 + 1))
+    emit("hpi_ratio, est_ltv, est_ltv_step null on 0 rows (asserted per quarter); hpi_ratio > 0 on every row;"
+         " hpi_ratio range %.4f .. %.4f" % (rep.ratio_min, rep.ratio_max))
     emit()
 
     # ---- R7 ---------------------------------------------------------------
@@ -1464,6 +1786,34 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
                                 pct(rep.terminated, rep.loans)))
     emit("%-40s%18s" % ("censored + terminated", fmt(total_cens + rep.terminated)))
     emit("%-40s%18s" % ("loans", fmt(rep.loans)))
+    emit("Counts above are over the raw performance files. Removed from the censoring files by the")
+    emit("loan-level exclusions: %s territory, %s null-ltv; censored loans written: %s." % (
+        fmt(rep.censor_excl_territory), fmt(rep.censor_excl_null_ltv),
+        fmt(total_cens - rep.censor_excl_territory - rep.censor_excl_null_ltv)))
+    emit()
+
+    # ---- run_length left-censoring -----------------------------------------
+    rule("=")
+    emit("RUN-LENGTH LEFT-CENSORING   (run_length_censored)")
+    rule("=")
+    emit("A run is censored when it starts at an artificial point: the loan's first observed row if that row is not its")
+    emit("origination (loan_age > 1 there), or the row after an interior gap. True until the first genuinely observed state")
+    emit("change. Asserted per quarter over every loan's full history (before role assignment): a first row at origination is")
+    emit("unflagged; a later entry is flagged; the flag is constant inside a run and never goes false then true without a")
+    emit("gap; every row after a gap is flagged; every post_gap panel row is flagged; never null.")
+    emit("%-44s%16s%12s%16s%12s" % ("", "rows", "of rows", "loans", "of loans"))
+    emit("%-44s%16s%12s%16s%12s" % ("flagged, any cause", fmt(rep.rlc_rows), pct(rep.rlc_rows, rep.panel_rows),
+                                    fmt(rep.rlc_loans), pct(rep.rlc_loans, rep.loans - sum(rep.zero_row_loans.values()))))
+    emit("%-44s%16s%12s%16s%12s" % ("  cause: entry (first row after origination)", fmt(rep.rlc_entry_rows),
+                                    pct(rep.rlc_entry_rows, rep.panel_rows), fmt(rep.rlc_entry_loans),
+                                    pct(rep.rlc_entry_loans, rep.loans - sum(rep.zero_row_loans.values()))))
+    emit("%-44s%16s%12s%16s%12s" % ("  cause: gap (row after an interior gap)", fmt(rep.rlc_gap_rows),
+                                    pct(rep.rlc_gap_rows, rep.panel_rows), fmt(rep.rlc_gap_loans),
+                                    pct(rep.rlc_gap_loans, rep.loans - sum(rep.zero_row_loans.values()))))
+    emit("loans with both causes: %s.   rows by cause add to flagged rows: %s" % (
+        fmt(rep.rlc_both_loans), "yes" if rep.rlc_entry_rows + rep.rlc_gap_rows == rep.rlc_rows else "NO"))
+    emit("panel loans first observed after their origination (entry-seasoned): %s" % fmt(rep.rlc_entry_seasoned_loans))
+    emit("rows with a null flag: 0 (a boolean; asserted via the nulls table).")
     emit()
 
     # ---- loans with no rows ----------------------------------------------
@@ -1499,6 +1849,7 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
     rule("=")
     emit("Rejected = MALFORMED: a build that finds any stops, so a finished build")
     emit("always shows 0. Null = the documented sentinel, stored as null.")
+    emit("Tallied BEFORE the exclusions, so the territory rows count here and the null-ltv rows show as null.")
     emit("%-16s%-34s%16s%12s%10s%14s%12s" % ("check", "valid / sentinel", "valid rows",
                                             "null rows", "rejected", "valid loans",
                                             "null loans"))
@@ -1527,8 +1878,8 @@ def write_report(rep, pidx, oidx, perf_sheet, orig_sheet, u_prov, p_prov,
         emit("%-28s%-14s%18s%12s" % (col, group, fmt(rep.nulls[col]),
                                      pct(rep.nulls[col], rep.panel_rows)))
     emit()
-    emit("hpi_feature is null by construction: it is a declared placeholder and")
-    emit("its encoding is not yet decided.")
+    emit("hpi_ratio, est_ltv and est_ltv_step are never null: the territory and null-ltv loans, the only")
+    emit("rows where they could be undefined, are excluded (see EXCLUSIONS AND HPI JOIN).")
     emit()
 
     rule("=")
@@ -1563,11 +1914,13 @@ def build(allow_multi_file_loans=False):
     rep.build_stamp = datetime.datetime.now().isoformat(timespec="microseconds")
 
     unrate, unchg, pmms, u_prov, p_prov = macro_tables()
+    hpi = Hpi()                     # a missing or gappy series fails before any write
+    rep.hpi = hpi
 
     print("building %d quarters" % len(perf_paths), flush=True)
     for perf_path, orig_path in zip(perf_paths, orig_paths):
         rows, quarter, secs = build_quarter(perf_path, orig_path, pidx, oidx,
-                                            (unrate, unchg, pmms), rep)
+                                            (unrate, unchg, pmms, hpi), rep)
         rep.quarters.append((quarter, rows, secs))
         print("    %-10s %14s rows  (%5.1fs)" % (quarter, fmt(rows), secs),
               flush=True)
@@ -1577,7 +1930,7 @@ def build(allow_multi_file_loans=False):
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT, "w", encoding="utf-8") as fh:
         fh.write("\n".join(_LINES) + "\n")
-    write_manifest(rep)             # last: only a completed build gets one
+    write_manifest(rep, PANEL_DIR)  # last: only a completed build gets one
     return rep
 
 
@@ -1588,4 +1941,15 @@ if __name__ == "__main__":
         help="downgrade a loan-id prefix shared across perf files from an error "
              "to a warning. Only for deliberate repartitioning: a loan split "
              "across files gets its run_length reset at the file boundary.")
-    build(allow_multi_file_loans=parser.parse_args().allow_multi_file_loans)
+    parser.add_argument(
+        "--out-dir", metavar="DIR",
+        help="write the panel, manifest, censoring files and build report under DIR "
+             "(which must be empty or absent) instead of data/panel/ and "
+             "diagnostics/. For proving the build reproduces a committed panel "
+             "without touching it.")
+    args = parser.parse_args()
+    if args.out_dir:
+        if os.path.isdir(args.out_dir) and os.listdir(args.out_dir):
+            raise SystemExit("--out-dir %s is not empty" % args.out_dir)
+        set_output_dir(args.out_dir)
+    build(allow_multi_file_loans=args.allow_multi_file_loans)
