@@ -1,0 +1,58 @@
+TRAINING COST   (cost measurement only - no predictive metric is computed or reported)
+==============================================================================================================
+*** THE RUN DID NOT COMPLETE: available system memory fell to 421 MB, below the 500 MB limit, after 0 completed boosting rounds ***
+*** Everything below is what had been measured up to that point. ***
+==============================================================================================================
+machine: 16 logical CPUs, 15.63 GB RAM, 9.52 GB swap/pagefile
+lightgbm 4.7.0, pandas 2.3.3, numpy 2.3.5, CPU only, objective multiclass, num_class 6, 100 boosting rounds, library defaults otherwise
+
+FEATURES (requested -> panel column)
+  fico                           -> fico
+  original_ltv                   -> ltv
+  dti                            -> dti
+  rate_spread                    -> rate_spread
+  property_state                 -> property_state   [native categorical]
+  loan_age                       -> loan_age
+  run_length                     -> run_length
+  run_length_censored            -> MISSING from the panel on disk; NOT in the matrix
+  est_ltv                        -> est_ltv
+  unemployment level             -> unemp_level
+  unemployment 12-month change   -> unemp_chg_12m
+
+!! run_length_censored absent from the panel on disk (data/panel manifest build 2026-10-06T16:50:16.061215), so the matrix has 10 columns, not 11.
+!! The panel was not rebuilt (that would modify data/). Every figure below is for the 10-column matrix.
+!! Expected extra cost of one more float32 column over 39,360,874 rows: matrix +150.1 MB, LightGBM's own copy +150.1 MB.
+  resolved list: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'loan_age', 'run_length', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+
+DATA
+  row filter: role == 'fit' and from_state == 'Current'   (a row filter, not a loan filter)
+  rows after filter:          39,360,874
+  rows dropped for null label: 0
+  feature matrix columns:     10
+  feature matrix in memory:       1388.9 MB  (1.36 GB)   (DataFrame.memory_usage(deep=True); numerics float32, property_state int8 category)
+  class set declared (fixed order): ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+  label counts in the training rows (class: rows):
+    0 Current      38,697,062
+    1 DQ30            335,367
+    2 DQ60              2,832
+    3 DQ90+             1,429
+    4 Prepaid         324,110
+    5 Default              74
+
+RSS CHECKPOINTS
+  after load                       4295.7 MB  (4.20 GB)
+  after feature matrix built       3394.1 MB  (3.31 GB)
+  after training               not reached
+
+TRAINING   (timed window = the whole lgb.train call, including Dataset construction)
+  rounds completed:           0 of 100
+  total wall-clock:           5.7 s  (0.1 min)
+  seconds per boosting round: not meaningful, the run did not complete
+  peak RSS during training:       7629.2 MB  (7.45 GB)   (max of the sampler and the OS peak working set)
+  min system available mem:        421.3 MB  (0.41 GB)   (12 samples at 0.5 s)
+  available at start / end:   4.12 GB / 0.41 GB
+  process page faults:        4,809,871 -> 6,434,853   delta 1,624,982
+  (page-fault delta counts soft faults too, which allocation and first touch produce even with no paging; read it with min available memory and the swap line.)
+  system swap used at start / max / end: 0.44 / 0.50 / 0.50 GB
+
+VERDICT: DID NOT COMPLETE - aborted for low memory; the run did not fit in memory.

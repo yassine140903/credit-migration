@@ -1,0 +1,61 @@
+THINNED TRAINING   (cost and feasibility only - no predictive metric is computed, printed or saved)
+================================================================================================================
+machine: 16 logical CPUs, 15.63 GB RAM, 6.50 GB pagefile
+lightgbm 4.7.0, pandas 2.2.3, numpy 1.26.4; CPU only; objective multiclass; num_class 6; 100 boosting rounds; library defaults otherwise (no tuning, no early stopping, no validation set)
+panel: build 2026-10-08T09:41:19.866411, 69,520,712 rows, 25 columns
+
+FEATURES  (resolved panel column names, in matrix order)
+  ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'loan_age', 'run_length', 'run_length_censored', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+  property_state is passed as a native pandas category (LightGBM categorical); no integer or FIPS encoding; nulls left as-is; numerics float32.
+
+STEP 1 - ROW BUDGET   (set by this machine's headroom, not by a modelling argument)
+  memory budget:             5,905,580,032 bytes  (5.50 GiB; --budget-gb 5.50)
+  assumption, bytes/value:   8   (--bytes-per-value)
+  per-row training cost:     n_classes x arrays x bytes = 6 x 3 x 8 = 144 bytes/row
+  row budget:                floor(5,905,580,032 / 144) = 41,010,972 rows
+  leaver rows (all kept):    663,812
+  stay rows in population:   38,697,062
+  remaining stayer budget:   41,010,972 - 663,812 = 40,347,160
+  keep rate on stay rows:    38,697,062 / 38,697,062 = 1.000000   (budget exceeds the stay rows: all kept)
+  note: the formula counts only the n x K x 3 value arrays. The feature matrix, LightGBM's transient copy of it, the binned data and histograms are on top of it and are what the RSS lines below measure.
+
+STEP 2 - THINNING   (row level, not loan level)
+  rule: every leaver row kept (incl. all Current->Default rows); stay rows sampled uniformly at random without replacement, seed 34
+  population = Current-origin fit rows with a valid to_state; null/unknown labels dropped: 0
+  to_state          full rows      share       thinned rows      share
+  Current          38,697,062   98.3135%         38,697,062   98.3135%
+  DQ30                335,367    0.8520%            335,367    0.8520%
+  DQ60                  2,832    0.0072%              2,832    0.0072%
+  DQ90+                 1,429    0.0036%              1,429    0.0036%
+  Prepaid             324,110    0.8234%            324,110    0.8234%
+  Default                  74    0.0002%                 74    0.0002%
+  total            39,360,874                    39,360,874           
+
+  STAY SHARE   full 98.3135%   thinned 98.3135%   difference (thinned - full) +0.0000 percentage points
+
+MEMORY CHECKPOINTS (RSS)
+  after load (label scan, pass 1)           496.7 MB  (0.49 GB)
+  after thinning (matrix assembled)        2766.6 MB  (2.70 GB)
+  after Dataset construction               1788.6 MB  (1.75 GB)
+  after training                           1793.6 MB  (1.75 GB)
+  feature matrix in memory:                1539.0 MB  (1.50 GB)  (39,360,874 rows x 11 columns; DataFrame.memory_usage(deep=True))
+
+TIMING AND PEAKS
+  Dataset construction:        3.0 s  (binning; outside the training timer)
+  rounds completed:            100 of 100
+  training wall-clock:         217.4 s  (3.6 min)   [lgb.train on the constructed Dataset]
+  seconds per boosting round:  2.17 s   (training wall-clock / 100)
+  peak RSS, whole run:             6719.9 MB  (6.56 GB)  (max of sampler and OS peak working set)
+  min system available memory:     2679.8 MB  (2.62 GB)  (whole run, 452 samples at 0.5 s)
+  per phase (sampler)                peak RSS            min available
+    start                            0.15 GB                 8.93 GB
+    pass 1: label scan               0.45 GB                 8.63 GB
+    pass 2: thinning                 4.17 GB                 5.00 GB
+    Dataset construction             4.86 GB                 4.30 GB
+    training                         6.55 GB                 2.62 GB
+  process page faults:         51,205 -> 6,950,808   whole-run delta 6,899,603   training-only delta 1,270,298
+  (page-fault deltas include the soft faults that allocation and first touch produce with no paging.)
+  system pagefile used, start / max / end: 0.90 / 0.90 / 0.90 GB
+  model saved: artifacts/thinned_lgbm/model.txt   (no predictions saved)
+
+VERDICT: Completed in memory without paging: min available 2.62 GB, pagefile moved 0.00 GB.

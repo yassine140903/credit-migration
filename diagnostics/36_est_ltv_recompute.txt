@@ -1,0 +1,172 @@
+est_ltv RECOMPUTE   (read-only; fixes nothing; no predictive metric)
+================================================================================================================
+panel build 2026-10-08T09:41:19.866411, 69,520,712 rows
+
+THE FORMULA AS THE CODE IMPLEMENTS IT   (writer: src/panel.py hpi_features(), lines 631-654; checker: src/features_hpi.py verify())
+  ratio     = hpi_disagg[state, from_month] / hpi_disagg[state, orig_month]     float64 / float64, not rounded
+  x         = ltv.astype(float64)                                                the panel's ltv is float32
+  hpi_ratio = ratio.astype(float32)                                              stored
+  est_ltv   = (x / ratio).astype(float32)                                        stored; divides by the UNROUNDED ratio
+  features_hpi.verify() recomputes all three from the HPI table and the origination record and requires exact float32 equality.
+
+WHERE THIS SCRIPT HAD TO CHOOSE
+  1. RAW and CAST divide by the STORED float32 hpi_ratio, as the task says, although the writer divides by the unrounded ratio. A gap is therefore expected by construction; its size is what is measured.
+  2. 'Original mismatches' = RAW mismatches (stored, upcast to float64, != the float64 recompute).
+  3. ORACLE recomputes the writer's arithmetic from the HPI table, with orig_month = from_month - loan_age (the panel's definition; features_hpi.verify() checks it against the origination record).
+  4. median = lower middle value; p99 = value at index int(0.99 (n-1)) of the sorted differences; relative difference = |recomputed - stored| / |stored|; rows with any null input are excluded and counted.
+
+----------------------------------------------------------------------------------------------------------------
+POPULATION (a)  condition rows at from_period == 200812  (diagnostic 35's population)
+----------------------------------------------------------------------------------------------------------------
+rows compared: 405,672   (rows excluded for a null in ltv / hpi_ratio / est_ltv: 0)
+
+RAW   float64 recompute from stored ltv and stored hpi_ratio, no cast, vs stored est_ltv
+  rows that differ at all:  405,644  (99.9931%)
+  absolute difference (LTV points):  min 0.000e+00   median 1.803e-06   mean 2.183e-06   p99 6.832e-06   max 1.490e-05
+  relative difference:               min 0.000e+00   median 2.326e-08   mean 2.681e-08   p99 7.561e-08   max 1.153e-07
+  bucket                   absolute         relative
+  == 0                           28               28
+  (0, 1e-6]                 120,860          405,644
+  (1e-6, 1e-5]              284,323                0
+  (1e-5, 1e-4]                  461                0
+  (1e-4, 1e-3]                    0                0
+  (1e-3, 1e-2]                    0                0
+  (1e-2, 1e-1]                    0                0
+  (1e-1, 1]                       0                0
+  (1, 10]                         0                0
+  > 10                            0                0
+  differing by more than 0.5 LTV points: 0    by more than 1.0 LTV point: 0
+  direction (recomputed vs stored): higher 194,608   lower 211,036   equal 28   -> MIXED
+
+CAST  the same recompute cast to float32 (the float32 test; diagnostic 35's comparison)
+  rows that differ at all:  84,400  (20.8050%)
+  absolute difference (LTV points):  min 0.000e+00   median 0.000e+00   mean 1.443e-06   p99 7.629e-06   max 1.526e-05
+  relative difference:               min 0.000e+00   median 0.000e+00   mean 1.759e-08   p99 1.103e-07   max 1.192e-07
+  bucket                   absolute         relative
+  == 0                      321,272          321,272
+  (0, 1e-6]                     250           84,400
+  (1e-6, 1e-5]               82,600                0
+  (1e-5, 1e-4]                1,550                0
+  (1e-4, 1e-3]                    0                0
+  (1e-3, 1e-2]                    0                0
+  (1e-2, 1e-1]                    0                0
+  (1e-1, 1]                       0                0
+  (1, 10]                         0                0
+  > 10                            0                0
+  differing by more than 0.5 LTV points: 0    by more than 1.0 LTV point: 0
+  direction (recomputed vs stored): higher 40,436   lower 43,964   equal 321,272   -> MIXED
+
+FLOAT32 TEST
+  original (RAW) mismatches: 405,644;  after the float64 recompute is cast to float32, mismatches that survive: 84,400
+  exact bit-level equality of the cast recompute with stored est_ltv: 321,272 of 405,672 rows (79.1950%)
+  RAW gap in units of one float32 spacing at the stored value: <=0.5 ulp 321,272, (0.5,1] 83,286, (1,2] 1,114, >2 0; max 1.425 ulp
+  ORACLE (the writer's arithmetic: unrounded HPI ratio, orig_month = from_month - loan_age, divide, cast):
+    rows recomputable 405,672 (outside the HPI series or unknown state: 0)
+    est_ltv    stored != oracle on 0 rows
+    hpi_ratio  stored != float32(oracle ratio) on 0 rows
+
+RAW gap > 0.5 LTV points, by property_state / origination year / from_period year
+  none: no row differs by more than 0.5 LTV points
+
+20 LARGEST RAW ABSOLUTE DIFFERENCES
+  loan_id        st   period       ltv    hpi_ratio stored est_ltv     recomputed     abs diff
+  F07Q20095337   CA   200812     100.0    0.6337678    157.7865143    157.7864994    1.490e-05
+  F07Q20070570   CA   200812     100.0    0.6337678    157.7865143    157.7864994    1.490e-05
+  F07Q20082084   CA   200812     100.0    0.6337678    157.7865143    157.7864994    1.490e-05
+  F07Q20152056   CA   200812     100.0    0.6337678    157.7865143    157.7864994    1.490e-05
+  F06Q40217477   NV   200812      94.0    0.6046883    155.4519653    155.4519788    1.346e-05
+  F07Q20447699   CA   200812      97.0    0.6337678    153.0529175    153.0529044    1.308e-05
+  F06Q20390348   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40087035   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40006438   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40121494   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40174564   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40118083   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40132616   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40161607   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40177553   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40105020   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40114857   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40113309   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40108266   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+  F06Q40175735   FL   200812      95.0    0.6447777    147.3375854    147.3375983    1.286e-05
+
+----------------------------------------------------------------------------------------------------------------
+POPULATION (b)  all panel rows, quarter by quarter
+----------------------------------------------------------------------------------------------------------------
+rows compared: 69,520,712   (rows excluded for a null in ltv / hpi_ratio / est_ltv: 0)
+
+RAW   float64 recompute from stored ltv and stored hpi_ratio, no cast, vs stored est_ltv
+  rows that differ at all:  67,490,892  (97.0803%)
+  absolute difference (LTV points):  min 0.000e+00   median 1.739e-06   mean 2.143e-06   p99 7.229e-06   max 1.826e-05
+  relative difference:               min 0.000e+00   median 2.440e-08   mean 2.819e-08   p99 8.600e-08   max 1.173e-07
+  bucket                   absolute         relative
+  == 0                    2,029,820        2,029,820
+  (0, 1e-6]              20,287,080       67,490,892
+  (1e-6, 1e-5]           47,087,581                0
+  (1e-5, 1e-4]              116,231                0
+  (1e-4, 1e-3]                    0                0
+  (1e-3, 1e-2]                    0                0
+  (1e-2, 1e-1]                    0                0
+  (1e-1, 1]                       0                0
+  (1, 10]                         0                0
+  > 10                            0                0
+  differing by more than 0.5 LTV points: 0    by more than 1.0 LTV point: 0
+  direction (recomputed vs stored): higher 33,834,944   lower 33,655,948   equal 2,029,820   -> MIXED
+
+CAST  the same recompute cast to float32 (the float32 test; diagnostic 35's comparison)
+  rows that differ at all:  15,810,893  (22.7427%)
+  absolute difference (LTV points):  min 0.000e+00   median 0.000e+00   mean 1.502e-06   p99 7.629e-06   max 1.526e-05
+  relative difference:               min 0.000e+00   median 0.000e+00   mean 1.973e-08   p99 1.125e-07   max 1.192e-07
+  bucket                   absolute         relative
+  == 0                   53,709,819       53,709,819
+  (0, 1e-6]                  74,147       15,810,893
+  (1e-6, 1e-5]           15,474,543                0
+  (1e-5, 1e-4]              262,203                0
+  (1e-4, 1e-3]                    0                0
+  (1e-3, 1e-2]                    0                0
+  (1e-2, 1e-1]                    0                0
+  (1e-1, 1]                       0                0
+  (1, 10]                         0                0
+  > 10                            0                0
+  differing by more than 0.5 LTV points: 0    by more than 1.0 LTV point: 0
+  direction (recomputed vs stored): higher 7,978,243   lower 7,832,650   equal 53,709,819   -> MIXED
+
+FLOAT32 TEST
+  original (RAW) mismatches: 67,490,892;  after the float64 recompute is cast to float32, mismatches that survive: 15,810,893
+  exact bit-level equality of the cast recompute with stored est_ltv: 53,709,819 of 69,520,712 rows (77.2573%)
+  RAW gap in units of one float32 spacing at the stored value: <=0.5 ulp 53,709,819, (0.5,1] 15,316,974, (1,2] 493,919, >2 0; max 1.472 ulp
+  ORACLE (the writer's arithmetic: unrounded HPI ratio, orig_month = from_month - loan_age, divide, cast):
+    rows recomputable 69,520,712 (outside the HPI series or unknown state: 0)
+    est_ltv    stored != oracle on 0 rows
+    hpi_ratio  stored != float32(oracle ratio) on 0 rows
+
+RAW gap > 0.5 LTV points, by property_state / origination year / from_period year
+  none: no row differs by more than 0.5 LTV points
+
+20 LARGEST RAW ABSOLUTE DIFFERENCES
+  loan_id        st   period       ltv    hpi_ratio stored est_ltv     recomputed     abs diff
+  F07Q30243267   NV   201101     100.0    0.5132288    194.8448639    194.8448822    1.826e-05
+  F07Q30395711   NV   201101     100.0    0.5132288    194.8448639    194.8448822    1.826e-05
+  F07Q30392301   NV   201101     100.0    0.5132288    194.8448639    194.8448822    1.826e-05
+  F07Q30395508   NV   201101     100.0    0.5132288    194.8448639    194.8448822    1.826e-05
+  F06Q40261423   AZ   201108      97.0    0.5035277    192.6408234    192.6408415    1.810e-05
+  F06Q30291315   AZ   201103     100.0    0.5152905    194.0653076    194.0652899    1.775e-05
+  F06Q30345945   AZ   201103     100.0    0.5152905    194.0653076    194.0652899    1.775e-05
+  F07Q20152029   NV   201003     100.0    0.5084746    196.6666565    196.6666389    1.757e-05
+  F07Q20525694   NV   201003     100.0    0.5084746    196.6666565    196.6666389    1.757e-05
+  F06Q10154045   NV   200905      95.0    0.5122221    185.4664001    185.4664176    1.748e-05
+  F06Q10235637   NV   200905      95.0    0.5122221    185.4664001    185.4664176    1.748e-05
+  F06Q10234451   NV   200905      95.0    0.5122221    185.4664001    185.4664176    1.748e-05
+  F06Q10342414   NV   200905      95.0    0.5122221    185.4664001    185.4664176    1.748e-05
+  F07Q40345072   NV   201112      94.0    0.5162694    182.0754700    182.0754873    1.733e-05
+  F07Q10079059   NV   200908     100.0    0.5030210    198.7988739    198.7988566    1.731e-05
+  F07Q20152029   NV   201002     100.0    0.5100824    196.0467529    196.0467702    1.724e-05
+  F07Q20525694   NV   201002     100.0    0.5100824    196.0467529    196.0467702    1.724e-05
+  F07Q10079059   NV   201211     100.0    0.5008429    199.6634369    199.6634197    1.722e-05
+  F07Q10079059   NV   201301     100.0    0.5228958    191.2426910    191.2427082    1.719e-05
+  F07Q20095963   FL   201103     100.0    0.5431097    184.1248627    184.1248798    1.710e-05
+
+MEMORY   peak RSS 2299.8 MB (2.25 GB)   min system available 2438.6 MB (2.38 GB)   (38 samples at 0.5 s)
+
+VERDICT: FLOAT32 ROUNDING. The writer's own arithmetic (unrounded HPI ratio) reproduces the stored est_ltv and hpi_ratio on all 69,520,712 recomputable rows; the gap to a recompute from the stored float32 hpi_ratio is at most 1.47 float32 ulp, 0 rows over 0.5 LTV points.

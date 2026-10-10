@@ -1,0 +1,221 @@
+======================================================================================================================
+REALISED vs FORECAST   (descriptive: no feature-set recommendation, no model-selection metric)
+======================================================================================================================
+panel build 2026-10-08T09:41:19.866411; cut 2008-12; horizons h = 0, 6, 12, 24, 60 months (2008-12, 2009-06, 2009-12, 2010-12, 2013-12)
+
+FORECAST RUNS (batch 0 of each)
+  ML with loan_age     data/forecast/pooled_v1   model: artifacts/ml/pooled sha256 e2e22dd77fbefded
+  ML without loan_age  data/forecast/pooled_no_loan_age_v1   model: artifacts/ml/pooled_no_loan_age sha256 26a4d91bae059db5
+
+======================================================================================================================
+1. THE LOANS
+======================================================================================================================
+  identified from the forecast output: the h = 0 rows of batch 0 in each run (not re-derived).
+  loans: 50,000 in each run; the two runs hold the identical set: yes; same start state for every loan: yes
+  found among the panel's test-split (condition + evaluate) loans: 50,000 of 50,000
+  eligible at the cut by src.horizon.eligibility: 50,000 of 50,000
+  forecast start state == the state the panel shows at the cut, loan by loan: 50,000 of 50,000
+  start states: Current 47,468, DQ30 1,181, DQ60 433, DQ90+ 918
+
+======================================================================================================================
+2. CENSORING   (no observation at the horizon month and not absorbed by it: its own column, never redistributed)
+======================================================================================================================
+  h    month         loans     observed       of which     censored    ends before T    hole at T
+                                              absorbed      (total)                              
+  0    2008-12      50,000       50,000              0            0                0            0
+  6    2009-06      50,000       49,972          6,726           28               26            2
+  12   2009-12      50,000       49,960         10,791           40               39            1
+  24   2010-12      50,000       49,927         18,945           73               69            4
+  60   2013-12      50,000       49,874         36,853          126              125            1
+  'ends before T': the loan's last observation is earlier than the horizon month.  'hole at T': observed on both
+  sides of T but not at it.  A loan absorbed (Prepaid/Default) at or before T is observed by construction.
+
+======================================================================================================================
+3. SIDE BY SIDE   (shares of the 50,000 loans; each forecast row sums to 100%)
+======================================================================================================================
+h = 0  (2008-12)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default    Censored
+  realised                      94.9360%     2.3620%     0.8660%     1.8360%     0.0000%     0.0000%     0.0000%
+     realised, loans              47,468       1,181         433         918           0           0           0
+  baseline (homogeneous)        94.9360%     2.3620%     0.8660%     1.8360%     0.0000%     0.0000%
+  ML with loan_age              94.9360%     2.3620%     0.8660%     1.8360%     0.0000%     0.0000%
+  ML without loan_age           94.9360%     2.3620%     0.8660%     1.8360%     0.0000%     0.0000%
+  censored loans at h = 0: 0 of 50,000
+
+h = 6  (2009-06)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default    Censored
+  realised                      80.0960%     2.3060%     0.8980%     3.1920%    13.0160%     0.4360%     0.0560%
+     realised, loans              40,048       1,153         449       1,596       6,508         218          28
+  baseline (homogeneous)        90.9644%     1.4516%     0.4397%     1.9221%     4.8058%     0.4164%
+  ML with loan_age              80.1355%     1.4994%     1.6975%    13.0112%     3.4981%     0.1583%
+  ML without loan_age           84.3155%     2.2036%     0.9675%     3.7248%     8.7101%     0.0784%
+  censored loans at h = 6: 28 of 50,000
+
+h = 12  (2009-12)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default    Censored
+  realised                      70.1780%     2.4120%     1.0920%     4.6560%    20.5280%     1.0540%     0.0800%
+     realised, loans              35,089       1,206         546       2,328      10,264         527          40
+  baseline (homogeneous)        86.4126%     1.3640%     0.4042%     1.6656%     9.3595%     0.7940%
+  ML with loan_age              76.8104%     1.6776%     2.4838%    13.6927%     5.1120%     0.2235%
+  ML without loan_age           75.3638%     2.1331%     1.1204%     5.2140%    16.0456%     0.1231%
+  censored loans at h = 12: 40 of 50,000
+
+h = 24  (2010-12)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default    Censored
+  realised                      54.7660%     2.0260%     0.8140%     4.3580%    35.0000%     2.8900%     0.1460%
+     realised, loans              27,383       1,013         407       2,179      17,500       1,445          73
+  baseline (homogeneous)        77.8238%     1.2242%     0.3593%     1.3865%    17.7757%     1.4305%
+  ML with loan_age              71.8800%     2.0007%     3.6200%    14.6976%     7.4775%     0.3242%
+  ML without loan_age           61.0011%     2.0045%     1.3007%     7.6674%    27.8314%     0.1949%
+  censored loans at h = 24: 73 of 50,000
+
+h = 60  (2013-12)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default    Censored
+  realised                      21.9940%     1.3060%     0.4880%     2.2540%    66.4220%     7.2840%     0.2520%
+     realised, loans              10,997         653         244       1,127      33,211       3,642         126
+  baseline (homogeneous)        56.6805%     0.8906%     0.2606%     0.9824%    38.2865%     2.8994%
+  ML with loan_age              63.6931%     2.6330%     5.3352%    16.1691%    11.6795%     0.4901%
+  ML without loan_age           35.7006%     1.7628%     1.4827%    12.1329%    48.5885%     0.3325%
+  censored loans at h = 60: 126 of 50,000
+
+======================================================================================================================
+4. FORECAST MINUS REALISED, percentage points of the 50,000 loans   (a censored loan is not in any state column)
+======================================================================================================================
+h = 0  (2008-12)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default
+  baseline (homogeneous)        +0.0000     +0.0000     +0.0000     +0.0000     +0.0000     +0.0000 
+  ML with loan_age              +0.0000     +0.0000     +0.0000     +0.0000     +0.0000     +0.0000 
+  ML without loan_age           +0.0000     +0.0000     +0.0000     +0.0000     +0.0000     +0.0000 
+
+h = 6  (2009-06)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default
+  baseline (homogeneous)       +10.8684     -0.8544     -0.4583     -1.2699     -8.2102     -0.0196 
+  ML with loan_age              +0.0395     -0.8066     +0.7995     +9.8192     -9.5179     -0.2777 
+  ML without loan_age           +4.2195     -0.1024     +0.0695     +0.5328     -4.3059     -0.3576 
+
+h = 12  (2009-12)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default
+  baseline (homogeneous)       +16.2346     -1.0480     -0.6878     -2.9904    -11.1685     -0.2600 
+  ML with loan_age              +6.6324     -0.7344     +1.3918     +9.0367    -15.4160     -0.8305 
+  ML without loan_age           +5.1858     -0.2789     +0.0284     +0.5580     -4.4824     -0.9309 
+
+h = 24  (2010-12)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default
+  baseline (homogeneous)       +23.0578     -0.8018     -0.4547     -2.9715    -17.2243     -1.4595 
+  ML with loan_age             +17.1140     -0.0253     +2.8060    +10.3396    -27.5225     -2.5658 
+  ML without loan_age           +6.2351     -0.0215     +0.4867     +3.3094     -7.1686     -2.6951 
+
+h = 60  (2013-12)
+                                 Current        DQ30        DQ60       DQ90+     Prepaid     Default
+  baseline (homogeneous)       +34.6865     -0.4154     -0.2274     -1.2716    -28.1355     -4.3846 
+  ML with loan_age             +41.6991     +1.3270     +4.8472    +13.9151    -54.7425     -6.7939 
+  ML without loan_age          +13.7066     +0.4568     +0.9947     +9.8789    -17.8335     -6.9515 
+
+======================================================================================================================
+5. REALISED MONTHLY PREPAYMENT, calendar months 2009-01 .. 2013-12, these 50,000 loans
+======================================================================================================================
+  at risk in month m: not absorbed before m and observed through m-1 (absorbed loans carried, censored loans
+  leave the denominator once unobserved). rate = new Prepaid in m / at risk.  cumulative = Prepaid by m / 50,000.
+  'implied' columns: the forecasts' own monthly rate from their portfolio sums, (Prepaid_h - Prepaid_h-1) /
+  (1 - Prepaid_h-1 - Default_h-1); shown only so the shapes can be read side by side.
+  month       at risk  new prepd     rate %    cumul. %             |  baseline ML w/ age ML no age
+                                                                    | implied % implied % implied %
+  2009-01      50,000        816     1.6320      1.6320             |    0.8206    1.5329    1.6562
+  2009-02      49,162      1,198     2.4368      4.0280             |    0.8192    0.4942    1.5333
+  2009-03      47,907      1,156     2.4130      6.3400             |    0.8186    0.4648    1.4882
+  2009-04      46,715      1,031     2.2070      8.4020             |    0.8184    0.3786    1.4721
+  2009-05      45,644      1,140     2.4976     10.6820             |    0.8184    0.3483    1.4571
+  2009-06      44,466      1,167     2.6245     13.0160             |    0.8184    0.3284    1.4411
+  2009-07      43,248        863     1.9955     14.7420             |    0.8185    0.3119    1.4263
+  2009-08      42,332        616     1.4552     15.9740             |    0.8186    0.2977    1.4104
+  2009-09      41,664        516     1.2385     17.0060             |    0.8187    0.2852    1.3957
+  2009-10      41,095        536     1.3043     18.0780             |    0.8188    0.2740    1.3800
+  2009-11      40,502        594     1.4666     19.2660             |    0.8189    0.2639    1.3654
+  2009-12      39,850        631     1.5834     20.5280             |    0.8189    0.2546    1.3499
+  2010-01      39,170        450     1.1488     21.4280             |    0.8190    0.2460    1.3354
+  2010-02      38,652        441     1.1410     22.3100             |    0.8190    0.2382    1.3202
+  2010-03      38,145        569     1.4917     23.4480             |    0.8191    0.2308    1.3058
+  2010-04      37,489        540     1.4404     24.5280             |    0.8191    0.2240    1.2907
+  2010-05      36,871        494     1.3398     25.5160             |    0.8192    0.2176    1.2766
+  2010-06      36,289        535     1.4743     26.5860             |    0.8192    0.2116    1.2617
+  2010-07      35,661        550     1.5423     27.6860             |    0.8192    0.2059    1.2476
+  2010-08      35,013        667     1.9050     29.0200             |    0.8193    0.2006    1.2329
+  2010-09      34,241        758     2.2137     30.5360             |    0.8193    0.1956    1.2191
+  2010-10      33,387        712     2.1326     31.9600             |    0.8193    0.1908    1.2046
+  2010-11      32,625        791     2.4245     33.5420             |    0.8193    0.1862    1.1909
+  2010-12      31,779        729     2.2940     35.0000             |    0.8194    0.1819    1.1766
+  2011-01      30,986        652     2.1042     36.3040             |    0.8194    0.1778    1.1630
+  2011-02      30,271        485     1.6022     37.2740             |    0.8194    0.1738    1.1489
+  2011-03      29,734        485     1.6311     38.2440             |    0.8194    0.1700    1.1356
+  2011-04      29,160        391     1.3409     39.0260             |    0.8194    0.1664    1.1217
+  2011-05      28,705        347     1.2088     39.7200             |    0.8194    0.1629    1.1085
+  2011-06      28,290        349     1.2337     40.4180             |    0.8194    0.1596    1.0948
+  2011-07      27,876        346     1.2412     41.1100             |    0.8194    0.1563    1.0818
+  2011-08      27,473        385     1.4014     41.8800             |    0.8194    0.1532    1.0683
+  2011-09      27,023        369     1.3655     42.6180             |    0.8194    0.1502    1.0555
+  2011-10      26,587        459     1.7264     43.5360             |    0.8195    0.1473    1.0422
+  2011-11      26,064        427     1.6383     44.3900             |    0.8195    0.1445    1.0296
+  2011-12      25,574        414     1.6188     45.2180             |    0.8195    0.1418    1.0166
+  2012-01      25,086        372     1.4829     45.9620             |    0.8195    0.1392    1.0041
+  2012-02      24,651        429     1.7403     46.8200             |    0.8195    0.1366    0.9913
+  2012-03      24,148        526     2.1782     47.8720             |    0.8195    0.1342    0.9790
+  2012-04      23,550        590     2.5053     49.0520             |    0.8195    0.1318    0.9664
+  2012-05      22,892        634     2.7695     50.3200             |    0.8195    0.1294    0.9544
+  2012-06      22,176        577     2.6019     51.4740             |    0.8195    0.1272    0.9420
+  2012-07      21,535        498     2.3125     52.4700             |    0.8195    0.1250    0.9301
+  2012-08      20,964        564     2.6903     53.5980             |    0.8195    0.1228    0.9180
+  2012-09      20,318        484     2.3821     54.5660             |    0.8195    0.1208    0.9063
+  2012-10      19,762        547     2.7679     55.6600             |    0.8195    0.1187    0.8944
+  2012-11      19,131        448     2.3417     56.5560             |    0.8195    0.1168    0.8829
+  2012-12      18,613        476     2.5574     57.5080             |    0.8195    0.1148    0.8712
+  2013-01      18,074        442     2.4455     58.3920             |    0.8195    0.1130    0.8599
+  2013-02      17,566        452     2.5732     59.2960             |    0.8195    0.1112    0.8485
+  2013-03      17,061        485     2.8427     60.2660             |    0.8195    0.1094    0.8374
+  2013-04      16,519        491     2.9723     61.2480             |    0.8195    0.1076    0.8261
+  2013-05      15,969        437     2.7366     62.1220             |    0.8195    0.1060    0.8153
+  2013-06      15,492        403     2.6013     62.9280             |    0.8195    0.1043    0.8043
+  2013-07      15,046        426     2.8313     63.7800             |    0.8195    0.1027    0.7936
+  2013-08      14,570        333     2.2855     64.4460             |    0.8195    0.1011    0.7828
+  2013-09      14,189        282     1.9875     65.0100             |    0.8195    0.0996    0.7724
+  2013-10      13,854        268     1.9345     65.5460             |    0.8195    0.0981    0.7618
+  2013-11      13,540        233     1.7208     66.0120             |    0.8195    0.0966    0.7516
+  2013-12      13,262        205     1.5458     66.4220             |    0.8195    0.0952    0.7412
+  cumulative Prepaid by month equals the horizon tables' Prepaid counts at h = 6, 12, 24, 60: yes
+
+======================================================================================================================
+6. WHICH FORECAST IS CLOSER TO REALISED, state by state   (smallest |forecast share - realised share|, in pp)
+======================================================================================================================
+h = 6 (2009-06)
+  Current  realised  80.0960%   closest: ML with loan_age     (+0.0395 pp);  then ML without loan_age (+4.2195 pp);  then baseline (+10.8684 pp)
+  DQ30     realised   2.3060%   closest: ML without loan_age  (-0.1024 pp);  then ML with loan_age (-0.8066 pp);  then baseline (-0.8544 pp)
+  DQ60     realised   0.8980%   closest: ML without loan_age  (+0.0695 pp);  then baseline (-0.4583 pp);  then ML with loan_age (+0.7995 pp)
+  DQ90+    realised   3.1920%   closest: ML without loan_age  (+0.5328 pp);  then baseline (-1.2699 pp);  then ML with loan_age (+9.8192 pp)
+  Prepaid  realised  13.0160%   closest: ML without loan_age  (-4.3059 pp);  then baseline (-8.2102 pp);  then ML with loan_age (-9.5179 pp)
+  Default  realised   0.4360%   closest: baseline             (-0.0196 pp);  then ML with loan_age (-0.2777 pp);  then ML without loan_age (-0.3576 pp)
+
+h = 12 (2009-12)
+  Current  realised  70.1780%   closest: ML without loan_age  (+5.1858 pp);  then ML with loan_age (+6.6324 pp);  then baseline (+16.2346 pp)
+  DQ30     realised   2.4120%   closest: ML without loan_age  (-0.2789 pp);  then ML with loan_age (-0.7344 pp);  then baseline (-1.0480 pp)
+  DQ60     realised   1.0920%   closest: ML without loan_age  (+0.0284 pp);  then baseline (-0.6878 pp);  then ML with loan_age (+1.3918 pp)
+  DQ90+    realised   4.6560%   closest: ML without loan_age  (+0.5580 pp);  then baseline (-2.9904 pp);  then ML with loan_age (+9.0367 pp)
+  Prepaid  realised  20.5280%   closest: ML without loan_age  (-4.4824 pp);  then baseline (-11.1685 pp);  then ML with loan_age (-15.4160 pp)
+  Default  realised   1.0540%   closest: baseline             (-0.2600 pp);  then ML with loan_age (-0.8305 pp);  then ML without loan_age (-0.9309 pp)
+
+h = 24 (2010-12)
+  Current  realised  54.7660%   closest: ML without loan_age  (+6.2351 pp);  then ML with loan_age (+17.1140 pp);  then baseline (+23.0578 pp)
+  DQ30     realised   2.0260%   closest: ML without loan_age  (-0.0215 pp);  then ML with loan_age (-0.0253 pp);  then baseline (-0.8018 pp)
+  DQ60     realised   0.8140%   closest: baseline             (-0.4547 pp);  then ML without loan_age (+0.4867 pp);  then ML with loan_age (+2.8060 pp)
+  DQ90+    realised   4.3580%   closest: baseline             (-2.9715 pp);  then ML without loan_age (+3.3094 pp);  then ML with loan_age (+10.3396 pp)
+  Prepaid  realised  35.0000%   closest: ML without loan_age  (-7.1686 pp);  then baseline (-17.2243 pp);  then ML with loan_age (-27.5225 pp)
+  Default  realised   2.8900%   closest: baseline             (-1.4595 pp);  then ML with loan_age (-2.5658 pp);  then ML without loan_age (-2.6951 pp)
+
+h = 60 (2013-12)
+  Current  realised  21.9940%   closest: ML without loan_age  (+13.7066 pp);  then baseline (+34.6865 pp);  then ML with loan_age (+41.6991 pp)
+  DQ30     realised   1.3060%   closest: baseline             (-0.4154 pp);  then ML without loan_age (+0.4568 pp);  then ML with loan_age (+1.3270 pp)
+  DQ60     realised   0.4880%   closest: baseline             (-0.2274 pp);  then ML without loan_age (+0.9947 pp);  then ML with loan_age (+4.8472 pp)
+  DQ90+    realised   2.2540%   closest: baseline             (-1.2716 pp);  then ML without loan_age (+9.8789 pp);  then ML with loan_age (+13.9151 pp)
+  Prepaid  realised  66.4220%   closest: ML without loan_age  (-17.8335 pp);  then baseline (-28.1355 pp);  then ML with loan_age (-54.7425 pp)
+  Default  realised   7.2840%   closest: baseline             (-4.3846 pp);  then ML with loan_age (-6.7939 pp);  then ML without loan_age (-6.9515 pp)
+
+These are numbers, not a ranking of the arms: no aggregate across states or horizons is computed, no feature set is
+recommended, and no log-loss, Brier or other selection metric appears anywhere in this report.

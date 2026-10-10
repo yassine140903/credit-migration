@@ -1,0 +1,55 @@
+PREDICTION DEDUPLICATION   (counting only - no predictive metric is computed, printed or saved)
+================================================================================================================
+panel build 2026-10-08T09:41:19.866411; model artifacts/thinned_lgbm/model.txt; origin filter: all transient states at the cut
+
+1. POPULATION   (condition rows, from_period == 200812)
+  rows with role == condition and from_period == 200812: 405,672
+  distinct loans among them:  405,672   (one row per loan: yes)
+  by from_state:              Current 385,996, DQ30 9,377, DQ90+ 6,932, DQ60 3,367
+  expected eligible loans:    405,705;  panel gives 405,672  (DIFFERENT, difference -33)
+  loans used below:           405,672
+  loan_age at the cut: min -71, max 36; loans with loan_age < 0: 1 (kept; the pooled key is shifted)
+  est_ltv re-derived from the pinned hpi_ratio differs from the stored est_ltv on 84,400 loans (float32, not NaN-aware ties counted equal)
+
+2. DISTINCT FEATURE ROWS BY FORECAST MONTH   (features: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'loan_age', 'est_ltv', 'unemp_level', 'unemp_chg_12m'])
+     h        loans    distinct rows    reduction
+     0      405,672          405,328        0.08%
+     1      405,672          405,328        0.08%
+     6      405,672          405,328        0.08%
+    12      405,672          405,328        0.08%
+    24      405,672          405,328        0.08%
+    36      405,672          405,328        0.08%
+    48      405,672          405,328        0.08%
+    60      405,672          405,328        0.08%
+  Advancing loan_age by the same h for every loan is a one-to-one map on rows, so the within-horizon count is the same at every h; the table measures that rather than assuming it.
+
+  Pooled across horizons (a row is the same row whichever loan and month asks for it):
+    the 8 reported horizons [0, 1, 6, 12, 24, 36, 48, 60]      3,245,376 evaluations ->      3,242,624 distinct rows   reduction   0.08%
+    every month h = 0..60 (the forecast grid)        24,745,992 evaluations ->     24,725,008 distinct rows   reduction   0.08%
+
+3. DISTINCT PREDICTIONS   (probabilities rounded to 10 decimals; counts only)
+  The saved model reads run_length and run_length_censored; both were supplied as NaN for every row.
+  Model's training range of loan_age: [0:35]. Rows at h=60 have loan_age up to 96.
+  h =  0: distinct input rows 405,328 -> distinct probability vectors 142,357   (fewer by 262,971, 64.88% of inputs)
+  h = 60: distinct input rows 405,328 -> distinct probability vectors 118,123   (fewer by 287,205, 70.86% of inputs)
+    h =  0: loans 405,672 -> distinct vectors 142,357  (reduction 64.91% vs loans)
+    h = 60: loans 405,672 -> distinct vectors 118,123  (reduction 70.88% vs loans)
+
+4. DISTINCTNESS BY FEATURE   (h = 0 population)
+  feature           distinct vals      nulls     distinct rows w/o it    rows lost
+  fico                        381        335                  377,574       27,754   <- biggest
+  ltv                         100          0                  405,328            0
+  dti                          65      8,875                  397,480        7,848
+  rate_spread               1,889          0                  403,853        1,475
+  property_state               51          0                  405,328            0
+  loan_age                     38          0                  405,328            0
+  est_ltv                  65,679          0                  405,328            0
+  unemp_level                   1          0                  405,328            0
+  unemp_chg_12m                 1          0                  405,328            0
+  all 9 features: 405,328 distinct rows. Single-feature drops understate features that are near-functions of others (est_ltv of ltv, loan_age of the rest).
+  'distinct vals' counts non-null values; a null is one more distinct value in the row counts.
+
+5. MEMORY
+  peak RSS: 3120.7 MB (3.05 GB)   min system available: 2967.8 MB (2.90 GB)   (47 samples at 0.5 s)
+
+VERDICT: NOT WORTH BUILDING: within one month 405,672 loans need 405,328 distinct rows (0.1% fewer); over the full 61-month grid 24,745,992 evaluations need 24,725,008 (0.1% fewer); distinct predictions at h=0 / h=60 are 142,357 / 118,123. (judgement threshold: 20% reduction)
