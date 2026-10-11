@@ -1,0 +1,55 @@
+Label-alignment / scoring probe   (standalone; shares no label or log-loss code with diagnostics 40-42)
+lightgbm 4.7.0
+population: role == 'fit', from_state == 'Current', 200601 <= from_period <= 200706; first 200,000 rows by (loan_id, from_period): F06Q10000001 .. F06Q10018906, from_period 200601..200706, 12,451 loans
+
+STEP 2. LABEL MAPPING (built in this script)
+distinct to_state values present, sorted: ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid']
+code -> state, as passed to LightGBM: 0=Current, 1=DQ30, 2=DQ60, 3=DQ90+, 4=Prepaid, 5=Default
+rows per code (whole subsample): 0=Current: 197,539, 1=DQ30: 1,213, 2=DQ60: 10, 3=DQ90+: 2, 4=Prepaid: 1,236, 5=Default: 0
+
+split by loan_id, seed 40, 80% of loans: train 160,167 rows / 9,961 loans; held-out 39,833 rows / 2,490 loans; no loan on both sides (asserted)
+trained: objective=multiclass num_class=6 (LightGBM defaults otherwise), 100 rounds; model header: ['num_class=6'], trees 600
+predict output shape (39833, 6): column j = probability of code j = {0: 'Current', 1: 'DQ30', 2: 'DQ60', 3: 'DQ90+', 4: 'Prepaid', 5: 'Default'}
+column check: mean predicted probability per column vs train frequency of that code (alignment sanity)
+  column 0 (Current ) mean pred 0.987490   train freq 0.987769
+  column 1 (DQ30    ) mean pred 0.006142   train freq 0.006069
+  column 2 (DQ60    ) mean pred 0.000073   train freq 0.000044
+  column 3 (DQ90+   ) mean pred 0.000017   train freq 0.000000
+  column 4 (Prepaid ) mean pred 0.006261   train freq 0.006119
+  column 5 (Default ) mean pred 0.000017   train freq 0.000000
+  mean predicted probability of the ACTUAL class, train rows with actual Current: column 0 = 0.989039; any other column mean on those rows: DQ30 0.005287, DQ60 0.000073, DQ90+ 0.000017, Prepaid 0.005567, Default 0.000017
+
+STEP 3. HAND-CHECK, FIVE HELD-OUT ROWS (probabilities prefixed by state name, this script's mapping order)
+  F06Q10000001, 200603, actual=Current, Current=0.986454 DQ30=0.000000 DQ60=0.000000 DQ90+=0.000000 Prepaid=0.013546 Default=0.000000  -> highest: Current
+  F06Q10000193, 200611, actual=DQ30, Current=0.986508 DQ30=0.005496 DQ60=0.000000 DQ90+=0.000000 Prepaid=0.007995 Default=0.000000  -> highest: Current
+  F06Q10009464, 200702, actual=DQ60, Current=0.985068 DQ30=0.008543 DQ60=0.000000 DQ90+=0.000000 Prepaid=0.006389 Default=0.000000  -> highest: Current
+  F06Q10014359, 200609, actual=DQ90+, Current=0.980746 DQ30=0.007418 DQ60=0.000000 DQ90+=0.000000 Prepaid=0.011836 Default=0.000000  -> highest: Current
+  F06Q10000004, 200703, actual=Prepaid, Current=0.997830 DQ30=0.001079 DQ60=0.000000 DQ90+=0.000000 Prepaid=0.001091 Default=0.000000  -> highest: Current
+
+STEP 4. HELD-OUT LOG-LOSS, THREE WAYS
+  (a) sklearn.metrics.log_loss(labels=[0, 1, 2, 3, 4, 5]) : 0.422495
+  (b) hand-written loop on the model's predictions : 0.412415
+  (c) prior-only (train-side class frequencies), hand-written : 0.078280
+  !!! (a) and (b) DISAGREE at six decimal places - THIS DISAGREEMENT IS THE FINDING !!!
+  context, train rows: model (hand-written) 0.082015   prior-only 0.074756
+  held-out model minus prior-only: +0.334135
+
+  4b. WHERE THE HELD-OUT LOSS COMES FROM (model predictions, probability of the actual class)
+    rows with p(actual) < 0.001: 540   by actual class: Current 415, DQ30 65, DQ60 3, DQ90+ 2, Prepaid 55
+    rows with p(actual) < 1e-06: 398   by actual class: Current 333, DQ30 30, DQ60 3, DQ90+ 2, Prepaid 30
+    rows with p(actual) < 1e-10: 315   by actual class: Current 261, DQ30 25, DQ60 3, DQ90+ 2, Prepaid 24
+    rows with p(actual) < 1e-15: 271   by actual class: Current 221, DQ30 24, DQ60 3, DQ90+ 2, Prepaid 21
+    p(actual): min 0.000e+00   1st pct 1.127e-06   median 0.994297   exactly 0.0: 26
+    contribution to (b) from rows with p(actual) < 1e-6: 0.302611 of 0.412415
+    hand loop with floor 1e-15: 0.412415   floor 2.22e-16 (float64 eps): 0.422495   floor 1e-300: 1.386349
+    on the rows with p(actual) < 1e-6, the class holding the highest probability: Current 62, DQ30 127, DQ60 80, DQ90+ 2, Prepaid 127   (their mean highest probability 0.993261)
+    for comparison, classes with ZERO train rows: DQ90+, Default
+    sklearn version 1.7.2; sklearn on the same predictions with clipping done by me at 1e-15: 0.412415
+
+STEP 5. CLASS PRESENCE
+  train    : present ['Current', 'DQ30', 'DQ60', 'Prepaid']; absent ['DQ90+', 'Default']   counts Current 158,208, DQ30 972, DQ60 7, DQ90+ 0, Prepaid 980, Default 0
+  held-out : present ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid']; absent ['Default']   counts Current 39,331, DQ30 241, DQ60 3, DQ90+ 2, Prepaid 256, Default 0
+  handling of absent classes:
+    (a) sklearn: labels= lists all six codes, so a class absent from held-out y_true is accepted; it contributes no rows to the average, and its probability column still takes part in sklearn's row normalisation.
+    (b) hand loop: only the probability of each row's actual class is read, so an absent class contributes nothing; p is floored at 1e-15 before the log.
+    (c) prior-only: a class absent from train gets prior probability 0; it would only matter if that class occurs in held-out, where p would be floored at 1e-15. Held-out classes with train frequency 0: ['DQ90+'].

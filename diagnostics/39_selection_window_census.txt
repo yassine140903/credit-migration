@@ -1,0 +1,107 @@
+Selection-window transition census   (fit rows only; panel validated against its manifest by load_panel)
+panel build 2026-10-08T09:41:19.866411   partitions 8   manifest rows 69,520,712
+selection window: role == 'fit' and 200601 <= from_period <= 200706
+fit rows in the whole panel 40,210,036; observed fit from_period range 200512..200812 (expected 200512..200812: MATCH)
+
+================================================================================================
+1. FIT ROWS IN THE SELECTION WINDOW
+================================================================================================
+rows           11,017,047  (in-grid; plus 0 outside the grid)
+distinct loans 1,315,273
+
+================================================================================================
+2. ROW COUNTS BY from_state  (selection window)
+================================================================================================
+from_state            rows   % of rows
+Current         10,911,314    99.0403%
+DQ30                85,936     0.7800%
+DQ60                11,010     0.0999%
+DQ90+                8,787     0.0798%
+TOTAL           11,017,047
+
+================================================================================================
+3. CONTINGENCY TABLE, RAW COUNTS  (selection window; rows = from_state, columns = to_state)
+================================================================================================
+from/to        Current        DQ30        DQ60       DQ90+     Prepaid     Default     ROW TOTAL
+Current     10,773,582      69,361         470         105      67,793           3    10,911,314
+DQ30            48,146      25,945      10,293          92       1,459           1        85,936
+DQ60             2,939       1,942       2,104       3,785         239           1        11,010
+DQ90+              860         250         288       6,871         157         361         8,787
+COL TOTAL   10,825,527      97,498      13,155      10,853      69,648         366    11,017,047
+
+================================================================================================
+4. SAME TABLE, ROW-NORMALISED PERCENTAGES  (each from_state row sums to 100)
+================================================================================================
+from/to        Current        DQ30        DQ60       DQ90+     Prepaid     Default   ROW TOTAL
+Current       98.7377%     0.6357%     0.0043%     0.0010%     0.6213%     0.0000%   100.0000%
+DQ30          56.0254%    30.1911%    11.9775%     0.1071%     1.6978%     0.0012%   100.0000%
+DQ60          26.6939%    17.6385%    19.1099%    34.3778%     2.1708%     0.0091%   100.0000%
+DQ90+          9.7872%     2.8451%     3.2776%    78.1951%     1.7867%     4.1083%   100.0000%
+
+================================================================================================
+5. EMPTY CELLS  (count == 0, selection window)
+================================================================================================
+none: every one of the 24 cells has at least one row.
+(0 of 24 cells empty)
+
+================================================================================================
+6. THIN CELLS  (0 < count < 100, selection window)
+================================================================================================
+Current -> Default : 3
+DQ30 -> DQ90+ : 92
+DQ30 -> Default : 1
+DQ60 -> Default : 1
+(4 cells with 1..99 rows; empty cells are listed in section 5, not repeated here)
+
+================================================================================================
+7. GROUPED ARCHITECTURE  (three models, one per origin group; selection window)
+================================================================================================
+Current alone
+  training rows available : 10,911,314
+  per-destination counts  : Current 10,773,582   DQ30 69,361   DQ60 470   DQ90+ 105   Prepaid 67,793   Default 3
+  destination classes present (6 of 6): Current, DQ30, DQ60, DQ90+, Prepaid, Default
+  classes it would LEARN  : 6 of 6
+  present but under 100 rows : Default (3)
+
+DQ30+DQ60 combined
+  training rows available : 96,946
+  per-destination counts  : Current 51,085   DQ30 27,887   DQ60 12,397   DQ90+ 3,877   Prepaid 1,698   Default 2
+  destination classes present (6 of 6): Current, DQ30, DQ60, DQ90+, Prepaid, Default
+  classes it would LEARN  : 6 of 6
+  present but under 100 rows : Default (2)
+
+DQ90+ alone
+  training rows available : 8,787
+  per-destination counts  : Current 860   DQ30 250   DQ60 288   DQ90+ 6,871   Prepaid 157   Default 361
+  destination classes present (6 of 6): Current, DQ30, DQ60, DQ90+, Prepaid, Default
+  classes it would LEARN  : 6 of 6
+
+
+================================================================================================
+8. POOLED ARCHITECTURE  (one model, all four origin states together; selection window)
+================================================================================================
+Pooled (Current + DQ30 + DQ60 + DQ90+)
+  training rows available : 11,017,047
+  per-destination counts  : Current 10,825,527   DQ30 97,498   DQ60 13,155   DQ90+ 10,853   Prepaid 69,648   Default 366
+  destination classes present (6 of 6): Current, DQ30, DQ60, DQ90+, Prepaid, Default
+  classes it would LEARN  : 6 of 6
+
+
+================================================================================================
+9. FULL FIT WINDOW, RAW COUNTS  (every role == 'fit' row, observed 200512..200812)
+================================================================================================
+from/to        Current        DQ30        DQ60       DQ90+     Prepaid     Default     ROW TOTAL
+Current     38,697,062     335,367       2,832       1,429     324,110          74    39,360,874
+DQ30           212,900     204,213     100,056         839       5,306          50       523,364
+DQ60            16,795      18,359      30,974      56,818         993          67       124,006
+DQ90+           12,365       2,634       3,882     174,837       1,083       6,991       201,792
+COL TOTAL   38,939,122     560,573     137,744     233,923     331,492       7,182    40,210,036
+
+selection window as a share of the full fit window, by cell (selection / full):
+from/to        Current        DQ30        DQ60       DQ90+     Prepaid     Default
+Current         27.84%      20.68%      16.60%       7.35%      20.92%       4.05%
+DQ30            22.61%      12.70%      10.29%      10.97%      27.50%       2.00%
+DQ60            17.50%      10.58%       6.79%       6.66%      24.07%       1.49%
+DQ90+            6.96%       9.49%       7.42%       3.93%      14.50%       5.16%
+
+cells empty in the full fit window: none

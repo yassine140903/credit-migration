@@ -1,0 +1,481 @@
+CURRENT and POOLED models, selection window: init score and boosting rounds under the Brier score   (measurement only; no selection, no recommendation)
+panel build 2026-10-08T09:41:19.866411   lightgbm 4.7.0   16 logical CPUs
+rows loaded (all four transient origins, selection window, role == 'fit'): 11,017,047; null/unknown labels dropped 0
+loans (all four origins): 1,315,273
+LightGBM defaults (num_leaves 31, min_data_in_leaf 20); 100 or 400 rounds per run; no early stopping, no validation set
+
+================================================================================================================
+POPULATION CURRENT: role == 'fit', from_state in ['Current'], 200601 <= from_period <= 200706
+================================================================================================================
+rows 10,911,314 (expected 10,911,314: MATCH)
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+NOT features: loan_age, run_length, run_length_censored, from_state (constant)
+
+SPLIT BY LOAN_ID (CURRENT)
+seed 40 (numpy default_rng on the sorted unique loan_ids); train fraction 0.8 of loans -> 1,052,138 of 1,315,173 loans to train, 263,035 held out
+no loan_id appears on both sides (asserted)
+
+train: 8,731,701 rows, 1,052,138 loans
+  Current 8,621,477   DQ30 55,447   DQ60 381   DQ90+ 78   Prepaid 54,315   Default 3
+  classes absent from train: none (all six present)
+
+held-out: 2,179,613 rows, 263,035 loans
+  Current 2,152,105   DQ30 13,914   DQ60 89   DQ90+ 27   Prepaid 13,478   Default 0
+  classes absent from held-out: Default
+
+row share: train 80.02%   held-out 19.98%
+NOTE: classes absent on a side - train: none; held-out: ['Default']. All six classes remain declared in the model (num_class = 6).
+
+prior-only reference (not a model): predicting the TRAIN-side class frequencies for every row
+  train-side class frequencies: Current 0.98737657, DQ30 0.00635008, DQ60 0.00004363, DQ90+ 0.00000893, Prepaid 0.00622044, Default 0.00000034
+  Brier    : train 0.0250085   held-out 0.0250029
+  log-loss : train 0.076817   held-out 0.076807
+
+INIT SCORE (train-row class frequencies -> log-odds log f_j, passed as LightGBM init_score when ON)
+  class        train frequency    init value (log f)
+  Current         0.9873765719           -0.01270378
+  DQ30            0.0063500800           -5.05928787
+  DQ60            0.0000436341          -10.03967138
+  DQ90+           0.0000089330          -11.62576193
+  Prepaid         0.0062204375           -5.07991504
+  Default         0.0000003436          -14.88385847
+  softmax(init) reproduces the frequencies: max |difference| 2.220e-16
+  round-zero Brier from the init values alone: held-out 0.0250029 vs prior-only 0.0250029 (difference +0.000e+00)
+
+================================================================================================================
+RUN CURRENT / 1. init OFF, 100 rounds
+================================================================================================================
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=100;  init_score=none (library default boost_from_average)
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+training wall-clock 33.8 s (0.56 min) = 0.34 s/round, Dataset construction included;  peak RSS in-run sampled 3.08 GB, process peak 3.09 GB;  min system available 4.65 GB
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  Brier, train                       : 0.0386261
+  Brier, held-out                    : 0.0395270
+  gap (held-out - train)             : +0.0009009
+  prior-only Brier, train / held-out : 0.0250085 / 0.0250029
+  held-out Brier minus prior-only held-out Brier : +0.0145241
+  (train Brier minus prior-only train Brier      : +0.0136176)
+
+  HELD-OUT BRIER BY NUMBER OF ROUNDS (added): 1: 0.0276286   10: 0.0283440   50: 0.0739347   100: 0.0395270
+
+  PER-CLASS DECOMPOSITION OF THE HELD-OUT BRIER  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.01966667    49.7550%        0.01246131     +0.00720536
+  DQ30          0.00877977    22.2121%        0.00634295     +0.00243682
+  DQ60          0.00186745     4.7245%        0.00004083     +0.00182662
+  DQ90+         0.00010795     0.2731%        0.00001239     +0.00009556
+  Prepaid       0.00910517    23.0353%        0.00614543     +0.00295974
+  Default       0.00000000     0.0000%        0.00000000     -0.00000000
+  TOTAL         0.03952701   100.0000%        0.02500291     +0.01452410
+
+  LOG-LOSS, as in diagnostic 42, carried for the record
+  multiclass log-loss, train / held-out : 0.425235 / 0.444013   gap +0.018779   held-out minus prior-only +0.367206
+  held-out rows with p(actual class) < 1e-6: 25,304 of 2,179,613 (1.1609%); their share of the total held-out log-loss: 89.48%
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,179,613 rows)
+  class         actual n   actual %   mean pred prob %   pred/actual     argmax n   argmax %
+  Current      2,152,105   98.7379%           98.2576%        1.00x    2,164,572   99.3099%
+  DQ30            13,914    0.6384%            0.6314%        0.99x        5,486    0.2517%
+  DQ60                89    0.0041%            0.4706%      115.25x        2,691    0.1235%
+  DQ90+               27    0.0012%            0.0117%        9.44x          214    0.0098%
+  Prepaid         13,478    0.6184%            0.6287%        1.02x        6,650    0.3051%
+  Default              0    0.0000%            0.0000%      n/a (0)            0    0.0000%
+  train-row pred/actual ratio: Current 1.00x   DQ30 0.96x   DQ60 110.75x   DQ90+ 10.20x   Prepaid 0.98x   Default 0.00x
+
+  REPRODUCTION CHECK vs diagnostic 44 run A: train Brier 0.0386261 vs 0.0386261, held-out 0.0395270 vs 0.0395270 -> MATCH to six decimals
+
+================================================================================================================
+RUN CURRENT / 2. init ON, 100 rounds
+================================================================================================================
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=100;  init_score=log train class frequencies, shape (n, 6)
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+training wall-clock 36.3 s (0.60 min) = 0.36 s/round, Dataset construction included;  peak RSS in-run sampled 3.87 GB, process peak 3.88 GB;  min system available 3.86 GB
+  round-zero check through the real predict path (start_iteration=100, zero trees + init): held-out Brier 0.0250029 vs prior-only 0.0250029 (difference +0.000e+00)
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  Brier, train                       : 0.0386261
+  Brier, held-out                    : 0.0395270
+  gap (held-out - train)             : +0.0009009
+  prior-only Brier, train / held-out : 0.0250085 / 0.0250029
+  held-out Brier minus prior-only held-out Brier : +0.0145241
+  (train Brier minus prior-only train Brier      : +0.0136176)
+
+  HELD-OUT BRIER BY NUMBER OF ROUNDS (added); round 0 = prior-only: 0: 0.0250029   1: 0.0276286   10: 0.0283440   50: 0.0739347   100: 0.0395270
+
+  PER-CLASS DECOMPOSITION OF THE HELD-OUT BRIER  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.01966667    49.7550%        0.01246131     +0.00720536
+  DQ30          0.00877977    22.2121%        0.00634295     +0.00243682
+  DQ60          0.00186745     4.7245%        0.00004083     +0.00182662
+  DQ90+         0.00010795     0.2731%        0.00001239     +0.00009556
+  Prepaid       0.00910517    23.0353%        0.00614543     +0.00295974
+  Default       0.00000000     0.0000%        0.00000000     -0.00000000
+  TOTAL         0.03952701   100.0000%        0.02500291     +0.01452410
+
+  LOG-LOSS, as in diagnostic 42, carried for the record
+  multiclass log-loss, train / held-out : 0.425235 / 0.444013   gap +0.018779   held-out minus prior-only +0.367206
+  held-out rows with p(actual class) < 1e-6: 25,304 of 2,179,613 (1.1609%); their share of the total held-out log-loss: 89.48%
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,179,613 rows)
+  class         actual n   actual %   mean pred prob %   pred/actual     argmax n   argmax %
+  Current      2,152,105   98.7379%           98.2576%        1.00x    2,164,572   99.3099%
+  DQ30            13,914    0.6384%            0.6314%        0.99x        5,486    0.2517%
+  DQ60                89    0.0041%            0.4706%      115.25x        2,691    0.1235%
+  DQ90+               27    0.0012%            0.0117%        9.44x          214    0.0098%
+  Prepaid         13,478    0.6184%            0.6287%        1.02x        6,650    0.3051%
+  Default              0    0.0000%            0.0000%      n/a (0)            0    0.0000%
+  train-row pred/actual ratio: Current 1.00x   DQ30 0.96x   DQ60 110.75x   DQ90+ 10.20x   Prepaid 0.98x   Default 0.00x
+
+================================================================================================================
+RUN CURRENT / 3. init OFF, 400 rounds
+================================================================================================================
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=400;  init_score=none (library default boost_from_average)
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 2400 (400 per class)
+training wall-clock 143.9 s (2.40 min) = 0.36 s/round, Dataset construction included;  peak RSS in-run sampled 3.09 GB, process peak 3.88 GB;  min system available 4.68 GB
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  Brier, train                       : 0.0429874
+  Brier, held-out                    : 0.0445380
+  gap (held-out - train)             : +0.0015506
+  prior-only Brier, train / held-out : 0.0250085 / 0.0250029
+  held-out Brier minus prior-only held-out Brier : +0.0195351
+  (train Brier minus prior-only train Brier      : +0.0179790)
+
+  HELD-OUT BRIER BY NUMBER OF ROUNDS (added): 1: 0.0276286   10: 0.0283440   50: 0.0739347   100: 0.0395270   200: 0.0393756   400: 0.0445380
+
+  PER-CLASS DECOMPOSITION OF THE HELD-OUT BRIER  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.02228640    50.0390%        0.01246131     +0.00982509
+  DQ30          0.00961376    21.5855%        0.00634295     +0.00327081
+  DQ60          0.00023169     0.5202%        0.00004083     +0.00019086
+  DQ90+         0.00019407     0.4357%        0.00001239     +0.00018168
+  Prepaid       0.01220798    27.4102%        0.00614543     +0.00606255
+  Default       0.00000413     0.0093%        0.00000000     +0.00000413
+  TOTAL         0.04453803   100.0000%        0.02500291     +0.01953512
+
+  LOG-LOSS, as in diagnostic 42, carried for the record
+  multiclass log-loss, train / held-out : 0.613765 / 0.638038   gap +0.024272   held-out minus prior-only +0.561231
+  held-out rows with p(actual class) < 1e-6: 38,776 of 2,179,613 (1.7790%); their share of the total held-out log-loss: 95.13%
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,179,613 rows)
+  class         actual n   actual %   mean pred prob %   pred/actual     argmax n   argmax %
+  Current      2,152,105   98.7379%           98.4333%        1.00x    2,157,712   98.9952%
+  DQ30            13,914    0.6384%            0.6406%        1.00x        7,345    0.3370%
+  DQ60                89    0.0041%            0.0191%        4.67x          416    0.0191%
+  DQ90+               27    0.0012%            0.0182%       14.67x          396    0.0182%
+  Prepaid         13,478    0.6184%            0.8884%        1.44x       13,735    0.6302%
+  Default              0    0.0000%            0.0004%      n/a (0)            9    0.0004%
+  train-row pred/actual ratio: Current 1.00x   DQ30 0.96x   DQ60 4.40x   DQ90+ 17.09x   Prepaid 1.36x   Default 2.67x
+
+================================================================================================================
+RUN CURRENT / 4. init ON, 400 rounds
+================================================================================================================
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=400;  init_score=log train class frequencies, shape (n, 6)
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 2400 (400 per class)
+training wall-clock 144.5 s (2.41 min) = 0.36 s/round, Dataset construction included;  peak RSS in-run sampled 3.89 GB, process peak 3.90 GB;  min system available 4.09 GB
+  round-zero check through the real predict path (start_iteration=400, zero trees + init): held-out Brier 0.0250029 vs prior-only 0.0250029 (difference +0.000e+00)
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  Brier, train                       : 0.0429874
+  Brier, held-out                    : 0.0445380
+  gap (held-out - train)             : +0.0015506
+  prior-only Brier, train / held-out : 0.0250085 / 0.0250029
+  held-out Brier minus prior-only held-out Brier : +0.0195351
+  (train Brier minus prior-only train Brier      : +0.0179790)
+
+  HELD-OUT BRIER BY NUMBER OF ROUNDS (added); round 0 = prior-only: 0: 0.0250029   1: 0.0276286   10: 0.0283440   50: 0.0739347   100: 0.0395270   200: 0.0393756   400: 0.0445380
+
+  PER-CLASS DECOMPOSITION OF THE HELD-OUT BRIER  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.02228640    50.0390%        0.01246131     +0.00982509
+  DQ30          0.00961376    21.5855%        0.00634295     +0.00327081
+  DQ60          0.00023169     0.5202%        0.00004083     +0.00019086
+  DQ90+         0.00019407     0.4357%        0.00001239     +0.00018168
+  Prepaid       0.01220798    27.4102%        0.00614543     +0.00606255
+  Default       0.00000413     0.0093%        0.00000000     +0.00000413
+  TOTAL         0.04453803   100.0000%        0.02500291     +0.01953512
+
+  LOG-LOSS, as in diagnostic 42, carried for the record
+  multiclass log-loss, train / held-out : 0.613765 / 0.638038   gap +0.024272   held-out minus prior-only +0.561231
+  held-out rows with p(actual class) < 1e-6: 38,776 of 2,179,613 (1.7790%); their share of the total held-out log-loss: 95.13%
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,179,613 rows)
+  class         actual n   actual %   mean pred prob %   pred/actual     argmax n   argmax %
+  Current      2,152,105   98.7379%           98.4333%        1.00x    2,157,712   98.9952%
+  DQ30            13,914    0.6384%            0.6406%        1.00x        7,345    0.3370%
+  DQ60                89    0.0041%            0.0191%        4.67x          416    0.0191%
+  DQ90+               27    0.0012%            0.0182%       14.67x          396    0.0182%
+  Prepaid         13,478    0.6184%            0.8884%        1.44x       13,735    0.6302%
+  Default              0    0.0000%            0.0004%      n/a (0)            9    0.0004%
+  train-row pred/actual ratio: Current 1.00x   DQ30 0.96x   DQ60 4.40x   DQ90+ 17.09x   Prepaid 1.36x   Default 2.67x
+
+================================================================================================================
+POPULATION POOLED: role == 'fit', from_state in ['Current', 'DQ30', 'DQ60', 'DQ90+'], 200601 <= from_period <= 200706
+================================================================================================================
+rows 11,017,047 (expected 11,017,047: MATCH)
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+NOT features: loan_age, run_length, run_length_censored
+
+SPLIT BY LOAN_ID (POOLED)
+seed 40 (numpy default_rng on the sorted unique loan_ids); train fraction 0.8 of loans -> 1,052,218 of 1,315,273 loans to train, 263,055 held out
+no loan_id appears on both sides (asserted)
+
+train: 8,817,112 rows, 1,052,218 loans
+  Current 8,663,839   DQ30 78,073   DQ60 10,543   DQ90+ 8,755   Prepaid 55,601   Default 301
+  classes absent from train: none (all six present)
+
+held-out: 2,199,935 rows, 263,055 loans
+  Current 2,161,688   DQ30 19,425   DQ60 2,612   DQ90+ 2,098   Prepaid 14,047   Default 65
+  classes absent from held-out: none (all six present)
+
+row share: train 80.03%   held-out 19.97%
+
+prior-only reference (not a model): predicting the TRAIN-side class frequencies for every row
+  train-side class frequencies: Current 0.98261642, DQ30 0.00885471, DQ60 0.00119574, DQ90+ 0.00099296, Prepaid 0.00630603, Default 0.00003414
+  Brier    : train 0.0343444   held-out 0.0343477
+  log-loss : train 0.106297   held-out 0.106205
+
+INIT SCORE (train-row class frequencies -> log-odds log f_j, passed as LightGBM init_score when ON)
+  class        train frequency    init value (log f)
+  Current         0.9826164168           -0.01753645
+  DQ30            0.0088547134           -4.72680537
+  DQ60            0.0011957430           -6.72898753
+  DQ90+           0.0009929555           -6.91482469
+  Prepaid         0.0063060331           -5.06624847
+  Default         0.0000341382          -10.28509467
+  softmax(init) reproduces the frequencies: max |difference| 1.735e-18
+  round-zero Brier from the init values alone: held-out 0.0343477 vs prior-only 0.0343477 (difference +0.000e+00)
+
+================================================================================================================
+RUN POOLED / 1. init OFF, 100 rounds
+================================================================================================================
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=100;  init_score=none (library default boost_from_average)
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+training wall-clock 36.3 s (0.60 min) = 0.36 s/round, Dataset construction included;  peak RSS in-run sampled 3.12 GB, process peak 3.90 GB;  min system available 4.79 GB
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  Brier, train                       : 0.0410566
+  Brier, held-out                    : 0.0413520
+  gap (held-out - train)             : +0.0002954
+  prior-only Brier, train / held-out : 0.0343444 / 0.0343477
+  held-out Brier minus prior-only held-out Brier : +0.0070043
+  (train Brier minus prior-only train Brier      : +0.0067122)
+
+  HELD-OUT BRIER BY NUMBER OF ROUNDS (added): 1: 0.0380157   10: 0.0393106   50: 0.0669752   100: 0.0413520
+
+  PER-CLASS DECOMPOSITION OF THE HELD-OUT BRIER  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.01948560    47.1213%        0.01708326     +0.00240235
+  DQ30          0.01104263    26.7040%        0.00875184     +0.00229079
+  DQ60          0.00180891     4.3744%        0.00118590     +0.00062301
+  DQ90+         0.00115548     2.7942%        0.00095276     +0.00020272
+  Prepaid       0.00765026    18.5003%        0.00634442     +0.00130584
+  Default       0.00020911     0.5057%        0.00002955     +0.00017957
+  TOTAL         0.04135200   100.0000%        0.03434772     +0.00700428
+
+  LOG-LOSS, as in diagnostic 42, carried for the record
+  multiclass log-loss, train / held-out : 0.426772 / 0.431822   gap +0.005050   held-out minus prior-only +0.325617
+  held-out rows with p(actual class) < 1e-6: 23,924 of 2,199,935 (1.0875%); their share of the total held-out log-loss: 86.50%
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,199,935 rows)
+  class         actual n   actual %   mean pred prob %   pred/actual     argmax n   argmax %
+  Current      2,161,688   98.2614%           98.2179%        1.00x    2,182,922   99.2267%
+  DQ30            19,425    0.8830%            0.8555%        0.97x        9,242    0.4201%
+  DQ60             2,612    0.1187%            0.1289%        1.09x        1,928    0.0876%
+  DQ90+            2,098    0.0954%            0.1630%        1.71x        2,421    0.1100%
+  Prepaid         14,047    0.6385%            0.6141%        0.96x        3,021    0.1373%
+  Default             65    0.0030%            0.0205%        6.95x          401    0.0182%
+  train-row pred/actual ratio: Current 1.00x   DQ30 0.98x   DQ60 1.09x   DQ90+ 1.67x   Prepaid 0.97x   Default 4.52x
+
+  REPRODUCTION CHECK vs diagnostic 44 run A: train Brier 0.0410566 vs 0.0410566, held-out 0.0413520 vs 0.0413520 -> MATCH to six decimals
+
+================================================================================================================
+RUN POOLED / 2. init ON, 100 rounds
+================================================================================================================
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=100;  init_score=log train class frequencies, shape (n, 6)
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+training wall-clock 37.0 s (0.62 min) = 0.37 s/round, Dataset construction included;  peak RSS in-run sampled 3.91 GB, process peak 3.92 GB;  min system available 3.99 GB
+  round-zero check through the real predict path (start_iteration=100, zero trees + init): held-out Brier 0.0343477 vs prior-only 0.0343477 (difference +0.000e+00)
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  Brier, train                       : 0.0410566
+  Brier, held-out                    : 0.0413520
+  gap (held-out - train)             : +0.0002954
+  prior-only Brier, train / held-out : 0.0343444 / 0.0343477
+  held-out Brier minus prior-only held-out Brier : +0.0070043
+  (train Brier minus prior-only train Brier      : +0.0067122)
+
+  HELD-OUT BRIER BY NUMBER OF ROUNDS (added); round 0 = prior-only: 0: 0.0343477   1: 0.0380157   10: 0.0393106   50: 0.0669752   100: 0.0413520
+
+  PER-CLASS DECOMPOSITION OF THE HELD-OUT BRIER  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.01948560    47.1213%        0.01708326     +0.00240235
+  DQ30          0.01104263    26.7040%        0.00875184     +0.00229079
+  DQ60          0.00180891     4.3744%        0.00118590     +0.00062301
+  DQ90+         0.00115548     2.7942%        0.00095276     +0.00020272
+  Prepaid       0.00765026    18.5003%        0.00634442     +0.00130584
+  Default       0.00020911     0.5057%        0.00002955     +0.00017957
+  TOTAL         0.04135200   100.0000%        0.03434772     +0.00700428
+
+  LOG-LOSS, as in diagnostic 42, carried for the record
+  multiclass log-loss, train / held-out : 0.426772 / 0.431822   gap +0.005050   held-out minus prior-only +0.325617
+  held-out rows with p(actual class) < 1e-6: 23,924 of 2,199,935 (1.0875%); their share of the total held-out log-loss: 86.50%
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,199,935 rows)
+  class         actual n   actual %   mean pred prob %   pred/actual     argmax n   argmax %
+  Current      2,161,688   98.2614%           98.2179%        1.00x    2,182,922   99.2267%
+  DQ30            19,425    0.8830%            0.8555%        0.97x        9,242    0.4201%
+  DQ60             2,612    0.1187%            0.1289%        1.09x        1,928    0.0876%
+  DQ90+            2,098    0.0954%            0.1630%        1.71x        2,421    0.1100%
+  Prepaid         14,047    0.6385%            0.6141%        0.96x        3,021    0.1373%
+  Default             65    0.0030%            0.0205%        6.95x          401    0.0182%
+  train-row pred/actual ratio: Current 1.00x   DQ30 0.98x   DQ60 1.09x   DQ90+ 1.67x   Prepaid 0.97x   Default 4.52x
+
+================================================================================================================
+RUN POOLED / 3. init OFF, 400 rounds
+================================================================================================================
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=400;  init_score=none (library default boost_from_average)
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 2400 (400 per class)
+training wall-clock 138.3 s (2.31 min) = 0.35 s/round, Dataset construction included;  peak RSS in-run sampled 3.13 GB, process peak 3.92 GB;  min system available 4.78 GB
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  Brier, train                       : 0.0458653
+  Brier, held-out                    : 0.0471826
+  gap (held-out - train)             : +0.0013173
+  prior-only Brier, train / held-out : 0.0343444 / 0.0343477
+  held-out Brier minus prior-only held-out Brier : +0.0128349
+  (train Brier minus prior-only train Brier      : +0.0115209)
+
+  HELD-OUT BRIER BY NUMBER OF ROUNDS (added): 1: 0.0380157   10: 0.0393106   50: 0.0669752   100: 0.0413520   200: 0.0457322   400: 0.0471826
+
+  PER-CLASS DECOMPOSITION OF THE HELD-OUT BRIER  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.02241897    47.5153%        0.01708326     +0.00533571
+  DQ30          0.01256794    26.6368%        0.00875184     +0.00381610
+  DQ60          0.00189689     4.0203%        0.00118590     +0.00071099
+  DQ90+         0.00089184     1.8902%        0.00095276     -0.00006091
+  Prepaid       0.00913427    19.3594%        0.00634442     +0.00278985
+  Default       0.00027274     0.5780%        0.00002955     +0.00024319
+  TOTAL         0.04718264   100.0000%        0.03434772     +0.01283492
+
+  LOG-LOSS, as in diagnostic 42, carried for the record
+  multiclass log-loss, train / held-out : 0.597501 / 0.618353   gap +0.020852   held-out minus prior-only +0.512148
+  held-out rows with p(actual class) < 1e-6: 37,062 of 2,199,935 (1.6847%); their share of the total held-out log-loss: 93.48%
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,199,935 rows)
+  class         actual n   actual %   mean pred prob %   pred/actual     argmax n   argmax %
+  Current      2,161,688   98.2614%           98.2243%        1.00x    2,176,830   98.9497%
+  DQ30            19,425    0.8830%            0.8864%        1.00x       11,893    0.5406%
+  DQ60             2,612    0.1187%            0.1248%        1.05x        2,311    0.1050%
+  DQ90+            2,098    0.0954%            0.0867%        0.91x        1,908    0.0867%
+  Prepaid         14,047    0.6385%            0.6535%        1.02x        6,458    0.2936%
+  Default             65    0.0030%            0.0243%        8.23x          535    0.0243%
+  train-row pred/actual ratio: Current 1.00x   DQ30 0.99x   DQ60 0.98x   DQ90+ 0.93x   Prepaid 1.00x   Default 6.56x
+
+================================================================================================================
+RUN POOLED / 4. init ON, 400 rounds
+================================================================================================================
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=400;  init_score=log train class frequencies, shape (n, 6)
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 2400 (400 per class)
+training wall-clock 140.5 s (2.34 min) = 0.35 s/round, Dataset construction included;  peak RSS in-run sampled 3.89 GB, process peak 3.92 GB;  min system available 4.27 GB
+  round-zero check through the real predict path (start_iteration=400, zero trees + init): held-out Brier 0.0343477 vs prior-only 0.0343477 (difference +0.000e+00)
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  Brier, train                       : 0.0458653
+  Brier, held-out                    : 0.0471826
+  gap (held-out - train)             : +0.0013173
+  prior-only Brier, train / held-out : 0.0343444 / 0.0343477
+  held-out Brier minus prior-only held-out Brier : +0.0128349
+  (train Brier minus prior-only train Brier      : +0.0115209)
+
+  HELD-OUT BRIER BY NUMBER OF ROUNDS (added); round 0 = prior-only: 0: 0.0343477   1: 0.0380157   10: 0.0393106   50: 0.0669752   100: 0.0413520   200: 0.0457322   400: 0.0471826
+
+  PER-CLASS DECOMPOSITION OF THE HELD-OUT BRIER  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.02241897    47.5153%        0.01708326     +0.00533571
+  DQ30          0.01256794    26.6368%        0.00875184     +0.00381610
+  DQ60          0.00189689     4.0203%        0.00118590     +0.00071099
+  DQ90+         0.00089184     1.8902%        0.00095276     -0.00006091
+  Prepaid       0.00913427    19.3594%        0.00634442     +0.00278985
+  Default       0.00027274     0.5780%        0.00002955     +0.00024319
+  TOTAL         0.04718264   100.0000%        0.03434772     +0.01283492
+
+  LOG-LOSS, as in diagnostic 42, carried for the record
+  multiclass log-loss, train / held-out : 0.597501 / 0.618353   gap +0.020852   held-out minus prior-only +0.512148
+  held-out rows with p(actual class) < 1e-6: 37,062 of 2,199,935 (1.6847%); their share of the total held-out log-loss: 93.48%
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,199,935 rows)
+  class         actual n   actual %   mean pred prob %   pred/actual     argmax n   argmax %
+  Current      2,161,688   98.2614%           98.2243%        1.00x    2,176,830   98.9497%
+  DQ30            19,425    0.8830%            0.8864%        1.00x       11,893    0.5406%
+  DQ60             2,612    0.1187%            0.1248%        1.05x        2,311    0.1050%
+  DQ90+            2,098    0.0954%            0.0867%        0.91x        1,908    0.0867%
+  Prepaid         14,047    0.6385%            0.6535%        1.02x        6,458    0.2936%
+  Default             65    0.0030%            0.0243%        8.23x          535    0.0243%
+  train-row pred/actual ratio: Current 1.00x   DQ30 0.99x   DQ60 0.98x   DQ90+ 0.93x   Prepaid 1.00x   Default 6.56x
+
+================================================================================================================
+SUMMARY  (figures only)
+================================================================================================================
+MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+run                                                    train Brier  held-out Brier          gap  held-out - prior
+CURRENT / 1. init OFF, 100 rounds                        0.0386261       0.0395270   +0.0009009        +0.0145241
+CURRENT / 2. init ON, 100 rounds                         0.0386261       0.0395270   +0.0009009        +0.0145241
+CURRENT / 3. init OFF, 400 rounds                        0.0429874       0.0445380   +0.0015506        +0.0195351
+CURRENT / 4. init ON, 400 rounds                         0.0429874       0.0445380   +0.0015506        +0.0195351
+(prior-only reference, CURRENT)                          0.0250085       0.0250029   -0.0000056        +0.0000000
+POOLED / 1. init OFF, 100 rounds                         0.0410566       0.0413520   +0.0002954        +0.0070043
+POOLED / 2. init ON, 100 rounds                          0.0410566       0.0413520   +0.0002954        +0.0070043
+POOLED / 3. init OFF, 400 rounds                         0.0458653       0.0471826   +0.0013173        +0.0128349
+POOLED / 4. init ON, 400 rounds                          0.0458653       0.0471826   +0.0013173        +0.0128349
+(prior-only reference, POOLED)                           0.0343444       0.0343477   +0.0000033        +0.0000000
+
+LOG-LOSS, as in diagnostic 42, for the record
+run                                                        train    held-out         gap  held-out - prior   rows p<1e-6  their share
+CURRENT / 1. init OFF, 100 rounds                       0.425235    0.444013   +0.018779         +0.367206        25,304       89.48%
+CURRENT / 2. init ON, 100 rounds                        0.425235    0.444013   +0.018779         +0.367206        25,304       89.48%
+CURRENT / 3. init OFF, 400 rounds                       0.613765    0.638038   +0.024272         +0.561231        38,776       95.13%
+CURRENT / 4. init ON, 400 rounds                        0.613765    0.638038   +0.024272         +0.561231        38,776       95.13%
+(prior-only reference, CURRENT)                         0.076817    0.076807   -0.000010         +0.000000
+POOLED / 1. init OFF, 100 rounds                        0.426772    0.431822   +0.005050         +0.325617        23,924       86.50%
+POOLED / 2. init ON, 100 rounds                         0.426772    0.431822   +0.005050         +0.325617        23,924       86.50%
+POOLED / 3. init OFF, 400 rounds                        0.597501    0.618353   +0.020852         +0.512148        37,062       93.48%
+POOLED / 4. init ON, 400 rounds                         0.597501    0.618353   +0.020852         +0.512148        37,062       93.48%
+(prior-only reference, POOLED)                          0.106297    0.106205   -0.000092         +0.000000
+
+run                                                    train seconds   in-run RSS GB   process peak GB
+CURRENT / 1. init OFF, 100 rounds                               33.8            3.08              3.09
+CURRENT / 2. init ON, 100 rounds                                36.3            3.87              3.88
+CURRENT / 3. init OFF, 400 rounds                              143.9            3.09              3.88
+CURRENT / 4. init ON, 400 rounds                               144.5            3.89              3.90
+POOLED / 1. init OFF, 100 rounds                                36.3            3.12              3.90
+POOLED / 2. init ON, 100 rounds                                 37.0            3.91              3.92
+POOLED / 3. init OFF, 400 rounds                               138.3            3.13              3.92
+POOLED / 4. init ON, 400 rounds                                140.5            3.89              3.92
+
+HELD-OUT BRIER BY NUMBER OF ROUNDS (added; round 0 = prior-only where an init score is used)
+CURRENT / 1. init OFF, 100 rounds                   1: 0.0276286   10: 0.0283440   50: 0.0739347   100: 0.0395270
+CURRENT / 2. init ON, 100 rounds                    0: 0.0250029   1: 0.0276286   10: 0.0283440   50: 0.0739347   100: 0.0395270
+CURRENT / 3. init OFF, 400 rounds                   1: 0.0276286   10: 0.0283440   50: 0.0739347   100: 0.0395270   200: 0.0393756   400: 0.0445380
+CURRENT / 4. init ON, 400 rounds                    0: 0.0250029   1: 0.0276286   10: 0.0283440   50: 0.0739347   100: 0.0395270   200: 0.0393756   400: 0.0445380
+POOLED / 1. init OFF, 100 rounds                    1: 0.0380157   10: 0.0393106   50: 0.0669752   100: 0.0413520
+POOLED / 2. init ON, 100 rounds                     0: 0.0343477   1: 0.0380157   10: 0.0393106   50: 0.0669752   100: 0.0413520
+POOLED / 3. init OFF, 400 rounds                    1: 0.0380157   10: 0.0393106   50: 0.0669752   100: 0.0413520   200: 0.0457322   400: 0.0471826
+POOLED / 4. init ON, 400 rounds                     0: 0.0343477   1: 0.0380157   10: 0.0393106   50: 0.0669752   100: 0.0413520   200: 0.0457322   400: 0.0471826

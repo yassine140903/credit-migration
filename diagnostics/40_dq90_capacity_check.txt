@@ -1,0 +1,91 @@
+DQ90+ single-origin model: capacity / memorisation check   (measurement only; no selection, no recommendation)
+panel build 2026-10-08T09:41:19.866411   lightgbm 4.7.0
+rows: role == 'fit', from_state == 'DQ90+', 200601 <= from_period <= 200706
+rows loaded 8,787 (expected 8,787: MATCH); null/unknown labels dropped 0
+features, matrix order (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+NOT features: from_state (constant), loan_age, run_length, run_length_censored
+rounds 100, no early stopping, no validation set
+
+====================================================================================================
+1. SPLIT BY LOAN_ID
+====================================================================================================
+seed 40 (numpy default_rng on the sorted unique loan_ids); train fraction 0.8 of loans -> 2,478 of 3,097 loans to train, 619 held out
+no loan_id appears on both sides (asserted)
+
+train: 7,049 rows, 2,478 loans
+  Current 669   DQ30 198   DQ60 233   DQ90+ 5,539   Prepaid 119   Default 291
+  classes absent from train: none (all six present)
+
+held-out: 1,738 rows, 619 loans
+  Current 191   DQ30 52   DQ60 55   DQ90+ 1,332   Prepaid 38   Default 70
+  classes absent from held-out: none (all six present)
+
+row share: train 80.22%   held-out 19.78%
+
+context, not a model: log-loss of predicting the TRAIN-side class frequencies for every row: train 0.826454   held-out 0.875942
+
+====================================================================================================
+RUN A. LightGBM defaults (as train_ml)
+====================================================================================================
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=100
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+
+  multiclass log-loss, train     : 0.239106
+  multiclass log-loss, held-out  : 0.964765
+  gap (held-out - train)         : +0.725659
+
+  HELD-OUT rows: actual vs predicted destination distribution  (1,738 rows)
+  class       actual n   actual %   mean pred prob %   argmax n   argmax %
+  Current          191   10.9896%           11.0227%         35    2.0138%
+  DQ30              52    2.9919%            1.7401%          1    0.0575%
+  DQ60              55    3.1646%            2.2935%          1    0.0575%
+  DQ90+          1,332   76.6398%           80.9042%      1,696   97.5834%
+  Prepaid           38    2.1864%            0.8121%          1    0.0575%
+  Default           70    4.0276%            3.2273%          4    0.2301%
+
+  TRAIN rows: actual vs predicted destination distribution  (7,049 rows)
+  class       actual n   actual %   mean pred prob %   argmax n   argmax %
+  Current          669    9.4907%            9.5062%        319    4.5255%
+  DQ30             198    2.8089%            2.8183%        176    2.4968%
+  DQ60             233    3.3054%            3.3143%        185    2.6245%
+  DQ90+          5,539   78.5785%           78.5403%      6,061   85.9838%
+  Prepaid          119    1.6882%            1.6849%        118    1.6740%
+  Default          291    4.1282%            4.1360%        190    2.6954%
+
+====================================================================================================
+RUN B. reduced capacity (for context)
+====================================================================================================
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1, num_leaves=8, min_data_in_leaf=100;  num_boost_round=100
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=8, min_data_in_leaf=100, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+
+  multiclass log-loss, train     : 0.582739
+  multiclass log-loss, held-out  : 0.879704
+  gap (held-out - train)         : +0.296965
+
+  HELD-OUT rows: actual vs predicted destination distribution  (1,738 rows)
+  class       actual n   actual %   mean pred prob %   argmax n   argmax %
+  Current          191   10.9896%           10.7424%          7    0.4028%
+  DQ30              52    2.9919%            3.0058%          0    0.0000%
+  DQ60              55    3.1646%            3.3269%          0    0.0000%
+  DQ90+          1,332   76.6398%           77.0455%      1,728   99.4246%
+  Prepaid           38    2.1864%            1.7245%          3    0.1726%
+  Default           70    4.0276%            4.1549%          0    0.0000%
+
+  TRAIN rows: actual vs predicted destination distribution  (7,049 rows)
+  class       actual n   actual %   mean pred prob %   argmax n   argmax %
+  Current          669    9.4907%            9.4912%         34    0.4823%
+  DQ30             198    2.8089%            2.8342%          8    0.1135%
+  DQ60             233    3.3054%            3.3153%          6    0.0851%
+  DQ90+          5,539   78.5785%           78.5386%      6,991   99.1772%
+  Prepaid          119    1.6882%            1.7122%         10    0.1419%
+  Default          291    4.1282%            4.1086%          0    0.0000%
+
+====================================================================================================
+SUMMARY  (figures only)
+====================================================================================================
+run                                         train log-loss   held-out log-loss         gap
+A. LightGBM defaults (as train_ml)                0.239106            0.964765   +0.725659
+B. reduced capacity (for context)                 0.582739            0.879704   +0.296965
+(prior-only reference)                            0.826454            0.875942   +0.049488

@@ -1,0 +1,197 @@
+CURRENT and POOLED models, selection window: capacity check   (measurement only; no selection, no recommendation)
+panel build 2026-10-08T09:41:19.866411   lightgbm 4.7.0   16 logical CPUs
+rows loaded (all four transient origins, selection window, role == 'fit'): 11,017,047; null/unknown labels dropped 0
+loans (all four origins): 1,315,273
+rounds 100, no early stopping, no validation set
+
+================================================================================================================
+POPULATION CURRENT: role == 'fit', from_state in ['Current'], 200601 <= from_period <= 200706
+================================================================================================================
+rows 10,911,314 (expected 10,911,314: MATCH)
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+NOT features: loan_age, run_length, run_length_censored, from_state (constant)
+
+SPLIT BY LOAN_ID (CURRENT)
+seed 40 (numpy default_rng on the sorted unique loan_ids); train fraction 0.8 of loans -> 1,052,138 of 1,315,173 loans to train, 263,035 held out
+no loan_id appears on both sides (asserted)
+
+train: 8,731,701 rows, 1,052,138 loans
+  Current 8,621,477   DQ30 55,447   DQ60 381   DQ90+ 78   Prepaid 54,315   Default 3
+  classes absent from train: none (all six present)
+
+held-out: 2,179,613 rows, 263,035 loans
+  Current 2,152,105   DQ30 13,914   DQ60 89   DQ90+ 27   Prepaid 13,478   Default 0
+  classes absent from held-out: Default
+
+row share: train 80.02%   held-out 19.98%
+NOTE: classes absent on a side - train: none; held-out: ['Default']. All six classes remain declared in the model (num_class = 6).
+
+prior-only reference (not a model): log-loss of predicting the TRAIN-side class frequencies for every row: train 0.076817   held-out 0.076807
+
+================================================================================================================
+RUN CURRENT / A. LightGBM defaults (as train_ml)
+================================================================================================================
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=100
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+training wall-clock 40.2 s (0.67 min) = 0.40 s/round, Dataset construction included;  peak RSS in-run sampled 3.12 GB, process peak 3.13 GB;  min system available 4.43 GB
+
+  multiclass log-loss, train     : 0.425235
+  multiclass log-loss, held-out  : 0.444013
+  gap (held-out - train)         : +0.018779
+  held-out minus prior-only held-out : +0.367206
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,179,613 rows)
+  class         actual n   actual %   mean pred prob %     argmax n   argmax %
+  Current      2,152,105   98.7379%           98.2576%    2,164,572   99.3099%
+  DQ30            13,914    0.6384%            0.6314%        5,486    0.2517%
+  DQ60                89    0.0041%            0.4706%        2,691    0.1235%
+  DQ90+               27    0.0012%            0.0117%          214    0.0098%
+  Prepaid         13,478    0.6184%            0.6287%        6,650    0.3051%
+  Default              0    0.0000%            0.0000%            0    0.0000%
+
+  TRAIN rows: actual vs predicted destination distribution  (8,731,701 rows)
+  class         actual n   actual %   mean pred prob %     argmax n   argmax %
+  Current      8,621,477   98.7377%           98.2926%    8,674,828   99.3487%
+  DQ30            55,447    0.6350%            0.6079%       19,960    0.2286%
+  DQ60               381    0.0044%            0.4832%       11,288    0.1293%
+  DQ90+               78    0.0009%            0.0091%          612    0.0070%
+  Prepaid         54,315    0.6220%            0.6071%       25,013    0.2865%
+  Default              3    0.0000%            0.0000%            0    0.0000%
+
+================================================================================================================
+RUN CURRENT / B. reduced capacity
+================================================================================================================
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1, num_leaves=8, min_data_in_leaf=100;  num_boost_round=100
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=8, min_data_in_leaf=100, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+training wall-clock 34.9 s (0.58 min) = 0.35 s/round, Dataset construction included;  peak RSS in-run sampled 3.12 GB, process peak 3.13 GB;  min system available 4.49 GB
+
+  multiclass log-loss, train     : 0.425183
+  multiclass log-loss, held-out  : 0.425425
+  gap (held-out - train)         : +0.000242
+  held-out minus prior-only held-out : +0.348619
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,179,613 rows)
+  class         actual n   actual %   mean pred prob %     argmax n   argmax %
+  Current      2,152,105   98.7379%           92.6731%    2,019,853   92.6703%
+  DQ30            13,914    0.6384%            0.5404%        2,636    0.1209%
+  DQ60                89    0.0041%            0.0448%          137    0.0063%
+  DQ90+               27    0.0012%            6.0737%      151,264    6.9399%
+  Prepaid         13,478    0.6184%            0.6372%        5,367    0.2462%
+  Default              0    0.0000%            0.0308%          356    0.0163%
+
+  TRAIN rows: actual vs predicted destination distribution  (8,731,701 rows)
+  class         actual n   actual %   mean pred prob %     argmax n   argmax %
+  Current      8,621,477   98.7377%           92.6358%    8,087,422   92.6214%
+  DQ30            55,447    0.6350%            0.5468%       10,908    0.1249%
+  DQ60               381    0.0044%            0.0446%          391    0.0045%
+  DQ90+               78    0.0009%            6.1002%      609,696    6.9826%
+  Prepaid         54,315    0.6220%            0.6429%       21,965    0.2516%
+  Default              3    0.0000%            0.0296%        1,319    0.0151%
+
+================================================================================================================
+POPULATION POOLED: role == 'fit', from_state in ['Current', 'DQ30', 'DQ60', 'DQ90+'], 200601 <= from_period <= 200706
+================================================================================================================
+rows 11,017,047 (expected 11,017,047: MATCH)
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+NOT features: loan_age, run_length, run_length_censored
+
+SPLIT BY LOAN_ID (POOLED)
+seed 40 (numpy default_rng on the sorted unique loan_ids); train fraction 0.8 of loans -> 1,052,218 of 1,315,273 loans to train, 263,055 held out
+no loan_id appears on both sides (asserted)
+
+train: 8,817,112 rows, 1,052,218 loans
+  Current 8,663,839   DQ30 78,073   DQ60 10,543   DQ90+ 8,755   Prepaid 55,601   Default 301
+  classes absent from train: none (all six present)
+
+held-out: 2,199,935 rows, 263,055 loans
+  Current 2,161,688   DQ30 19,425   DQ60 2,612   DQ90+ 2,098   Prepaid 14,047   Default 65
+  classes absent from held-out: none (all six present)
+
+row share: train 80.03%   held-out 19.97%
+
+prior-only reference (not a model): log-loss of predicting the TRAIN-side class frequencies for every row: train 0.106297   held-out 0.106205
+
+================================================================================================================
+RUN POOLED / A. LightGBM defaults (as train_ml)
+================================================================================================================
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1;  num_boost_round=100
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+training wall-clock 39.6 s (0.66 min) = 0.40 s/round, Dataset construction included;  peak RSS in-run sampled 3.16 GB, process peak 3.16 GB;  min system available 4.35 GB
+
+  multiclass log-loss, train     : 0.426772
+  multiclass log-loss, held-out  : 0.431822
+  gap (held-out - train)         : +0.005050
+  held-out minus prior-only held-out : +0.325617
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,199,935 rows)
+  class         actual n   actual %   mean pred prob %     argmax n   argmax %
+  Current      2,161,688   98.2614%           98.2179%    2,182,922   99.2267%
+  DQ30            19,425    0.8830%            0.8555%        9,242    0.4201%
+  DQ60             2,612    0.1187%            0.1289%        1,928    0.0876%
+  DQ90+            2,098    0.0954%            0.1630%        2,421    0.1100%
+  Prepaid         14,047    0.6385%            0.6141%        3,021    0.1373%
+  Default             65    0.0030%            0.0205%          401    0.0182%
+
+  TRAIN rows: actual vs predicted destination distribution  (8,817,112 rows)
+  class         actual n   actual %   mean pred prob %     argmax n   argmax %
+  Current      8,663,839   98.2616%           98.2073%    8,747,939   99.2155%
+  DQ30            78,073    0.8855%            0.8671%       38,270    0.4340%
+  DQ60            10,543    0.1196%            0.1298%        7,731    0.0877%
+  DQ90+            8,755    0.0993%            0.1660%        9,855    0.1118%
+  Prepaid         55,601    0.6306%            0.6144%       12,167    0.1380%
+  Default            301    0.0034%            0.0154%        1,150    0.0130%
+
+================================================================================================================
+RUN POOLED / B. reduced capacity
+================================================================================================================
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+params passed to lgb.train: objective='multiclass', num_class=6, device_type='cpu', verbosity=-1, num_leaves=8, min_data_in_leaf=100;  num_boost_round=100
+effective values (from the model's parameters block): learning_rate=0.1, num_leaves=8, min_data_in_leaf=100, min_sum_hessian_in_leaf=0.001, max_depth=-1, lambda_l1=0, lambda_l2=0, feature_fraction=1, bagging_fraction=1, max_bin=255, num_threads=0, seed=0, deterministic=0
+trees 600 (100 per class)
+training wall-clock 36.4 s (0.61 min) = 0.36 s/round, Dataset construction included;  peak RSS in-run sampled 3.15 GB, process peak 3.16 GB;  min system available 4.46 GB
+
+  multiclass log-loss, train     : 0.751998
+  multiclass log-loss, held-out  : 0.761395
+  gap (held-out - train)         : +0.009397
+  held-out minus prior-only held-out : +0.655190
+
+  HELD-OUT rows: actual vs predicted destination distribution  (2,199,935 rows)
+  class         actual n   actual %   mean pred prob %     argmax n   argmax %
+  Current      2,161,688   98.2614%           97.8249%    2,171,724   98.7176%
+  DQ30            19,425    0.8830%            1.3625%       18,948    0.8613%
+  DQ60             2,612    0.1187%            0.1724%        3,124    0.1420%
+  DQ90+            2,098    0.0954%            0.0562%        1,237    0.0562%
+  Prepaid         14,047    0.6385%            0.5797%        4,809    0.2186%
+  Default             65    0.0030%            0.0042%           93    0.0042%
+
+  TRAIN rows: actual vs predicted destination distribution  (8,817,112 rows)
+  class         actual n   actual %   mean pred prob %     argmax n   argmax %
+  Current      8,663,839   98.2616%           97.8532%    8,706,725   98.7480%
+  DQ30            78,073    0.8855%            1.3219%       72,467    0.8219%
+  DQ60            10,543    0.1196%            0.1743%       12,699    0.1440%
+  DQ90+            8,755    0.0993%            0.0623%        5,495    0.0623%
+  Prepaid         55,601    0.6306%            0.5851%       19,440    0.2205%
+  Default            301    0.0034%            0.0032%          286    0.0032%
+
+================================================================================================================
+SUMMARY  (figures only)
+================================================================================================================
+run                                                   train log-loss   held-out log-loss         gap  held-out - prior
+CURRENT / A. LightGBM defaults (as train_ml)                0.425235            0.444013   +0.018779         +0.367206
+CURRENT / B. reduced capacity                               0.425183            0.425425   +0.000242         +0.348619
+(prior-only reference, CURRENT)                             0.076817            0.076807   -0.000010         +0.000000
+POOLED / A. LightGBM defaults (as train_ml)                 0.426772            0.431822   +0.005050         +0.325617
+POOLED / B. reduced capacity                                0.751998            0.761395   +0.009397         +0.655190
+(prior-only reference, POOLED)                              0.106297            0.106205   -0.000092         +0.000000
+
+run                                                    train seconds   in-run RSS GB   process peak GB
+CURRENT / A. LightGBM defaults (as train_ml)                    40.2            3.12              3.13
+CURRENT / B. reduced capacity                                   34.9            3.12              3.13
+POOLED / A. LightGBM defaults (as train_ml)                     39.6            3.16              3.16
+POOLED / B. reduced capacity                                    36.4            3.15              3.16
