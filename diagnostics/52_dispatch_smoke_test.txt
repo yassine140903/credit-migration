@@ -1,0 +1,346 @@
+DIAGNOSTIC 52: the forecaster's three-model dispatch   (smoke test; plumbing only; model quality is irrelevant and is not evaluated)
+lightgbm 4.7.0   16 logical CPUs   run date 2026-10-12
+panel build 2026-10-08T09:41:19.866411; partitions 8 (2006Q1..2007Q4)
+
+============================================================================================================================
+0. WHAT THE REAL SCRIPTS OFFER  (read from the source in this session; reported before anything runs)
+============================================================================================================================
+src/train_ml.py: options --name --with-loan-age --origin-states --from-period-max --overwrite. NO row-cap option; NO round-count option (N_ROUNDS = 100, a module constant).
+   from_state is a feature iff len(origin_states) > 1 (resolve(): pooled = len(origin) > 1); the sidecar records features, categories, class_order, origin_states,
+   from_state_is_feature, label_counts, n_rows, training_window, n_rounds. params declare num_class = 6 whatever the labels contain.
+src/forecast.py: --model-map STATE=DIR (one Model per distinct directory; unique_models() gives one frame per model). Model.__init__ REQUIRES sidecar class_order == panel.STATES
+   (forecast.py:123), booster feature names == sidecar features (:125) and num_model_per_iteration == 6 (:128). propagate() writes out[k*n:(k+1)*n] into trans[:, o, :] (:283-285)
+   with no class mapping and no zero-fill of any column. build_frame() takes the column list from the model's own sidecar features (from_state only if listed).
+So the three-model dispatch (--model-map, a frame per model, feature order and from_state keyed off each sidecar) IS implemented; a zero-fill of absent classes is not in the code.
+Consequence for this diagnostic: nothing needed to STOP on 'dispatch not implemented'. The cap and rounds are applied by patching module attributes in this process only (see the docstring).
+
+============================================================================================================================
+1. THE TRAINING WINDOW AS IT ACTUALLY IS  (uncapped label census through train_ml.label_scan; role == 'fit', from_period <= 200806)
+============================================================================================================================
+train_ml has only an upper from_period bound; the lower edge is wherever the fit rows start (observed below). Brief's window: 200601..200806.
+model A (Current): origin states ['Current']; rows 29,861,069; from_period observed 200512..200806; null labels dropped 0
+   labels: Current 29,392,048  DQ30 220,057  DQ60 1,844  DQ90+ 525  Prepaid 246,560  Default 35
+model B (DQ30+DQ60): origin states ['DQ30', 'DQ60']; rows 387,706; from_period observed 200602..200806; null labels dropped 0
+   labels: Current 162,250  DQ30 127,459  DQ60 66,760  DQ90+ 26,326  Prepaid 4,875  Default 36
+   rows by origin state: DQ30 324,015  DQ60 63,691
+model C (DQ90+): origin states ['DQ90+']; rows 85,201; from_period observed 200605..200806; null labels dropped 0
+   labels: Current 5,368  DQ30 1,534  DQ60 2,061  DQ90+ 71,933  Prepaid 689  Default 3,616
+Window lower edge: model A's uncapped rows reach back to from_period 200512 (B 200602, C 200605); train_ml has no lower from_period bound, so 'window 200601..200806' is, in the real code path, 'everything up to 200806'. Not altered here.
+DQ90+ -> Prepaid transitions in the training window: from_period <= 200706 (the 11 Oct window): 157 of 8,787 DQ90+ rows; from_period <= 200806 (today's window): 689 of 85,201.  The 11 Oct expectation of NO DQ90+ -> Prepaid transitions does not hold even at 200706.  (full-window counts, before the 50,000-row cap)
+
+============================================================================================================================
+2. THE THREE TINY MODELS  (real src.train_ml.main; N_ROUNDS patched to 5, rows capped at about 50,000, in this process only)
+============================================================================================================================
+cap: 8 partitions up to 2008Q2 -> at most 6,250 valid-label rows per partition (<= 50,000 rows per model); rows drawn at random within a partition, seeded by that partition's valid-row count, so the label scan and the matrix build see the same rows.
+--- train_ml log, model A (diag52_A_current) ---
+   model name:            diag52_A_current
+   origin states:         ['Current']
+   from_state feature:    OMITTED (single origin state: it is constant)
+   loan_age feature:      OMITTED (default)
+   features, matrix order: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+   categorical features:  ['property_state']
+   class order:           ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+   training window:       role == fit, from_period <= 200806
+   training rows 50,000; null/unknown labels dropped 0; loan_age in the rows (provenance) 0 .. 29; from_period 200601 .. 200806
+     label Current          49,185
+     label DQ30                368
+     label DQ60                  8
+     label DQ90+                 1
+     label Prepaid             438
+     label Default               0   <- absent from the training labels; class kept
+   matrix 50,000 x 8, 0.00 GB
+   Dataset constructed in 0.0 s
+   
+   training wall-clock:   0.2 s (0.0 min) for 5 rounds, 0.04 s/round;  Dataset construction 0.0 s
+   total wall-clock:      9.8 s
+   peak RSS:              1.42 GB   min system available 1.75 GB
+   loan_age is not a feature: no clamp bound written (training rows span 0 .. 29, recorded as provenance)
+   saved: artifacts/diag52/models/diag52_A_current/model.txt
+          artifacts/diag52/models/diag52_A_current/model.json
+--- train_ml log, model B (diag52_B_dq30_dq60) ---
+   model name:            diag52_B_dq30_dq60
+   origin states:         ['DQ30', 'DQ60']
+   from_state feature:    INCLUDED (several origin states)
+   loan_age feature:      OMITTED (default)
+   features, matrix order: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+   categorical features:  ['property_state', 'from_state']
+   class order:           ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+   training window:       role == fit, from_period <= 200806
+   training rows 50,000; null/unknown labels dropped 0; loan_age in the rows (provenance) 0 .. 28; from_period 200602 .. 200806
+     label Current          21,135
+     label DQ30             15,906
+     label DQ60              8,767
+     label DQ90+             3,587
+     label Prepaid             602
+     label Default               3
+   matrix 50,000 x 9, 0.00 GB
+   Dataset constructed in 0.0 s
+   
+   training wall-clock:   0.4 s (0.0 min) for 5 rounds, 0.07 s/round;  Dataset construction 0.0 s
+   total wall-clock:      9.3 s
+   peak RSS:              1.50 GB   min system available 1.85 GB
+   loan_age is not a feature: no clamp bound written (training rows span 0 .. 28, recorded as provenance)
+   saved: artifacts/diag52/models/diag52_B_dq30_dq60/model.txt
+          artifacts/diag52/models/diag52_B_dq30_dq60/model.json
+--- train_ml log, model C (diag52_C_dq90plus) ---
+   model name:            diag52_C_dq90plus
+   origin states:         ['DQ90+']
+   from_state feature:    OMITTED (single origin state: it is constant)
+   loan_age feature:      OMITTED (default)
+   features, matrix order: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+   categorical features:  ['property_state']
+   class order:           ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+   training window:       role == fit, from_period <= 200806
+   training rows 44,488; null/unknown labels dropped 0; loan_age in the rows (provenance) 2 .. 29; from_period 200605 .. 200806
+     label Current           2,698
+     label DQ30                808
+     label DQ60              1,048
+     label DQ90+            37,802
+     label Prepaid             319
+     label Default           1,813
+   matrix 44,488 x 8, 0.00 GB
+   Dataset constructed in 0.0 s
+   
+   training wall-clock:   0.2 s (0.0 min) for 5 rounds, 0.05 s/round;  Dataset construction 0.0 s
+   total wall-clock:      6.4 s
+   peak RSS:              1.74 GB   min system available 1.36 GB
+   loan_age is not a feature: no clamp bound written (training rows span 2 .. 29, recorded as provenance)
+   saved: artifacts/diag52/models/diag52_C_dq90plus/model.txt
+          artifacts/diag52/models/diag52_C_dq90plus/model.json
+training wall-clock, three models: 25.5 s
+
+============================================================================================================================
+3. REPORTED BEFORE ANY FORECAST: classes each model learned, and the class order its sidecar records
+============================================================================================================================
+model A (Current)  dir artifacts/diag52/models/diag52_A_current
+   origin states ['Current']; rows 50,000; n_rounds 5; training window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200601, 'from_period_max_observed': 200806}
+   sidecar class_order: ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']  (== panel.STATES)
+   label counts: Current 49,185  DQ30 368  DQ60 8  DQ90+ 1  Prepaid 438  Default 0
+   classes learned (5 of 6): ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid']
+   classes MISSING: ['Default']   <- landmine (1) is live for this model: the zero-fill path is genuinely exercised
+model B (DQ30+DQ60)  dir artifacts/diag52/models/diag52_B_dq30_dq60
+   origin states ['DQ30', 'DQ60']; rows 50,000; n_rounds 5; training window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200602, 'from_period_max_observed': 200806}
+   sidecar class_order: ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']  (== panel.STATES)
+   label counts: Current 21,135  DQ30 15,906  DQ60 8,767  DQ90+ 3,587  Prepaid 602  Default 3
+   classes learned (6 of 6): ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+   classes MISSING: none (all six present)
+model C (DQ90+)  dir artifacts/diag52/models/diag52_C_dq90plus
+   origin states ['DQ90+']; rows 44,488; n_rounds 5; training window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200605, 'from_period_max_observed': 200806}
+   sidecar class_order: ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']  (== panel.STATES)
+   label counts: Current 2,698  DQ30 808  DQ60 1,048  DQ90+ 37,802  Prepaid 319  Default 1,813
+   classes learned (6 of 6): ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+   classes MISSING: none (all six present)
+
+At least one model learned fewer than six classes: landmine (1) is live. Note: every model still DECLARES six classes (num_class = 6) and so returns six columns in the panel order; a class with no training label is not removed from the output, it simply gets a small softmax value.
+
+============================================================================================================================
+4. THE FORECAST  (real src.forecast.main, --model-map, --batch-size 3000 --canary; outputs redirected to artifacts/diag52)
+============================================================================================================================
+model map: Current=artifacts/diag52/models/diag52_A_current  DQ30=artifacts/diag52/models/diag52_B_dq30_dq60  DQ60=artifacts/diag52/models/diag52_B_dq30_dq60  DQ90+=artifacts/diag52/models/diag52_C_dq90plus
+forecast wall-clock 8.3 s
+   loading the loans at the cut
+     initial 2006Q1: 46,297 loans
+     initial 2006Q2: 46,461 loans
+     initial 2006Q3: 42,676 loans
+     initial 2006Q4: 50,975 loans
+     initial 2007Q1: 53,229 loans
+     initial 2007Q2: 63,017 loans
+     initial 2007Q3: 49,011 loans
+     initial 2007Q4: 54,006 loans
+   loans: 405,672;  frozen unemp_level 7.3000, unemp_chg_12m 2.3000
+   batch 1/136: 3,000 loans, 1 s, clamp inert (no clamped feature), worst |sum-1| f64 2.24e-14 f32 4.66e-08
+   FORECASTER BUILD   (propagation of a one-month multiclass model over 60 months; no predictive metric)
+   ================================================================================================================
+   run: diag52_dispatch    output: artifacts/diag52/forecast/diag52_dispatch
+   panel build 2026-10-08T09:41:19.866411; cut 200812; horizon h = 0..60 inclusive (h = 0 is the initial vector)
+   MODELS   (origin state -> model)
+     Current -> artifacts/diag52/models/diag52_A_current   sha256 3a2aeb7169ee310a
+         trained on origin states ['Current'], 50,000 rows, window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200601, 'from_period_max_observed': 200806}, features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+         clamped features: none (the model reads no feature the forecaster advances; loan_age is not a feature)
+         loan_age in the training rows (provenance only, not a bound): 0 .. 29
+     DQ30/DQ60 -> artifacts/diag52/models/diag52_B_dq30_dq60   sha256 473f47cb20e39c8d
+         trained on origin states ['DQ30', 'DQ60'], 50,000 rows, window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200602, 'from_period_max_observed': 200806}, features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+         clamped features: none (the model reads no feature the forecaster advances; loan_age is not a feature)
+         loan_age in the training rows (provenance only, not a bound): 0 .. 28
+     DQ90+ -> artifacts/diag52/models/diag52_C_dq90plus   sha256 529f5e68c4487001
+         trained on origin states ['DQ90+'], 44,488 rows, window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200605, 'from_period_max_observed': 200806}, features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+         clamped features: none (the model reads no feature the forecaster advances; loan_age is not a feature)
+         loan_age in the training rows (provenance only, not a bound): 2 .. 29
+   SCOPE
+     loans in the forecast population: 405,672;  batch size 3,000;  batches done 1 of 136   (CANARY: the first batch only)
+     loans in the batches done: 3,000;  batch indices run in this invocation (0-based): 0
+   CLAMP   (a feature the forecaster advances monthly is clipped to the model's trained [min, max])
+     INERT: no model in this run reads a clamped feature (loan_age), so nothing was advanced or clamped.
+     The machinery is in place for the models that do (loan_age with --with-loan-age; run_length later); it has no counts to report here, and zero would be misleading.
+   CHECKS   (asserted per batch; a failure stops the run before the batch is written)
+     every loan's vector sums to 1 at every h:   PASS   worst |sum - 1| = 2.243e-14 in float64 as computed (tolerance 1e-09)
+         as stored (float32 values, summed in float64):    worst |sum - 1| = 4.657e-08   within 1e-05
+     no negative probability:                    PASS   smallest probability = 0.000e+00 (float64), 0.000e+00 as stored
+     Prepaid, Default mass non-decreasing in h:  PASS   smallest one-month change = 0.000e+00 (Prepaid+Default 8.390e-41)
+   RESOURCES   (this invocation)
+     wall clock 8.3 s (0.1 min);  peak RSS 1.74 GB;  min system available 2.65 GB
+     seconds per batch (all done batches): 1
+     output: artifacts/diag52/forecast/diag52_dispatch, 3 files, 4.5 MB (0.00 GB); rows written 1,098,000
+   PORTFOLIO STATE DISTRIBUTION   (mean probability over the 3,000 loans in the batches done; a sanity read)
+        h    Current       DQ30       DQ60      DQ90+    Prepaid    Default
+        0   0.955333   0.017333   0.008000   0.019333   0.000000   0.000000   (sum 1.000000000)
+        6   0.905817   0.017293   0.005144   0.018587   0.048031   0.005127   (sum 1.000000000)
+       12   0.860298   0.015705   0.004529   0.016689   0.093137   0.009643   (sum 1.000000000)
+       24   0.775929   0.013473   0.003786   0.013833   0.175603   0.017376   (sum 1.000000000)
+       60   0.572030   0.009020   0.002435   0.008763   0.373786   0.033967   (sum 1.000000000)
+   VERDICT: canary batch written and all three checks passed; 135 of 136 batches remain.
+batch: 3,000 loans, F06Q10000002 .. F06Q10023451; origin states in the batch: Current 2,866, DQ30 52, DQ60 24, DQ90+ 58
+stored forecast read back independently: 3,000 loans x h = 0..60 x 6 states, dtype float32
+
+============================================================================================================================
+5. DISPATCH EVIDENCE  (what the forecaster actually did, resolved from the sidecars and the run, not assumed)
+============================================================================================================================
+origin state -> model the forecaster's own load_models() assigns (and that model's origin states):
+   Current -> diag52_A_current       origin states ['Current']
+   DQ30   -> diag52_B_dq30_dq60     origin states ['DQ30', 'DQ60']
+   DQ60   -> diag52_B_dq30_dq60     origin states ['DQ30', 'DQ60']
+   DQ90+  -> diag52_C_dq90plus      origin states ['DQ90+']
+
+frames the forecaster built, once per model (wrapper around the real build_frame; the real function ran):
+   model                 origin blocks         rows  columns
+   diag52_A_current      ['Current']          3,000  ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+   diag52_B_dq30_dq60    ['DQ30', 'DQ60']     6,000  ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+   diag52_C_dq90plus     ['DQ90+']            3,000  ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+   (build_frame was called 3 times in total: once per model per batch, because the frames are built before the monthly loop and reused)
+
+feature orders side by side (from the three sidecars):
+   pos model A (Current)       model B (DQ30+DQ60)     model C (DQ90+)         
+   1   fico                    fico                    fico                    
+   2   ltv                     ltv                     ltv                     
+   3   dti                     dti                     dti                     
+   4   rate_spread             rate_spread             rate_spread             
+   5   property_state          property_state          property_state          
+   6   est_ltv                 est_ltv                 est_ltv                 
+   7   unemp_level             unemp_level             unemp_level             
+   8   unemp_chg_12m           unemp_chg_12m           unemp_chg_12m           
+   9   -                       from_state              -                       
+   A == C: True;  B == A + ['from_state']: True
+
+============================================================================================================================
+6. THE CHECK THAT CATCHES MISALIGNMENT: hand-computed row vs the row the forecaster wrote
+============================================================================================================================
+
+--- Current
+loan_id F06Q10000002   origin state at the cut: Current   dispatched to: diag52_A_current (model A), whose origin states are ['Current']   -> ROUTED CORRECTLY
+feature vector (sidecar order, hand-built): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+frame the forecaster built for this model: columns ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']; origin blocks ['Current']
+                                                     Current                      DQ30                      DQ60                     DQ90+                   Prepaid                   Default
+forecaster h=0 (initial vector)                            1                         0                         0                         0                         0                         0
+forecaster h=1 (stored float32)          0.98563456535339355     0.0054845674894750118    0.00010724018648033962    1.3405676327238325e-05     0.0087602157145738602    1.0167584446098017e-15
+hand-computed (float64)                  0.98563457062626136      0.005484567328946097     0.0001072401887075233     1.340567654717952e-05     0.0087602161795366715                         0
+raw predict before zero-fill             0.98563457062626136      0.005484567328946097     0.0001072401887075233     1.340567654717952e-05     0.0087602161795366715    1.0167584681799765e-15
+max |hand - stored|, float64          5.2728678090474546e-09     1.605289148137734e-10    2.2271836881259527e-12    2.1994119511216902e-13    4.6496281130847805e-10    1.0167584446098017e-15
+max |hand - stored|, float32-cast                          0                         0                         0                         0                         0    1.0167584446098017e-15
+hand row sums to 0.99999999999999889 (zero-filled classes ['Default']); stored h=1 row sums to 0.999999994420251
+RESULT: FAIL: classes that differ: ['Default']
+
+--- DQ30/DQ60
+loan_id F06Q10000024   origin state at the cut: DQ30   dispatched to: diag52_B_dq30_dq60 (model B), whose origin states are ['DQ30', 'DQ60']   -> ROUTED CORRECTLY
+feature vector (sidecar order, hand-built): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+frame the forecaster built for this model: columns ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']; origin blocks ['DQ30', 'DQ60']
+                                                     Current                      DQ30                      DQ60                     DQ90+                   Prepaid                   Default
+forecaster h=0 (initial vector)                            0                         1                         0                         0                         0                         0
+forecaster h=1 (stored float32)          0.35484349727630615       0.32798194885253906       0.25829404592514038      0.048813384026288986      0.010025781579315662    4.1342369513586164e-05
+hand-computed (float64)                  0.35484350387977337        0.3279819527352329       0.25829403566837661      0.048813383960385384      0.010025781388277999    4.1342367953733941e-05
+raw predict before zero-fill             0.35484350387977337        0.3279819527352329       0.25829403566837661      0.048813383960385384      0.010025781388277999    4.1342367953733941e-05
+max |hand - stored|, float64          6.6034672174808406e-09    3.8826938331126826e-09    1.0256763771643307e-08    6.5903602020078722e-11     1.910376631192312e-10    1.5598522229735498e-12
+max |hand - stored|, float32-cast                          0                         0                         0                         0                         0                         0
+hand row sums to 1 (zero-filled classes none); stored h=1 row sums to 1.0000000000291038
+RESULT: PASS (every class identical after the float32 cast)
+
+--- DQ90+
+loan_id F06Q10000012   origin state at the cut: DQ90+   dispatched to: diag52_C_dq90plus (model C), whose origin states are ['DQ90+']   -> ROUTED CORRECTLY
+feature vector (sidecar order, hand-built): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+frame the forecaster built for this model: columns ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']; origin blocks ['DQ90+']
+                                                     Current                      DQ30                      DQ60                     DQ90+                   Prepaid                   Default
+forecaster h=0 (initial vector)                            0                         0                         0                         1                         0                         0
+forecaster h=1 (stored float32)         0.060794707387685776      0.019659219309687614      0.022703176364302635       0.77845233678817749     0.0059628477320075035       0.11242774128913879
+hand-computed (float64)                 0.060794706358823544      0.019659219937123142      0.022703175586916372        0.7784523082359035     0.0059628478612496752        0.1124277420199838
+raw predict before zero-fill            0.060794706358823544      0.019659219937123142      0.022703175586916372        0.7784523082359035     0.0059628478612496752        0.1124277420199838
+max |hand - stored|, float64          1.0288622315224316e-09    6.2743552714517037e-10    7.7738626300116742e-10    2.8552273989568278e-08    1.2924217165227736e-10    7.3084500951114961e-10
+max |hand - stored|, float32-cast                          0                         0                         0                         0                         0                         0
+hand row sums to 1 (zero-filled classes none); stored h=1 row sums to 1.0000000288709998
+RESULT: PASS (every class identical after the float32 cast)
+
+--- DQ60 (ADDITIONAL: the other origin state of model B, to exercise from_state both ways)
+loan_id F06Q10000026   origin state at the cut: DQ60   dispatched to: diag52_B_dq30_dq60 (model B), whose origin states are ['DQ30', 'DQ60']   -> ROUTED CORRECTLY
+feature vector (sidecar order, hand-built): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+frame the forecaster built for this model: columns ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']; origin blocks ['DQ30', 'DQ60']
+                                                     Current                      DQ30                      DQ60                     DQ90+                   Prepaid                   Default
+forecaster h=0 (initial vector)                            0                         0                         1                         0                         0                         0
+forecaster h=1 (stored float32)          0.29322889447212219       0.24633832275867462       0.19622804224491119       0.25260770320892334      0.011555115692317486    4.1910134314093739e-05
+hand-computed (float64)                  0.29322890817374936       0.24633831973362735       0.19622804376422015       0.25260770245641867       0.01155511573624936    4.1910135734995709e-05
+raw predict before zero-fill             0.29322890817374936       0.24633831973362735       0.19622804376422015       0.25260770245641867       0.01155511573624936    4.1910135734995709e-05
+max |hand - stored|, float64          1.3701627166184949e-08    3.0250472682347151e-09    1.5193089564213835e-09    7.5250466968768137e-10    4.3931873763836116e-11    1.4209019703025072e-12
+max |hand - stored|, float32-cast                          0                         0                         0                         0                         0                         0
+hand row sums to 0.99999999999999967 (zero-filled classes none); stored h=1 row sums to 0.99999998851126293
+RESULT: PASS (every class identical after the float32 cast)
+
+============================================================================================================================
+7. ALSO VERIFIED  (all 3,000 loans, every h = 0..60)
+============================================================================================================================
+- sum to one: worst |sum - 1| computed by the forecaster in float64 in memory (its check, from the batch marker): 2.243e-14  (SUM_TOL 1e-09)
+              worst |sum - 1| in the STORED float32 values, summed in float64 (recomputed here from the parquet): 4.657e-08  (STORED_TOL 1e-05: within; tolerance not loosened). The forecaster's own stored-float32 figure: 4.657e-08.
+- no negative probability: smallest stored probability 0 -> PASS; all finite: True
+- Prepaid and Default mass never falls across h: most negative one-step change over 3,000 loans x 60 steps x 2 classes (stored float32): 0 -> PASS
+
+- classes a model never learned: the value the forecaster stored at h = 1 for the loans routed to that model (exact float32 value, widened to float64)
+   model A (Current) never saw Default : 2,866 loans routed; stored h=1 value min 0, max 4.1560162836141654e-15; exactly 0.0 for 5 of 2,866  -> FAIL
+      the same loans' float64 predict() value (before the float32 cast): min 1.1019645586379296e-53, max 4.1560161382206421e-15; 5 loan(s) are stored as exactly 0.0 ONLY because their float64 value is below the float32 range (underflow in the write), not because anything zero-filled them; 2,866 of 2,866 are positive in float64
+
+- from_state (landmine 2), resolved from the sidecars and from the frames the forecaster built:
+   model A (Current): origin states ['Current'] (n = 1); sidecar from_state_is_feature False; from_state in sidecar features False; PASSED TO THE MODEL BY THE FORECASTER: False  -> consistent
+   model B (DQ30+DQ60): origin states ['DQ30', 'DQ60'] (n = 2); sidecar from_state_is_feature True; from_state in sidecar features True; PASSED TO THE MODEL BY THE FORECASTER: True (categories ['DQ30', 'DQ60']; per-origin blocks hold [['DQ30'], ['DQ60']])  -> consistent
+   model C (DQ90+): origin states ['DQ90+'] (n = 1); sidecar from_state_is_feature False; from_state in sidecar features False; PASSED TO THE MODEL BY THE FORECASTER: False  -> consistent
+
+- separate matrix per group (landmine 3):
+   model A: frame object 0x1edb8df5cd0, 3,000 rows x 8 columns; columns == the model's own feature list == sidecar order: True
+   model B: frame object 0x1ed6ea7b4d0, 6,000 rows x 9 columns; columns == the model's own feature list == sidecar order: True
+   model C: frame object 0x1edb1f67f90, 3,000 rows x 8 columns; columns == the model's own feature list == sidecar order: True
+   three distinct frame objects: True
+   LIMITATION of this test for landmine 3: models A and C carry the SAME feature order, so a bug that reused A's matrix for C would not show as a column mismatch; only model B's differing order (one extra trailing column) and the per-model hand comparison in section 6 can expose reuse across A/B or B/C.
+
+============================================================================================================================
+FINDINGS  (PASS / FAIL per landmine; nothing reconciled, no tolerance adjusted, src/ untouched)
+============================================================================================================================
+LANDMINE (1) CLASS ORDER / ZERO-FILL: FAIL
+   column mapping on the learned classes (hand row through the sidecar class order vs the stored row, float32-exact): PASS
+   exact-zero fill of classes a model never learned: FAIL
+      model A never saw Default: stored h=1 value ranges 0 .. 4.1560162836141654e-15 (not exactly 0.0 for 2,861 of 2,866 loans)
+   DEFECT, precisely: src/forecast.py (Model.__init__ :123-129, propagate :283-285) requires six columns in panel order and writes the booster's output as it comes; it has no step that sets a never-learned class to exact zero. LightGBM declares num_class = 6, so an unseen class is still emitted with a small positive softmax value, which the forecaster stores and chains. Not fixed here, by instruction.
+LANDMINE (2) from_state FLAG: PASS   (passed to model B, the two-origin model; omitted for A and C; resolved from each sidecar and checked against the frame the forecaster built, including the per-origin block contents)
+LANDMINE (3) FEATURE ORDER / per-group matrix: PASS   (three distinct frames, each in its own model's sidecar order; A and C orders are identical, B has from_state last; see the stated limitation in section 7)
+ROUTING (loan -> model): PASS for all 4 compared loans
+h = 0 caveat: the brief asks for the comparison at h = 0; the forecaster's h = 0 is the initial one-hot vector, so the model-output comparison was made at h = 1 (h = 0 printed alongside).
+
+THE COMPARISON ROWS IN FULL (columns: Current, DQ30, DQ60, DQ90+, Prepaid, Default)
+Current   F06Q10000002  origin Current  -> diag52_A_current
+   hand-computed : 0.98563457062626136  0.005484567328946097  0.0001072401887075233  1.340567654717952e-05  0.0087602161795366715  0
+   forecaster h=1: 0.98563456535339355  0.0054845674894750118  0.00010724018648033962  1.3405676327238325e-05  0.0087602157145738602  1.0167584446098017e-15
+   forecaster h=0: 1  0  0  0  0  0
+   max |diff| per class (float32-cast): 0  0  0  0  0  1.0167584446098017e-15   -> FAIL ['Default']
+DQ30/DQ60 F06Q10000024  origin DQ30  -> diag52_B_dq30_dq60
+   hand-computed : 0.35484350387977337  0.3279819527352329  0.25829403566837661  0.048813383960385384  0.010025781388277999  4.1342367953733941e-05
+   forecaster h=1: 0.35484349727630615  0.32798194885253906  0.25829404592514038  0.048813384026288986  0.010025781579315662  4.1342369513586164e-05
+   forecaster h=0: 0  1  0  0  0  0
+   max |diff| per class (float32-cast): 0  0  0  0  0  0   -> PASS
+DQ90+     F06Q10000012  origin DQ90+  -> diag52_C_dq90plus
+   hand-computed : 0.060794706358823544  0.019659219937123142  0.022703175586916372  0.7784523082359035  0.0059628478612496752  0.1124277420199838
+   forecaster h=1: 0.060794707387685776  0.019659219309687614  0.022703176364302635  0.77845233678817749  0.0059628477320075035  0.11242774128913879
+   forecaster h=0: 0  0  0  1  0  0
+   max |diff| per class (float32-cast): 0  0  0  0  0  0   -> PASS
+DQ60      F06Q10000026  origin DQ60  -> diag52_B_dq30_dq60
+   hand-computed : 0.29322890817374936  0.24633831973362735  0.19622804376422015  0.25260770245641867  0.01155511573624936  4.1910135734995709e-05
+   forecaster h=1: 0.29322889447212219  0.24633832275867462  0.19622804224491119  0.25260770320892334  0.011555115692317486  4.1910134314093739e-05
+   forecaster h=0: 0  0  1  0  0  0
+   max |diff| per class (float32-cast): 0  0  0  0  0  0   -> PASS
+
+WINDOW FACTS (census, section 1): DQ90+ -> Prepaid transitions: 157 at from_period <= 200706, 689 at <= 200806 - the 11 Oct expectation of none does not hold. train_ml has no lower from_period bound: model A's rows reach back to 200512.
+Checks that could not be run: none.
+Model quality was not evaluated or reported; the models are 5 rounds on at most about 50,000 rows each and mean nothing.
+PEAK RSS (src.memwatch): process peak 1.74 GB; lowest system-available memory seen 1.58 GB; total wall-clock 56.3 s

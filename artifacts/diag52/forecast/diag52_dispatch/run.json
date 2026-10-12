@@ -1,0 +1,32 @@
+{
+  "models": {
+    "Current": {
+      "directory": "artifacts/diag52/models/diag52_A_current",
+      "sha256": "3a2aeb7169ee310a249ec7e18ca9e23ded622c64883c4e4140ff689b50de6cd6"
+    },
+    "DQ30": {
+      "directory": "artifacts/diag52/models/diag52_B_dq30_dq60",
+      "sha256": "473f47cb20e39c8d450fca913206e5ac62ade1b30dca0b1fe2a9c3ecda18eb2a"
+    },
+    "DQ60": {
+      "directory": "artifacts/diag52/models/diag52_B_dq30_dq60",
+      "sha256": "473f47cb20e39c8d450fca913206e5ac62ade1b30dca0b1fe2a9c3ecda18eb2a"
+    },
+    "DQ90+": {
+      "directory": "artifacts/diag52/models/diag52_C_dq90plus",
+      "sha256": "529f5e68c4487001ec9c4bcb7c0add913b541cac4047c4416b80b6b83fa3fe9f"
+    }
+  },
+  "probability_dtype": "float32",
+  "clamp_bounds": {
+    "Current": {},
+    "DQ30": {},
+    "DQ60": {},
+    "DQ90+": {}
+  },
+  "batch_size": 3000,
+  "horizon": 60,
+  "n_loans": 405672,
+  "cut": 200812,
+  "panel_build_stamp": "2026-10-08T09:41:19.866411"
+}

@@ -1,0 +1,47 @@
+FORECASTER BUILD   (propagation of a one-month multiclass model over 60 months; no predictive metric)
+================================================================================================================
+run: diag52_dispatch    output: artifacts/diag52/forecast/diag52_dispatch
+panel build 2026-10-08T09:41:19.866411; cut 200812; horizon h = 0..60 inclusive (h = 0 is the initial vector)
+
+MODELS   (origin state -> model)
+  Current -> artifacts/diag52/models/diag52_A_current   sha256 3a2aeb7169ee310a
+      trained on origin states ['Current'], 50,000 rows, window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200601, 'from_period_max_observed': 200806}, features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+      clamped features: none (the model reads no feature the forecaster advances; loan_age is not a feature)
+      loan_age in the training rows (provenance only, not a bound): 0 .. 29
+  DQ30/DQ60 -> artifacts/diag52/models/diag52_B_dq30_dq60   sha256 473f47cb20e39c8d
+      trained on origin states ['DQ30', 'DQ60'], 50,000 rows, window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200602, 'from_period_max_observed': 200806}, features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+      clamped features: none (the model reads no feature the forecaster advances; loan_age is not a feature)
+      loan_age in the training rows (provenance only, not a bound): 0 .. 28
+  DQ90+ -> artifacts/diag52/models/diag52_C_dq90plus   sha256 529f5e68c4487001
+      trained on origin states ['DQ90+'], 44,488 rows, window {'role': 'fit', 'from_period_max_arg': 200806, 'from_period_min_observed': 200605, 'from_period_max_observed': 200806}, features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+      clamped features: none (the model reads no feature the forecaster advances; loan_age is not a feature)
+      loan_age in the training rows (provenance only, not a bound): 2 .. 29
+
+SCOPE
+  loans in the forecast population: 405,672;  batch size 3,000;  batches done 1 of 136   (CANARY: the first batch only)
+  loans in the batches done: 3,000;  batch indices run in this invocation (0-based): 0
+
+CLAMP   (a feature the forecaster advances monthly is clipped to the model's trained [min, max])
+  INERT: no model in this run reads a clamped feature (loan_age), so nothing was advanced or clamped.
+  The machinery is in place for the models that do (loan_age with --with-loan-age; run_length later); it has no counts to report here, and zero would be misleading.
+
+CHECKS   (asserted per batch; a failure stops the run before the batch is written)
+  every loan's vector sums to 1 at every h:   PASS   worst |sum - 1| = 2.243e-14 in float64 as computed (tolerance 1e-09)
+      as stored (float32 values, summed in float64):    worst |sum - 1| = 4.657e-08   within 1e-05
+  no negative probability:                    PASS   smallest probability = 0.000e+00 (float64), 0.000e+00 as stored
+  Prepaid, Default mass non-decreasing in h:  PASS   smallest one-month change = 0.000e+00 (Prepaid+Default 8.390e-41)
+
+RESOURCES   (this invocation)
+  wall clock 8.3 s (0.1 min);  peak RSS 1.74 GB;  min system available 2.65 GB
+  seconds per batch (all done batches): 1
+  output: artifacts/diag52/forecast/diag52_dispatch, 3 files, 4.5 MB (0.00 GB); rows written 1,098,000
+
+PORTFOLIO STATE DISTRIBUTION   (mean probability over the 3,000 loans in the batches done; a sanity read)
+     h    Current       DQ30       DQ60      DQ90+    Prepaid    Default
+     0   0.955333   0.017333   0.008000   0.019333   0.000000   0.000000   (sum 1.000000000)
+     6   0.905817   0.017293   0.005144   0.018587   0.048031   0.005127   (sum 1.000000000)
+    12   0.860298   0.015705   0.004529   0.016689   0.093137   0.009643   (sum 1.000000000)
+    24   0.775929   0.013473   0.003786   0.013833   0.175603   0.017376   (sum 1.000000000)
+    60   0.572030   0.009020   0.002435   0.008763   0.373786   0.033967   (sum 1.000000000)
+
+VERDICT: canary batch written and all three checks passed; 135 of 136 batches remain.

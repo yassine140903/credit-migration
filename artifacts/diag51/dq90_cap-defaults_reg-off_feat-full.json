@@ -1,0 +1,50 @@
+{
+ "origin_states": [
+  "DQ90+"
+ ],
+ "features": [
+  "fico",
+  "ltv",
+  "dti",
+  "rate_spread",
+  "property_state",
+  "est_ltv",
+  "unemp_level",
+  "unemp_chg_12m"
+ ],
+ "categorical": [
+  "property_state"
+ ],
+ "class_order": [
+  "Current",
+  "DQ30",
+  "DQ60",
+  "DQ90+",
+  "Prepaid",
+  "Default"
+ ],
+ "params": {
+  "objective": "multiclass",
+  "num_class": 6,
+  "device_type": "cpu",
+  "verbosity": 0,
+  "num_leaves": 31,
+  "min_data_in_leaf": 20,
+  "min_sum_hessian_in_leaf": 0.001,
+  "lambda_l2": 0.0
+ },
+ "num_boost_round": 100,
+ "window": [
+  200601,
+  200812
+ ],
+ "split_seed": 40,
+ "train_fraction": 0.8,
+ "cell": {
+  "capacity": "DEFAULTS",
+  "regularisation": "OFF",
+  "features": "full"
+ },
+ "run": 1,
+ "made_by": "diagnostics/51_dq90_origin_regularised.py"
+}
