@@ -1,0 +1,340 @@
+ORDERING vs LEVEL: CURRENT-origin loans, full fit window, retrained diagnostic-47 runs R1 and R2   (measurement only)
+lightgbm 4.7.0   16 logical CPUs
+
+======================================================================================================================
+SETUP
+======================================================================================================================
+panel build 2026-10-08T09:41:19.866411; window role == 'fit', 200601 <= from_period <= 200812; from_state == Current
+rows 39,360,873; loans 1,930,979; null/unknown labels dropped 0
+split by loan_id: seed 40, train fraction 0.8 -> 1,544,783 of 1,930,979 loans to train, 386,196 held out; no loan on both sides (asserted)
+  class         TRAIN rows   expected (47)   HELD-OUT rows   expected (47)
+  Current       30,959,138      30,959,138       7,737,923       7,737,923
+  DQ30             268,335         268,335          67,032          67,032
+  DQ60               2,289           2,289             543             543
+  DQ90+              1,159           1,159             270             270
+  Prepaid          259,277         259,277          64,833          64,833
+  Default               55              55              19              19
+per-class counts vs diagnostic 47's pass-1 table: IDENTICAL
+memory layout: a first attempt of this script stopped on the memory floor (available system memory fell to 621 MB during R2 training, no rows sampled); this report is from the second attempt, which rebuilds the training frame with R2's six columns after R1 is done (so R2 needs no second copy) and keeps fewer score arrays between runs. The data, split, params and rounds are unchanged.
+
+RUN R1 full features: features (8) ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']; categorical ['property_state']; params objective='multiclass', num_class=6, device_type='cpu', verbosity=0; num_boost_round=100
+  library messages: none
+  wall-clock: lgb.train (Dataset construction included) 133.8 s (2.23 min); held-out predict 22.2 s;  peak RSS in-run sampled 6.39 GB, process peak 6.40 GB;  min system available 1.05 GB
+  REPRODUCTION of diagnostic 47: held-out Brier 0.0535804 vs 47's 0.0535804 -> MATCH to seven decimals
+  model persisted: artifacts\diag48\current_R1_full.txt (+ .json sidecar)
+
+RUN R2 borrower-only features: features (6) ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv']; categorical ['property_state']; params objective='multiclass', num_class=6, device_type='cpu', verbosity=0; num_boost_round=100
+  library messages: none
+  wall-clock: lgb.train (Dataset construction included) 123.8 s (2.06 min); held-out predict 23.0 s;  peak RSS in-run sampled 6.21 GB, process peak 6.40 GB;  min system available 1.18 GB
+  REPRODUCTION of diagnostic 47: held-out Brier 0.0428301 vs 47's 0.0428301 -> MATCH to seven decimals
+  model persisted: artifacts\diag48\current_R2_borrower_only.txt (+ .json sidecar)
+
+======================================================================================================================
+STEP 1: TIE STRUCTURE of the predicted scores  (held-out rows; reported before any ordering number)
+======================================================================================================================
+
+R1 full features / LEAVES CURRENT, score = 1 - P(Current)   (7,870,620 held-out rows)
+  distinct predicted values: 2,294,289   share of rows in the single largest tie block: 62.6780%   distinct values needed to cover 50% of rows: 1; 90%: 1,507,227
+  rank           predicted value          rows   share of held-out
+     1                         0     4,933,144            62.6780%
+     2                         1        59,278             0.7532%
+     3    2.2204460492503131e-16         4,173             0.0530%
+     4    4.4408920985006262e-16         1,974             0.0251%
+     5    6.6613381477509392e-16           773             0.0098%
+     6    8.8817841970012523e-16           321             0.0041%
+     7    1.1102230246251565e-15           179             0.0023%
+     8    1.3322676295501878e-15           161             0.0020%
+     9    1.5543122344752192e-15           113             0.0014%
+    10    2.4424906541753444e-15           109             0.0014%
+
+R1 full features / MOVES TO DQ30, score = P(DQ30)   (7,870,620 held-out rows)
+  distinct predicted values: 2,348,173   share of rows in the single largest tie block: 62.6671%   distinct values needed to cover 50% of rows: 1; 90%: 1,561,111
+  rank           predicted value          rows   share of held-out
+     1                         0     4,932,286            62.6671%
+     2                         1        17,519             0.2226%
+     3    2.8189501159950211e-64            58             0.0007%
+     4    6.6968896024760024e-64            53             0.0007%
+     5    2.7997514233799214e-64            47             0.0006%
+     6    3.2015891991763015e-64            37             0.0005%
+     7    5.0047117957239416e-64            36             0.0005%
+     8    3.8491486034814622e-64            36             0.0005%
+     9     0.0098962445273870891            34             0.0004%
+    10    6.8830400140083067e-64            33             0.0004%
+
+R1 full features / SUPPLEMENTARY forms of the LEAVES CURRENT score: distinct values, largest tie block share
+  sum of the five other probabilities : 2,417,138 distinct, largest block 61.5066%
+  margin (logsumexp of other raws - Current raw) : 5,398,885 distinct, largest block 0.0068%
+  rows where P(Current) is exactly 1.0 in float64: 4,933,144;  max |(1 - P(Current)) - sum of other probabilities| = 4.545e-16
+
+R2 borrower-only features / LEAVES CURRENT, score = 1 - P(Current)   (7,870,620 held-out rows)
+  distinct predicted values: 1,669,596   share of rows in the single largest tie block: 32.9375%   distinct values needed to cover 50% of rows: 63,995; 90%: 883,517
+  rank           predicted value          rows   share of held-out
+     1                         0     2,592,386            32.9375%
+     2                         1        35,618             0.4525%
+     3    4.4408920985006262e-16           492             0.0063%
+     4    6.6613381477509392e-16           403             0.0051%
+     5      0.010634559461936033           278             0.0035%
+     6      0.010800398207920558           258             0.0033%
+     7    2.2204460492503131e-16           248             0.0032%
+     8     0.0093184883263783824           241             0.0031%
+     9      0.010868505077209267           199             0.0025%
+    10        0.0117926317805781           197             0.0025%
+
+R2 borrower-only features / MOVES TO DQ30, score = P(DQ30)   (7,870,620 held-out rows)
+  distinct predicted values: 1,674,722   share of rows in the single largest tie block: 33.1422%   distinct values needed to cover 50% of rows: 65,033; 90%: 887,660
+  rank           predicted value          rows   share of held-out
+     1                         0     2,608,495            33.1422%
+     2                         1         5,848             0.0743%
+     3     0.0043092401995554015           278             0.0035%
+     4     0.0045308275786667468           258             0.0033%
+     5     0.0037667185910523079           241             0.0031%
+     6     0.0041121536466195768           199             0.0025%
+     7      0.004364016088208687           197             0.0025%
+     8     0.0040435722642016567           177             0.0022%
+     9     0.0043640197770771138           173             0.0022%
+    10     0.0052778488748838137           172             0.0022%
+
+R2 borrower-only features / SUPPLEMENTARY forms of the LEAVES CURRENT score: distinct values, largest tie block share
+  sum of the five other probabilities : 1,683,871 distinct, largest block 32.5531%
+  margin (logsumexp of other raws - Current raw) : 2,540,799 distinct, largest block 0.0035%
+  rows where P(Current) is exactly 1.0 in float64: 2,592,386;  max |(1 - P(Current)) - sum of other probabilities| = 5.039e-16
+
+======================================================================================================================
+STEP 2: ORDERING, held-out rows, ALL MONTHS POOLED
+======================================================================================================================
+AUC counts tied pairs as 0.5 (exact). Top-q% cuts credit the events of the block tied at the cutoff pro rata ('tied' = rows in that block; '*' = the cutoff falls inside it). Random ranking: AUC 0.5, top q% captures q% of events.
+
+R1 full features / LEAVES CURRENT:  rows 7,870,620, events 132,697 (1.6860%)
+  AUC = 0.56837   (0.5 = chance)
+     cut      rows k   events in top  share of events  random gives    lift   tied@cutoff
+      1%      78,707         1393.00            1.05%            1%    1.05            2 
+      5%     393,531        13516.00           10.19%            5%    2.04            2 
+     10%     787,062        25636.00           19.32%           10%    1.93            5*
+  DECILE TABLE (decile 1 = lowest predicted score; equal-count groups, tied blocks shared pro rata)
+  decile        rows      events   actual rate  mean predicted  distinct values
+       1     787,062     11125.4       1.4135%         0.0000%                1
+       2     787,062     11125.4       1.4135%         0.0000%                1
+       3     787,062     11125.4       1.4135%         0.0000%                1
+       4     787,062     11125.4       1.4135%         0.0000%                1
+       5     787,062     11125.4       1.4135%         0.0000%                1
+       6     787,062     11125.4       1.4135%         0.0000%                1
+       7     787,062     11613.3       1.4755%         0.1804%          395,058
+       8     787,062     11492.0       1.4601%         1.2162%          659,521
+       9     787,062     17203.0       2.1857%         2.1674%          642,350
+      10     787,062     25636.0       3.2572%        14.9865%          597,361
+  top decile rate / bottom decile rate: 2.30x;  monotone non-decreasing across deciles: False
+  SUPPLEMENTARY: AUC of the margin score 0.58330 (5,398,885 distinct values); top-1%/5%/10% shares 1.05% / 10.19% / 19.32%
+
+R1 full features / MOVES TO DQ30 (secondary):  rows 7,870,620, events 67,032 (0.8517%)
+  AUC = 0.64724   (0.5 = chance)
+     cut      rows k   events in top  share of events  random gives    lift   tied@cutoff
+      1%      78,707         2152.00            3.21%            1%    3.21            1 
+      5%     393,531        12400.00           18.50%            5%    3.70            3*
+     10%     787,062        20497.00           30.58%           10%    3.06            1 
+  DECILE TABLE (decile 1 = lowest predicted score; equal-count groups, tied blocks shared pro rata)
+  decile        rows      events   actual rate  mean predicted  distinct values
+       1     787,062      4341.7       0.5516%         0.0000%                1
+       2     787,062      4341.7       0.5516%         0.0000%                1
+       3     787,062      4341.7       0.5516%         0.0000%                1
+       4     787,062      4341.7       0.5516%         0.0000%                1
+       5     787,062      4341.7       0.5516%         0.0000%                1
+       6     787,062      4341.7       0.5516%         0.0000%                1
+       7     787,062      5087.9       0.6464%         0.0204%          425,861
+       8     787,062      5625.0       0.7147%         0.4690%          639,636
+       9     787,062      9772.0       1.2416%         1.1725%          644,533
+      10     787,062     20497.0       2.6042%         7.1066%          638,143
+  top decile rate / bottom decile rate: 4.72x;  monotone non-decreasing across deciles: True
+
+R2 borrower-only features / LEAVES CURRENT:  rows 7,870,620, events 132,697 (1.6860%)
+  AUC = 0.60592   (0.5 = chance)
+     cut      rows k   events in top  share of events  random gives    lift   tied@cutoff
+      1%      78,707         2193.35            1.65%            1%    1.65           40*
+      5%     393,531        16474.00           12.41%            5%    2.48            1 
+     10%     787,062        29693.00           22.38%           10%    2.24            3 
+  DECILE TABLE (decile 1 = lowest predicted score; equal-count groups, tied blocks shared pro rata)
+  decile        rows      events   actual rate  mean predicted  distinct values
+       1     787,062      9708.7       1.2335%         0.0000%                1
+       2     787,062      9708.7       1.2335%         0.0000%                1
+       3     787,062      9708.7       1.2335%         0.0000%                1
+       4     787,062      9679.9       1.2299%         0.1816%          213,452
+       5     787,062      9636.0       1.2243%         0.8565%          289,927
+       6     787,062      9881.0       1.2554%         1.1790%          236,878
+       7     787,062     11497.0       1.4607%         1.4651%          226,382
+       8     787,062     14070.0       1.7877%         1.8548%          221,539
+       9     787,062     19114.0       2.4285%         2.4639%          232,852
+      10     787,062     29693.0       3.7726%         9.1660%          248,569
+  top decile rate / bottom decile rate: 3.06x;  monotone non-decreasing across deciles: False
+  SUPPLEMENTARY: AUC of the margin score 0.60837 (2,540,799 distinct values); top-1%/5%/10% shares 1.65% / 12.41% / 22.38%
+
+R2 borrower-only features / MOVES TO DQ30 (secondary):  rows 7,870,620, events 67,032 (0.8517%)
+  AUC = 0.72976   (0.5 = chance)
+     cut      rows k   events in top  share of events  random gives    lift   tied@cutoff
+      1%      78,707         3326.00            4.96%            1%    4.96            3 
+      5%     393,531        14409.00           21.50%            5%    4.30           18*
+     10%     787,062        24287.00           36.23%           10%    3.62           18*
+  DECILE TABLE (decile 1 = lowest predicted score; equal-count groups, tied blocks shared pro rata)
+  decile        rows      events   actual rate  mean predicted  distinct values
+       1     787,062      2510.7       0.3190%         0.0000%                1
+       2     787,062      2510.7       0.3190%         0.0000%                1
+       3     787,062      2510.7       0.3190%         0.0000%                1
+       4     787,062      3147.9       0.4000%         0.0509%          192,432
+       5     787,062      2911.0       0.3699%         0.3313%          231,453
+       6     787,062      3537.0       0.4494%         0.4767%          194,998
+       7     787,062      5199.0       0.6606%         0.6519%          253,625
+       8     787,062      7710.0       0.9796%         1.0317%          268,744
+       9     787,062     12708.0       1.6146%         1.6514%          250,721
+      10     787,062     24287.0       3.0858%         4.3001%          282,754
+  top decile rate / bottom decile rate: 9.67x;  monotone non-decreasing across deciles: False
+
+======================================================================================================================
+STEP 3: ORDERING WITHIN CALENDAR MONTHS  (each month separately; NOT pooled)
+======================================================================================================================
+Per month: held-out rows of that from_period only. Decile rows show the actual event rate (%) per equal-count group of that month (decile 1 = lowest predicted score; ties shared pro rata). A flat line / AUC 0.5 within a month means no borrower-level ordering there.
+
+R1 full features / LEAVES CURRENT
+                    200706      200712      200806      200809      200811      200812
+  rows             247,392     329,511     327,509     318,560     311,426     308,325
+  events             3,039       5,566       5,082       5,707       6,545       9,775
+  AUC              0.57649     0.54178     0.56663     0.57524     0.54714     0.52140
+  distinct          74,863     103,021     122,408     131,037     180,538     178,030
+  decile 1 %        0.9971      1.5230      1.3481      1.5087      1.7773      3.1310
+  decile 2 %        0.9971      1.5230      1.3481      1.5087      1.7773      3.1310
+  decile 3 %        0.9971      1.5230      1.3481      1.5087      1.7773      3.1310
+  decile 4 %        0.9971      1.5230      1.3481      1.5087      1.7838      3.2527
+  decile 5 %        0.9971      1.5230      1.3481      1.5087      1.4867      2.9061
+  decile 6 %        0.9971      1.5230      1.3481      1.3902      1.8913      2.2865
+  decile 7 %        1.0752      1.5747      1.0351      1.1615      2.2542      2.7179
+  decile 8 %        1.1762      1.5720      1.1877      1.6292      3.4743      2.9547
+  decile 9 %        1.5926      1.8907      1.8442      2.3857      2.9446      3.6261
+  decile 10 %       2.4577      2.7162      3.3617      3.8046      1.8495      4.5665
+  all rows %        1.2284      1.6892      1.5517      1.7915      2.1016      3.1704
+
+R1 full features / MOVES TO DQ30 (secondary)
+                    200706      200712      200806      200809      200811      200812
+  rows             247,392     329,511     327,509     318,560     311,426     308,325
+  events             1,586       2,552       2,801       3,345       3,831       3,929
+  AUC              0.63834     0.63489     0.64737     0.65341     0.64043     0.64975
+  distinct          76,657     110,541     128,710     125,999     181,506     179,264
+  decile 1 %        0.4264      0.5177      0.5618      0.6745      0.8018      0.8363
+  decile 2 %        0.4264      0.5177      0.5618      0.6745      0.8018      0.8363
+  decile 3 %        0.4264      0.5177      0.5618      0.6745      0.8018      0.8363
+  decile 4 %        0.4264      0.5177      0.5618      0.6745      0.7573      0.8835
+  decile 5 %        0.4264      0.5177      0.5618      0.6745      0.6197      0.5579
+  decile 6 %        0.4264      0.5177      0.7329      0.6396      0.7000      0.6195
+  decile 7 %        0.4450      0.7602      0.4611      0.5745      1.0982      0.9989
+  decile 8 %        0.6548      0.5796      0.5740      1.0359      1.4610      1.4693
+  decile 9 %        0.8772      1.0895      1.2091      1.6166      2.3730      2.1731
+  decile 10 %       1.8756      2.2093      2.7663      3.2616      2.8867      3.5319
+  all rows %        0.6411      0.7745      0.8552      1.0500      1.2301      1.2743
+
+R2 borrower-only features / LEAVES CURRENT
+                    200706      200712      200806      200809      200811      200812
+  rows             247,392     329,511     327,509     318,560     311,426     308,325
+  events             3,039       5,566       5,082       5,707       6,545       9,775
+  AUC              0.63256     0.59662     0.62247     0.62037     0.61161     0.53294
+  distinct         156,387     210,997     212,190     207,350     203,457     200,724
+  decile 1 %        0.7924      1.3312      1.0482      1.2067      1.4675      3.0908
+  decile 2 %        0.7924      1.3312      1.0482      1.2067      1.4675      3.0908
+  decile 3 %        0.7924      1.3312      1.0482      1.2067      1.4675      3.0908
+  decile 4 %        0.7596      1.1806      1.1026      1.2486      1.4961      2.8738
+  decile 5 %        0.9378      1.0925      1.0626      1.3122      1.6280      2.6109
+  decile 6 %        0.8772      1.1229      1.2030      1.3624      1.5830      2.6887
+  decile 7 %        0.9863      1.5720      1.2519      1.6072      1.8078      2.7146
+  decile 8 %        1.3824      1.9757      1.6427      1.7956      2.2445      2.9288
+  decile 9 %        1.8554      2.3945      2.3114      2.6840      3.2143      3.4931
+  decile 10 %       3.1085      3.5598      3.7984      4.2849      4.6399      5.1211
+  all rows %        1.2284      1.6892      1.5517      1.7915      2.1016      3.1704
+
+R2 borrower-only features / MOVES TO DQ30 (secondary)
+                    200706      200712      200806      200809      200811      200812
+  rows             247,392     329,511     327,509     318,560     311,426     308,325
+  events             1,586       2,552       2,801       3,345       3,831       3,929
+  AUC              0.72654     0.73157     0.73939     0.73190     0.72753     0.72748
+  distinct         156,733     211,611     212,857     208,121     204,205     201,477
+  decile 1 %        0.2559      0.2856      0.2846      0.3587      0.4393      0.4659
+  decile 2 %        0.2559      0.2856      0.2846      0.3587      0.4393      0.4659
+  decile 3 %        0.2559      0.2856      0.2846      0.3587      0.4393      0.4659
+  decile 4 %        0.2306      0.3661      0.4134      0.5404      0.5990      0.6165
+  decile 5 %        0.3517      0.2944      0.3634      0.4489      0.4816      0.4606
+  decile 6 %        0.3476      0.4400      0.4427      0.6090      0.7193      0.7557
+  decile 7 %        0.4891      0.5068      0.6687      0.8758      1.0276      1.0703
+  decile 8 %        0.6427      0.9590      0.9862      1.2431      1.5413      1.6282
+  decile 9 %        1.2571      1.5478      1.6671      1.8803      2.5079      2.4682
+  decile 10 %       2.3243      2.7738      3.1572      3.8266      4.1069      4.3460
+  all rows %        0.6411      0.7745      0.8552      1.0500      1.2301      1.2743
+
+======================================================================================================================
+STEP 4: LEVEL, for contrast  (LEAVES CURRENT, held-out rows)
+======================================================================================================================
+
+R1 full features: overall mean predicted 1.8551% vs actual 1.6860% (ratio 1.100x)
+  (a) ten equal-count bins (the Step 2 deciles)
+   bin        rows   mean predicted   actual rate  predicted / actual
+     1     787,062          0.0000%       1.4135%               0.00x
+     2     787,062          0.0000%       1.4135%               0.00x
+     3     787,062          0.0000%       1.4135%               0.00x
+     4     787,062          0.0000%       1.4135%               0.00x
+     5     787,062          0.0000%       1.4135%               0.00x
+     6     787,062          0.0000%       1.4135%               0.00x
+     7     787,062          0.1804%       1.4755%               0.12x
+     8     787,062          1.2162%       1.4601%               0.83x
+     9     787,062          2.1674%       2.1857%               0.99x
+    10     787,062         14.9865%       3.2572%               4.60x
+  (b) ten bins on the predicted VALUE
+  predicted value in            rows   mean predicted   actual rate    events  predicted / actual
+  [0, 0.005)               5,395,007          0.0137%       1.4236%    76,801               0.01x
+  [0.005, 0.01)              303,921          0.7549%       1.3418%     4,078               0.56x
+  [0.01, 0.015)              462,316          1.2615%       1.4365%     6,641               0.88x
+  [0.015, 0.02)              424,404          1.7376%       1.8713%     7,942               0.93x
+  [0.02, 0.03)               599,272          2.4597%       2.4017%    14,393               1.02x
+  [0.03, 0.05)               432,456          3.7246%       3.4036%    14,719               1.09x
+  [0.05, 0.1)                137,383          6.3826%       4.3462%     5,971               1.47x
+  [0.1, 0.2)                  20,657         13.5802%       2.0719%       428               6.55x
+  [0.2, 0.5)                   8,682         32.1356%       2.2230%       193              14.46x
+  [0.5, 1]                    86,522         97.7219%       1.7695%     1,531              55.23x
+
+R2 borrower-only features: overall mean predicted 1.7167% vs actual 1.6860% (ratio 1.018x)
+  (a) ten equal-count bins (the Step 2 deciles)
+   bin        rows   mean predicted   actual rate  predicted / actual
+     1     787,062          0.0000%       1.2335%               0.00x
+     2     787,062          0.0000%       1.2335%               0.00x
+     3     787,062          0.0000%       1.2335%               0.00x
+     4     787,062          0.1816%       1.2299%               0.15x
+     5     787,062          0.8565%       1.2243%               0.70x
+     6     787,062          1.1790%       1.2554%               0.94x
+     7     787,062          1.4651%       1.4607%               1.00x
+     8     787,062          1.8548%       1.7877%               1.04x
+     9     787,062          2.4639%       2.4285%               1.01x
+    10     787,062          9.1660%       3.7726%               2.43x
+  (b) ten bins on the predicted VALUE
+  predicted value in            rows   mean predicted   actual rate    events  predicted / actual
+  [0, 0.005)               3,052,783          0.0295%       1.2372%    37,769               0.02x
+  [0.005, 0.01)              757,251          0.7907%       1.2149%     9,200               0.65x
+  [0.01, 0.015)            1,400,678          1.2431%       1.2979%    18,179               0.96x
+  [0.015, 0.02)              933,944          1.7305%       1.6892%    15,776               1.02x
+  [0.02, 0.03)               987,895          2.4253%       2.3856%    23,567               1.02x
+  [0.03, 0.05)               596,136          3.7297%       3.8070%    22,695               0.98x
+  [0.05, 0.1)                 88,567          5.9757%       5.2107%     4,615               1.15x
+  [0.1, 0.2)                   6,606         13.4744%       2.6037%       172               5.18x
+  [0.2, 0.5)                   4,338         32.1954%       1.4984%        65              21.49x
+  [0.5, 1]                    42,422         96.3603%       1.5534%       659              62.03x
+
+======================================================================================================================
+FINDINGS  (measured only; no interpretation, no recommendation)
+======================================================================================================================
+R1 full features:
+  - reproduces diagnostic 47's held-out Brier: True (0.0535804).
+  - LEAVES CURRENT: 2,294,289 distinct values, largest tie block 62.68% of rows; pooled AUC 0.56837 (132,697 events in 7,870,620 rows); top 1/5/10% hold 1.05% / 10.19% / 19.32% of events; decile 1 rate 1.4135%, decile 10 rate 3.2572%, all rows 1.6860%.
+    per-month AUC: 200706: 0.57649; 200712: 0.54178; 200806: 0.56663; 200809: 0.57524; 200811: 0.54714; 200812: 0.52140.
+    level: overall mean predicted 1.8551% vs actual 1.6860%; top decile mean predicted 14.9865% vs actual 3.2572%.
+  - MOVES TO DQ30 (secondary): 2,348,173 distinct values, largest tie block 62.67% of rows; pooled AUC 0.64724 (67,032 events in 7,870,620 rows); top 1/5/10% hold 3.21% / 18.50% / 30.58% of events; decile 1 rate 0.5516%, decile 10 rate 2.6042%, all rows 0.8517%.
+    per-month AUC: 200706: 0.63834; 200712: 0.63489; 200806: 0.64737; 200809: 0.65341; 200811: 0.64043; 200812: 0.64975.
+R2 borrower-only features:
+  - reproduces diagnostic 47's held-out Brier: True (0.0428301).
+  - LEAVES CURRENT: 1,669,596 distinct values, largest tie block 32.94% of rows; pooled AUC 0.60592 (132,697 events in 7,870,620 rows); top 1/5/10% hold 1.65% / 12.41% / 22.38% of events; decile 1 rate 1.2335%, decile 10 rate 3.7726%, all rows 1.6860%.
+    per-month AUC: 200706: 0.63256; 200712: 0.59662; 200806: 0.62247; 200809: 0.62037; 200811: 0.61161; 200812: 0.53294.
+    level: overall mean predicted 1.7167% vs actual 1.6860%; top decile mean predicted 9.1660% vs actual 3.7726%.
+  - MOVES TO DQ30 (secondary): 1,674,722 distinct values, largest tie block 33.14% of rows; pooled AUC 0.72976 (67,032 events in 7,870,620 rows); top 1/5/10% hold 4.96% / 21.50% / 36.23% of events; decile 1 rate 0.3190%, decile 10 rate 3.0858%, all rows 0.8517%.
+    per-month AUC: 200706: 0.72654; 200712: 0.73157; 200806: 0.73939; 200809: 0.73190; 200811: 0.72753; 200812: 0.72748.
+
+PEAK RSS (src.memwatch): process peak 6.40 GB; lowest system-available memory seen 1.05 GB

@@ -1,0 +1,366 @@
+LightGBM multiclass starting point: init_score OFF vs ON at 0, 1, 2 boosting rounds   (measurement only)
+panel build 2026-10-08T09:41:19.866411   lightgbm 4.7.0   16 logical CPUs
+rows loaded (all four transient origins, selection window, role == 'fit'): 11,017,047; null/unknown labels dropped 0
+params passed to lgb.train / Booster / Dataset: objective='multiclass', num_class=6, device_type='cpu', verbosity=0  (diagnostic 44's dict, verbosity 0 instead of -1 so that library warnings are produced)
+
+================================================================================================================
+POPULATION CURRENT: role == 'fit', from_state in ['Current'], 200601 <= from_period <= 200706
+================================================================================================================
+rows 10,911,314 (expected 10,911,314: MATCH)
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+split by loan_id: seed 40, train fraction 0.8 -> 1,052,138 of 1,315,173 loans to train, 263,035 held out; train rows 8,731,701, held-out rows 2,179,613; no loan on both sides (asserted)
+REPRODUCTION CHECK vs diagnostic 44's report: train counts [8621477, 55447, 381, 78, 54315, 3] vs [8621477, 55447, 381, 78, 54315, 3]; held-out counts [2152105, 13914, 89, 27, 13478, 0] vs [2152105, 13914, 89, 27, 13478, 0]; prior-only held-out Brier 0.0250029 vs 0.0250029 -> MATCH
+
+CLASS FREQUENCIES (class order = panel.STATES)
+  class        TRAIN count      TRAIN freq  HELD-OUT count   HELD-OUT freq    init value log f
+  Current        8,621,477    0.9873765719       2,152,105    0.9873794109         -0.01270378
+  DQ30              55,447    0.0063500800          13,914    0.0063837021         -5.05928787
+  DQ60                 381    0.0000436341              89    0.0000408329        -10.03967138
+  DQ90+                 78    0.0000089330              27    0.0000123875        -11.62576193
+  Prepaid           54,315    0.0062204375          13,478    0.0061836665         -5.07991504
+  Default                3    0.0000003436               0    0.0000000000        -14.88385847
+PRIOR-ONLY REFERENCE (predict the TRAIN frequencies for every row): Brier held-out 0.0250029   (train rows 0.0250085)
+BRIER: Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.
+
+================================================================================================================
+CURRENT / init OFF  (no init_score; boost_from_average default)
+================================================================================================================
+
+  --- init OFF, num_boost_round = 0 ---
+  lgb.train(num_boost_round=0) -> ValueError: Number of boosting rounds must be greater than 0. Got 0; the round-0 model here is lgb.Booster(params, train_set=Dataset) with no update() (trees 0, current_iteration 0)
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 2.9 s;  peak RSS in-run sampled 3.67 GB, process peak 3.79 GB
+  library messages: none;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned
+  class           train freq   held-out freq  mean pred prob        mean raw
+  Current       0.9873765719    0.9873794109    0.1666666667      0.00000000
+  DQ30          0.0063500800    0.0063837021    0.1666666667      0.00000000
+  DQ60          0.0000436341    0.0000408329    0.1666666667      0.00000000
+  DQ90+         0.0000089330    0.0000123875    0.1666666667      0.00000000
+  Prepaid       0.0062204375    0.0061836665    0.1666666667      0.00000000
+  Default       0.0000003436    0.0000000000    0.1666666667      0.00000000
+  Brier (held-out), as returned          : 0.8333333   (prior-only reference 0.0250029; difference +0.8083304)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 0.000e+00
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.1666666667  DQ30 0.1666666667  DQ60 0.1666666667  DQ90+ 0.1666666667  Prepaid 0.1666666667  Default 0.1666666667
+
+  --- init OFF, num_boost_round = 1 ---
+  lgb.train(num_boost_round=1) ran: trees 6 (1 per class), current_iteration 1
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 4.2 s;  peak RSS in-run sampled 3.65 GB, process peak 5.15 GB
+  library messages: [LightGBM] [Warning] No further splits with positive gain, best gain: -inf;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned
+  class           train freq   held-out freq  mean pred prob        mean raw
+  Current       0.9873765719    0.9873794109    0.9858880401     -0.01278536
+  DQ30          0.0063500800    0.0063837021    0.0063991349     -5.05941801
+  DQ60          0.0000436341    0.0000408329    0.0000846032    -10.03881465
+  DQ90+         0.0000089330    0.0000123875    0.0001937045    -11.62563642
+  Prepaid       0.0062204375    0.0061836665    0.0062739035     -5.07971392
+  Default       0.0000003436    0.0000000000    0.0011606138    -14.88010643
+  Brier (held-out), as returned          : 0.0276286   (prior-only reference 0.0250029; difference +0.0026257)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 1.944e+02
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9859157195  DQ30 0.0063993012  DQ60 0.0000732003  DQ90+ 0.0002147252  Prepaid 0.0062722144  Default 0.0011248394
+
+  --- init OFF, num_boost_round = 2 ---
+  lgb.train(num_boost_round=2) ran: trees 12 (2 per class), current_iteration 2
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 2.6 s;  peak RSS in-run sampled 3.47 GB, process peak 5.54 GB
+  library messages: [LightGBM] [Warning] No further splits with positive gain, best gain: -inf;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned
+  class           train freq   held-out freq  mean pred prob        mean raw
+  Current       0.9873765719    0.9873794109    0.9872598336      5.07663837
+  DQ30          0.0063500800    0.0063837021    0.0063961041     -5.06777153
+  DQ60          0.0000436341    0.0000408329    0.0000715229    -10.12153300
+  DQ90+         0.0000089330    0.0000123875    0.0000313341    -14.32764790
+  Prepaid       0.0062204375    0.0061836665    0.0062409167     -5.08270472
+  Default       0.0000003436    0.0000000000    0.0000002886   -471.45258551
+  Brier (held-out), as returned          : 0.0250173   (prior-only reference 0.0250029; difference +0.0000144)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 2.527e+05
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9872794930  DQ30 0.0063967997  DQ60 0.0000529398  DQ90+ 0.0000326707  Prepaid 0.0062378083  Default 0.0000002886
+
+================================================================================================================
+CURRENT / init ON  (Dataset init_score = log TRAIN class frequencies)
+================================================================================================================
+
+  --- init ON, num_boost_round = 0 ---
+  lgb.train(num_boost_round=0) -> ValueError: Number of boosting rounds must be greater than 0. Got 0; the round-0 model here is lgb.Booster(params, train_set=Dataset) with no update() (trees 0, current_iteration 0)
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 3.8 s;  peak RSS in-run sampled 5.12 GB, process peak 5.15 GB
+  library messages: none;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned  |  with the init added back manually (softmax(raw + log f))
+  class           train freq   held-out freq  mean pred prob        mean raw      prob +init       raw +init
+  Current       0.9873765719    0.9873794109    0.1666666667      0.00000000    0.9873765719     -0.01270378
+  DQ30          0.0063500800    0.0063837021    0.1666666667      0.00000000    0.0063500800     -5.05928787
+  DQ60          0.0000436341    0.0000408329    0.1666666667      0.00000000    0.0000436341    -10.03967138
+  DQ90+         0.0000089330    0.0000123875    0.1666666667      0.00000000    0.0000089330    -11.62576193
+  Prepaid       0.0062204375    0.0061836665    0.1666666667      0.00000000    0.0062204375     -5.07991504
+  Default       0.0000003436    0.0000000000    0.1666666667      0.00000000    0.0000003436    -14.88385846
+  Brier (held-out), as returned          : 0.8333333   (prior-only reference 0.0250029; difference +0.8083304)
+  Brier (held-out), with init added back : 0.0250029   (difference from prior-only +0.0000000)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 0.000e+00
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9873765719  DQ30 0.0063500800  DQ60 0.0000436341  DQ90+ 0.0000089330  Prepaid 0.0062204375  Default 0.0000003436
+
+  --- init ON, num_boost_round = 1 ---
+  lgb.train(num_boost_round=1) ran: trees 6 (1 per class), current_iteration 1
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 5.0 s;  peak RSS in-run sampled 5.09 GB, process peak 5.15 GB
+  library messages: [LightGBM] [Warning] No further splits with positive gain, best gain: -inf;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned  |  with the init added back manually (softmax(raw + log f))
+  class           train freq   held-out freq  mean pred prob        mean raw      prob +init       raw +init
+  Current       0.9873765719    0.9873794109    0.1696006056     -0.00008158    0.9858880401     -0.01278536
+  DQ30          0.0063500800    0.0063837021    0.1691891335     -0.00013015    0.0063991349     -5.05941801
+  DQ60          0.0000436341    0.0000408329    0.1689192354      0.00085672    0.0000846032    -10.03881465
+  DQ90+         0.0000089330    0.0000123875    0.1662197219      0.00012551    0.0001937045    -11.62563642
+  Prepaid       0.0062204375    0.0061836665    0.1693357345      0.00020112    0.0062739035     -5.07971392
+  Default       0.0000003436    0.0000000000    0.1567355690      0.00375203    0.0011606138    -14.88010643
+  Brier (held-out), as returned          : 0.8291828   (prior-only reference 0.0250029; difference +0.8041799)
+  Brier (held-out), with init added back : 0.0276286   (difference from prior-only +0.0026257)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 1.944e+02
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9859157195  DQ30 0.0063993012  DQ60 0.0000732003  DQ90+ 0.0002147252  Prepaid 0.0062722144  Default 0.0011248394
+
+  --- init ON, num_boost_round = 2 ---
+  lgb.train(num_boost_round=2) ran: trees 12 (2 per class), current_iteration 2
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 3.3 s;  peak RSS in-run sampled 5.11 GB, process peak 5.54 GB
+  library messages: [LightGBM] [Warning] No further splits with positive gain, best gain: -inf;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned  |  with the init added back manually (softmax(raw + log f))
+  class           train freq   held-out freq  mean pred prob        mean raw      prob +init       raw +init
+  Current       0.9873765719    0.9873794109    0.1810856243      5.08934215    0.9872598336      5.07663837
+  DQ30          0.0063500800    0.0063837021    0.1771205331     -0.00848366    0.0063961041     -5.06777153
+  DQ60          0.0000436341    0.0000408329    0.1744778153     -0.08186163    0.0000715229    -10.12153300
+  DQ90+         0.0000089330    0.0000123875    0.1390253146     -2.70188598    0.0000313341    -14.32764790
+  Prepaid       0.0062204375    0.0061836665    0.1778916616     -0.00278967    0.0062409167     -5.08270472
+  Default       0.0000003436    0.0000000000    0.1503990512   -456.56872706    0.0000002886   -471.45258551
+  Brier (held-out), as returned          : 0.8075574   (prior-only reference 0.0250029; difference +0.7825545)
+  Brier (held-out), with init added back : 0.0250173   (difference from prior-only +0.0000144)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 2.527e+05
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9872794930  DQ30 0.0063967997  DQ60 0.0000529398  DQ90+ 0.0000326707  Prepaid 0.0062378083  Default 0.0000002886
+
+================================================================================================================
+POPULATION POOLED: role == 'fit', from_state in ['Current', 'DQ30', 'DQ60', 'DQ90+'], 200601 <= from_period <= 200706
+================================================================================================================
+rows 11,017,047 (expected 11,017,047: MATCH)
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+split by loan_id: seed 40, train fraction 0.8 -> 1,052,218 of 1,315,273 loans to train, 263,055 held out; train rows 8,817,112, held-out rows 2,199,935; no loan on both sides (asserted)
+REPRODUCTION CHECK vs diagnostic 44's report: train counts [8663839, 78073, 10543, 8755, 55601, 301] vs [8663839, 78073, 10543, 8755, 55601, 301]; held-out counts [2161688, 19425, 2612, 2098, 14047, 65] vs [2161688, 19425, 2612, 2098, 14047, 65]; prior-only held-out Brier 0.0343477 vs 0.0343477 -> MATCH
+
+CLASS FREQUENCIES (class order = panel.STATES)
+  class        TRAIN count      TRAIN freq  HELD-OUT count   HELD-OUT freq    init value log f
+  Current        8,663,839    0.9826164168       2,161,688    0.9826144863         -0.01753645
+  DQ30              78,073    0.0088547134          19,425    0.0088298063         -4.72680537
+  DQ60              10,543    0.0011957430           2,612    0.0011873078         -6.72898753
+  DQ90+              8,755    0.0009929555           2,098    0.0009536645         -6.91482469
+  Prepaid           55,601    0.0063060331          14,047    0.0063851887         -5.06624847
+  Default              301    0.0000341382              65    0.0000295463        -10.28509467
+PRIOR-ONLY REFERENCE (predict the TRAIN frequencies for every row): Brier held-out 0.0343477   (train rows 0.0343444)
+BRIER: Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.
+
+================================================================================================================
+POOLED / init OFF  (no init_score; boost_from_average default)
+================================================================================================================
+
+  --- init OFF, num_boost_round = 0 ---
+  lgb.train(num_boost_round=0) -> ValueError: Number of boosting rounds must be greater than 0. Got 0; the round-0 model here is lgb.Booster(params, train_set=Dataset) with no update() (trees 0, current_iteration 0)
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 1.7 s;  peak RSS in-run sampled 3.84 GB, process peak 5.54 GB
+  library messages: none;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned
+  class           train freq   held-out freq  mean pred prob        mean raw
+  Current       0.9826164168    0.9826144863    0.1666666667      0.00000000
+  DQ30          0.0088547134    0.0088298063    0.1666666667      0.00000000
+  DQ60          0.0011957430    0.0011873078    0.1666666667      0.00000000
+  DQ90+         0.0009929555    0.0009536645    0.1666666667      0.00000000
+  Prepaid       0.0063060331    0.0063851887    0.1666666667      0.00000000
+  Default       0.0000341382    0.0000295463    0.1666666667      0.00000000
+  Brier (held-out), as returned          : 0.8333333   (prior-only reference 0.0343477; difference +0.7989856)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 0.000e+00
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.1666666667  DQ30 0.1666666667  DQ60 0.1666666667  DQ90+ 0.1666666667  Prepaid 0.1666666667  Default 0.1666666667
+
+  --- init OFF, num_boost_round = 1 ---
+  lgb.train(num_boost_round=1) ran: trees 6 (1 per class), current_iteration 1
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 2.2 s;  peak RSS in-run sampled 3.71 GB, process peak 5.54 GB
+  library messages: none;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned
+  class           train freq   held-out freq  mean pred prob        mean raw
+  Current       0.9826164168    0.9826144863    0.9748405056     -0.01728418
+  DQ30          0.0088547134    0.0088298063    0.0088424741     -4.72691498
+  DQ60          0.0011957430    0.0011873078    0.0074735395     -6.72988534
+  DQ90+         0.0009929555    0.0009536645    0.0021570264     -6.91722304
+  Prepaid       0.0063060331    0.0063851887    0.0061753360     -5.06609197
+  Default       0.0000341382    0.0000295463    0.0005111184    -10.28890128
+  Brier (held-out), as returned          : 0.0380157   (prior-only reference 0.0343477; difference +0.0036680)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 5.918e+02
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9747793805  DQ30 0.0088444710  DQ60 0.0075163335  DQ90+ 0.0021678676  Prepaid 0.0061739437  Default 0.0005180038
+
+  --- init OFF, num_boost_round = 2 ---
+  lgb.train(num_boost_round=2) ran: trees 12 (2 per class), current_iteration 2
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 2.5 s;  peak RSS in-run sampled 3.63 GB, process peak 5.61 GB
+  library messages: none;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned
+  class           train freq   held-out freq  mean pred prob        mean raw
+  Current       0.9826164168    0.9826144863    0.9781682506      0.49436615
+  DQ30          0.0088547134    0.0088298063    0.0087935800     -4.56077376
+  DQ60          0.0011957430    0.0011873078    0.0043261080     -2.41701382
+  DQ90+         0.0009929555    0.0009536645    0.0019475719    -22.77914050
+  Prepaid       0.0063060331    0.0063851887    0.0064425684     -4.77523656
+  Default       0.0000341382    0.0000295463    0.0003219211    -63.56395498
+  Brier (held-out), as returned          : 0.0354268   (prior-only reference 0.0343477; difference +0.0010791)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 6.594e+04
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9781043234  DQ30 0.0087889580  DQ60 0.0043469302  DQ90+ 0.0019737211  Prepaid 0.0064529003  Default 0.0003331670
+
+================================================================================================================
+POOLED / init ON  (Dataset init_score = log TRAIN class frequencies)
+================================================================================================================
+
+  --- init ON, num_boost_round = 0 ---
+  lgb.train(num_boost_round=0) -> ValueError: Number of boosting rounds must be greater than 0. Got 0; the round-0 model here is lgb.Booster(params, train_set=Dataset) with no update() (trees 0, current_iteration 0)
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 2.6 s;  peak RSS in-run sampled 4.87 GB, process peak 5.54 GB
+  library messages: none;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned  |  with the init added back manually (softmax(raw + log f))
+  class           train freq   held-out freq  mean pred prob        mean raw      prob +init       raw +init
+  Current       0.9826164168    0.9826144863    0.1666666667      0.00000000    0.9826164168     -0.01753645
+  DQ30          0.0088547134    0.0088298063    0.1666666667      0.00000000    0.0088547134     -4.72680537
+  DQ60          0.0011957430    0.0011873078    0.1666666667      0.00000000    0.0011957430     -6.72898752
+  DQ90+         0.0009929555    0.0009536645    0.1666666667      0.00000000    0.0009929555     -6.91482469
+  Prepaid       0.0063060331    0.0063851887    0.1666666667      0.00000000    0.0063060331     -5.06624847
+  Default       0.0000341382    0.0000295463    0.1666666667      0.00000000    0.0000341382    -10.28509467
+  Brier (held-out), as returned          : 0.8333333   (prior-only reference 0.0343477; difference +0.7989856)
+  Brier (held-out), with init added back : 0.0343477   (difference from prior-only +0.0000000)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 0.000e+00
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9826164168  DQ30 0.0088547134  DQ60 0.0011957430  DQ90+ 0.0009929555  Prepaid 0.0063060331  Default 0.0000341382
+
+  --- init ON, num_boost_round = 1 ---
+  lgb.train(num_boost_round=1) ran: trees 6 (1 per class), current_iteration 1
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 2.9 s;  peak RSS in-run sampled 5.09 GB, process peak 5.54 GB
+  library messages: none;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned  |  with the init added back manually (softmax(raw + log f))
+  class           train freq   held-out freq  mean pred prob        mean raw      prob +init       raw +init
+  Current       0.9826164168    0.9826144863    0.1759605309      0.00025227    0.9748405056     -0.01728418
+  DQ30          0.0088547134    0.0088298063    0.1680943133     -0.00010961    0.0088424741     -4.72691498
+  DQ60          0.0011957430    0.0011873078    0.1660784657     -0.00089781    0.0074735395     -6.72988534
+  DQ90+         0.0009929555    0.0009536645    0.1593980980     -0.00239835    0.0021570264     -6.91722304
+  Prepaid       0.0063060331    0.0063851887    0.1718378413      0.00015650    0.0061753360     -5.06609197
+  Default       0.0000341382    0.0000295463    0.1586307508     -0.00380661    0.0005111184    -10.28890128
+  Brier (held-out), as returned          : 0.8198221   (prior-only reference 0.0343477; difference +0.7854744)
+  Brier (held-out), with init added back : 0.0380157   (difference from prior-only +0.0036680)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 5.918e+02
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9747793805  DQ30 0.0088444710  DQ60 0.0075163335  DQ90+ 0.0021678676  Prepaid 0.0061739437  Default 0.0005180038
+
+  --- init ON, num_boost_round = 2 ---
+  lgb.train(num_boost_round=2) ran: trees 12 (2 per class), current_iteration 2
+  model parameters block: boost_from_average=1, learning_rate=0.1, num_leaves=31, min_data_in_leaf=20, max_bin=255, num_threads=0, seed=0, deterministic=0
+  predictions served from: model string reload;  wall-clock 3.4 s;  peak RSS in-run sampled 5.15 GB, process peak 5.61 GB
+  library messages: none;  Python warnings: none
+  HELD-OUT mean per class: predict() as returned  |  with the init added back manually (softmax(raw + log f))
+  class           train freq   held-out freq  mean pred prob        mean raw      prob +init       raw +init
+  Current       0.9826164168    0.9826144863    0.1873994409      0.51190260    0.9781682506      0.49436615
+  DQ30          0.0088547134    0.0088298063    0.1711949054      0.16603161    0.0087935800     -4.56077376
+  DQ60          0.0011957430    0.0011873078    0.1574261924      4.31197370    0.0043261080     -2.41701382
+  DQ90+         0.0009929555    0.0009536645    0.1529670423    -15.86431580    0.0019475719    -22.77914050
+  Prepaid       0.0063060331    0.0063851887    0.1788563671      0.29101191    0.0064425684     -4.77523656
+  Default       0.0000341382    0.0000295463    0.1521560519    -53.27886031    0.0003219211    -63.56395498
+  Brier (held-out), as returned          : 0.7975758   (prior-only reference 0.0343477; difference +0.7632280)
+  Brier (held-out), with init added back : 0.0354268   (difference from prior-only +0.0010791)
+  consistency: max |softmax(raw as returned) - predict() probabilities| = 0.000e+00;  largest across-row spread of any class's raw score = 6.594e+04
+  booster's internal TRAINING-set score (mean probability per class over train rows): Current 0.9781043234  DQ30 0.0087889580  DQ60 0.0043469302  DQ90+ 0.0019737211  Prepaid 0.0064529003  Default 0.0003331670
+
+================================================================================================================
+CRITICAL CHECK: does predict() include the init_score contribution, and did the training objective see it?
+================================================================================================================
+
+--- CURRENT ---
+(1) Was the init_score array accepted by the Dataset?  (inspected: the Dataset's C-side field after construct())
+    init ON : passed shape (8731701, 6) dtype float64; Dataset num_data 8,731,701 (train rows 8,731,701); get_field('init_score') -> shape (8731701, 6), dtype float64, size 52,390,206 (= n_train x 6: True); max |stored - passed| over all rows/classes = 0.000e+00; stored row 0 = [-0.01270378, -5.05928787, -10.03967138, -11.62576193, -5.07991504, -14.88385847] vs log f = [-0.01270378, -5.05928787, -10.03967138, -11.62576193, -5.07991504, -14.88385847]
+    init OFF: get_field('init_score') -> None
+(2) Did the TRAINING side see it?  Booster's internal training-set score at round 0 (zero trees), mean probability per class over train rows:
+    class           train freq    internal, init OFF     internal, init ON
+    Current       0.9873765719          0.1666666667          0.9873765719
+    DQ30          0.0063500800          0.1666666667          0.0063500800
+    DQ60          0.0000436341          0.1666666667          0.0000436341
+    DQ90+         0.0000089330          0.1666666667          0.0000089330
+    Prepaid       0.0062204375          0.1666666667          0.0062204375
+    Default       0.0000003436          0.1666666667          0.0000003436
+    init ON, train row 0: logit differences log(p_j/p_0) = [0.0, -5.046584, -10.026968, -11.613058, -5.067211, -14.871155] vs init differences [0.0, -5.046584, -10.026968, -11.613058, -5.067211, -14.871155]
+    init OFF, train row 0: logit differences log(p_j/p_0) = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    largest across-row spread of any class's internal training probability, round 0: OFF 0.0, ON 0.0
+    after trees are added (internal training score, mean prob per class):
+      OFF  round 1: 0.9859157195  0.0063993012  0.0000732003  0.0002147252  0.0062722144  0.0011248394
+      ON   round 1: 0.9859157195  0.0063993012  0.0000732003  0.0002147252  0.0062722144  0.0011248394
+      OFF  round 2: 0.9872794930  0.0063967997  0.0000529398  0.0000326707  0.0062378083  0.0000002886
+      ON   round 2: 0.9872794930  0.0063967997  0.0000529398  0.0000326707  0.0062378083  0.0000002886
+    ADDED PROBE: a Dataset init_score of all zeros, 1 round.
+      probe round-1 predict() raw scores vs init-ON round-1 predict() raw scores: max |difference| = 1.943672e+02 (probabilities 8.548703e-01)
+      probe round-1 mean raw (as returned): 0.49241870  -0.09619069  -0.09997355  -0.09999468  -0.09625798  -0.09999981
+      ON    round-1 mean raw (as returned): -0.00008158  -0.00013015  0.00085672  0.00012551  0.00020112  0.00375203
+(3) Does predict() reflect it?  OFF vs ON, held-out rows, per round
+    rounds  raw identical?   max|raw OFF-ON|   max|prob OFF-ON|   max|raw OFF-(ON+init)|   max|prob OFF-(ON+init)|   Brier OFF    Brier ON  Brier ON+init
+         0            True      0.000000e+00       0.000000e+00             1.488386e+01              8.207099e-01   0.8333333   0.8333333      0.0250029
+         1           False      1.488386e+01       9.648284e-01             0.000000e+00              0.000000e+00   0.0276286   0.8291828      0.0276286
+         2           False      1.488386e+01       9.631895e-01             2.910383e-11              2.220446e-16   0.0250173   0.8075574      0.0250173
+
+--- POOLED ---
+(1) Was the init_score array accepted by the Dataset?  (inspected: the Dataset's C-side field after construct())
+    init ON : passed shape (8817112, 6) dtype float64; Dataset num_data 8,817,112 (train rows 8,817,112); get_field('init_score') -> shape (8817112, 6), dtype float64, size 52,902,672 (= n_train x 6: True); max |stored - passed| over all rows/classes = 0.000e+00; stored row 0 = [-0.01753645, -4.72680537, -6.72898753, -6.91482469, -5.06624847, -10.28509467] vs log f = [-0.01753645, -4.72680537, -6.72898753, -6.91482469, -5.06624847, -10.28509467]
+    init OFF: get_field('init_score') -> None
+(2) Did the TRAINING side see it?  Booster's internal training-set score at round 0 (zero trees), mean probability per class over train rows:
+    class           train freq    internal, init OFF     internal, init ON
+    Current       0.9826164168          0.1666666667          0.9826164168
+    DQ30          0.0088547134          0.1666666667          0.0088547134
+    DQ60          0.0011957430          0.1666666667          0.0011957430
+    DQ90+         0.0009929555          0.1666666667          0.0009929555
+    Prepaid       0.0063060331          0.1666666667          0.0063060331
+    Default       0.0000341382          0.1666666667          0.0000341382
+    init ON, train row 0: logit differences log(p_j/p_0) = [0.0, -4.709269, -6.711451, -6.897288, -5.048712, -10.267558] vs init differences [0.0, -4.709269, -6.711451, -6.897288, -5.048712, -10.267558]
+    init OFF, train row 0: logit differences log(p_j/p_0) = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    largest across-row spread of any class's internal training probability, round 0: OFF 0.0, ON 0.0
+    after trees are added (internal training score, mean prob per class):
+      OFF  round 1: 0.9747793805  0.0088444710  0.0075163335  0.0021678676  0.0061739437  0.0005180038
+      ON   round 1: 0.9747793805  0.0088444710  0.0075163335  0.0021678676  0.0061739437  0.0005180038
+      OFF  round 2: 0.9781043234  0.0087889580  0.0043469302  0.0019737211  0.0064529003  0.0003331670
+      ON   round 2: 0.9781043234  0.0087889580  0.0043469302  0.0019737211  0.0064529003  0.0003331670
+    ADDED PROBE: a Dataset init_score of all zeros, 1 round.
+      probe round-1 predict() raw scores vs init-ON round-1 predict() raw scores: max |difference| = 5.917661e+02 (probabilities 8.505517e-01)
+      probe round-1 mean raw (as returned): 0.48959983  -0.09469728  -0.09929027  -0.09942136  -0.09620911  -0.09998031
+      ON    round-1 mean raw (as returned): 0.00025227  -0.00010961  -0.00089781  -0.00239835  0.00015650  -0.00380661
+(3) Does predict() reflect it?  OFF vs ON, held-out rows, per round
+    rounds  raw identical?   max|raw OFF-ON|   max|prob OFF-ON|   max|raw OFF-(ON+init)|   max|prob OFF-(ON+init)|   Brier OFF    Brier ON  Brier ON+init
+         0            True      0.000000e+00       0.000000e+00             1.028509e+01              8.159498e-01   0.8333333   0.8333333      0.0343477
+         1           False      1.028509e+01       8.716786e-01             0.000000e+00              0.000000e+00   0.0380157   0.8198221      0.0380157
+         2           False      1.028509e+01       9.237436e-01             7.275958e-12              3.541611e-14   0.0354268   0.7975758      0.0354268
+
+================================================================================================================
+FINDINGS  (measured only; no interpretation for the ML arm)
+================================================================================================================
+
+CURRENT:
+  - lgb.train(num_boost_round=0): ValueError: Number of boosting rounds must be greater than 0. Got 0.
+  - The Dataset accepted the init_score array: stored shape (8731701, 6), max |stored - passed| 0.0e+00; init OFF Dataset holds None.
+  - Round 0, predict() raw scores: OFF mean 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000; ON mean 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000; identical row for row: True.
+  - Round 0, predict() mean probabilities: OFF 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667; ON 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667; train frequencies 0.98737657, 0.00635008, 0.00004363, 0.00000893, 0.00622044, 0.00000034.
+  - predict() on the trained/reloaded booster does NOT include the Dataset init_score: at round 0 it returns raw 0 / probability 1/6 for init ON exactly as for init OFF (max |raw OFF - ON| 0.0); adding log f back manually turns init ON's round-0 Brier from 0.8333333 into 0.0250029.
+  - init OFF at round 0 returns the uniform 1/6 start (no boost-from-average contribution, no trees); at rounds 1 and 2 init OFF's predict() raw scores equal init ON's raw + log f (max |difference| 0.0e+00 at round 1, 2.9e-11 at round 2).
+  - Round 0, Brier: OFF as returned 0.8333333; ON as returned 0.8333333; ON with init added back 0.0250029; prior-only 0.0250029.
+  - Booster's internal training score at round 0 (mean prob): OFF 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667; ON 0.98737657, 0.00635008, 0.00004363, 0.00000893, 0.00622044, 0.00000034.
+  - Round 1: OFF Brier 0.0276286; ON as returned 0.8291828; ON with init added back 0.0276286; max |raw OFF - (ON raw + init)| 0.000e+00; max |prob OFF - ON-with-init| 0.000e+00.
+  - Round 2: OFF Brier 0.0250173; ON as returned 0.8075574; ON with init added back 0.0250173; max |raw OFF - (ON raw + init)| 2.910e-11; max |prob OFF - ON-with-init| 2.220e-16.
+  - Probe (zero init_score, 1 round) vs init ON, round-1 raw scores as returned: max |difference| 1.944e+02.
+  - Library messages seen in this population's runs: [LightGBM] [Warning] No further splits with positive gain, best gain: -inf.
+
+POOLED:
+  - lgb.train(num_boost_round=0): ValueError: Number of boosting rounds must be greater than 0. Got 0.
+  - The Dataset accepted the init_score array: stored shape (8817112, 6), max |stored - passed| 0.0e+00; init OFF Dataset holds None.
+  - Round 0, predict() raw scores: OFF mean 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000; ON mean 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000; identical row for row: True.
+  - Round 0, predict() mean probabilities: OFF 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667; ON 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667; train frequencies 0.98261642, 0.00885471, 0.00119574, 0.00099296, 0.00630603, 0.00003414.
+  - predict() on the trained/reloaded booster does NOT include the Dataset init_score: at round 0 it returns raw 0 / probability 1/6 for init ON exactly as for init OFF (max |raw OFF - ON| 0.0); adding log f back manually turns init ON's round-0 Brier from 0.8333333 into 0.0343477.
+  - init OFF at round 0 returns the uniform 1/6 start (no boost-from-average contribution, no trees); at rounds 1 and 2 init OFF's predict() raw scores equal init ON's raw + log f (max |difference| 0.0e+00 at round 1, 7.3e-12 at round 2).
+  - Round 0, Brier: OFF as returned 0.8333333; ON as returned 0.8333333; ON with init added back 0.0343477; prior-only 0.0343477.
+  - Booster's internal training score at round 0 (mean prob): OFF 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667, 0.16666667; ON 0.98261642, 0.00885471, 0.00119574, 0.00099296, 0.00630603, 0.00003414.
+  - Round 1: OFF Brier 0.0380157; ON as returned 0.8198221; ON with init added back 0.0380157; max |raw OFF - (ON raw + init)| 0.000e+00; max |prob OFF - ON-with-init| 0.000e+00.
+  - Round 2: OFF Brier 0.0354268; ON as returned 0.7975758; ON with init added back 0.0354268; max |raw OFF - (ON raw + init)| 7.276e-12; max |prob OFF - ON-with-init| 3.542e-14.
+  - Probe (zero init_score, 1 round) vs init ON, round-1 raw scores as returned: max |difference| 5.918e+02.
+  - Library messages seen in this population's runs: none.
+
+PEAK RSS (src.memwatch): largest in-run sampled 5.44 GB; process peak 5.61 GB

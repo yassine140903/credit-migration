@@ -1,0 +1,336 @@
+FULL FIT WINDOW capacity check: CURRENT and POOLED, full vs borrower-only features, plus within-month discrimination   (measurement only; no selection, no recommendation)
+lightgbm 4.7.0   16 logical CPUs
+CAVEAT carried through the report: est_ltv is borrower-level but contains an HPI component, so the R2 'borrower-only' runs are not macro-free; the R1-vs-R2 comparison cannot separate macro from est_ltv's HPI part.
+
+======================================================================================================================
+PASS 1: ROW COUNTS AND CLASS COUNTS  (labels only; no model has been trained, no score exists yet)
+======================================================================================================================
+window: role == 'fit', 200601 <= from_period <= 200812 (the selection window was 200601..200706)
+panel build 2026-10-08T09:41:19.866411; rows loaded (all four origin states): 40,210,035; null/unknown labels dropped 0
+
+POPULATION CURRENT: from_state in ['Current']
+  rows 39,360,873 on the full window, 1,930,979 loans; rows with from_period <= 200706: 10,911,314 (diagnostic 44: 10,911,314: MATCH)
+  split by loan_id: seed 40, train fraction 0.8 -> 1,544,783 of 1,930,979 loans to train, 386,196 held out; train rows 31,490,253, held-out rows 7,870,620; no loan on both sides (asserted)
+  class         TRAIN rows    TRAIN freq   HELD-OUT rows   HELD-OUT freq   sel-window TRAIN rows (diag 44)
+  Current       30,959,138  0.9831339875       7,737,923    0.9831402100                         8,621,477
+  DQ30             268,335  0.0085212081          67,032    0.0085167369                            55,447
+  DQ60               2,289  0.0000726892             543    0.0000689908                               381
+  DQ90+              1,159  0.0000368050             270    0.0000343048                                78
+  Prepaid          259,277  0.0082335636          64,833    0.0082373434                            54,315
+  Default               55  0.0000017466              19    0.0000024140                                 3
+  TOTAL         31,490,253                     7,870,620
+  >>> TRAIN rows of the rare classes on the full window: Default 55, DQ90+ 1,159, DQ60 2,289   (selection window, diagnostic 44: Default 3, DQ90+ 78, DQ60 381)
+  held-out rows and events by from_period month (rows / DQ90+ / Default):
+    200601: 185/0/0                  200602: 11,496/0/0               200603: 25,558/0/0               200604: 40,792/0/0            
+    200605: 54,968/1/0               200606: 69,437/0/0               200607: 85,745/0/0               200608: 100,268/0/0           
+    200609: 114,910/2/0              200610: 127,503/1/0              200611: 142,178/1/0              200612: 155,339/5/0           
+    200701: 172,194/3/0              200702: 184,226/5/0              200703: 200,085/1/0              200704: 215,790/2/0           
+    200705: 231,620/2/0              200706: 247,392/0/0              200707: 261,739/2/1              200708: 277,622/4/0           
+    200709: 289,582/4/0              200710: 304,262/1/0              200711: 319,328/10/0             200712: 329,511/3/1           
+    200801: 343,100/18/0             200802: 341,143/10/0             200803: 336,507/8/1              200804: 331,200/7/0           
+    200805: 329,544/12/1             200806: 327,509/8/1              200807: 324,707/6/3              200808: 321,149/16/3          
+    200809: 318,560/26/1             200810: 315,720/40/1             200811: 311,426/57/2             200812: 308,325/15/4          
+
+POPULATION POOLED: from_state in ['Current', 'DQ30', 'DQ60', 'DQ90+']
+  rows 40,210,035 on the full window, 1,931,057 loans; rows with from_period <= 200706: 11,017,047 (diagnostic 44: 11,017,047: MATCH)
+  split by loan_id: seed 40, train fraction 0.8 -> 1,544,846 of 1,931,057 loans to train, 386,211 held out; train rows 32,169,080, held-out rows 8,040,955; no loan on both sides (asserted)
+  class         TRAIN rows    TRAIN freq   HELD-OUT rows   HELD-OUT freq   sel-window TRAIN rows (diag 44)
+  Current       31,151,081  0.9683547369       7,788,040    0.9685466465                         8,663,839
+  DQ30             449,050  0.0139590563         111,523    0.0138693725                            78,073
+  DQ60             110,492  0.0034347268          27,252    0.0033891497                            10,543
+  DQ90+            187,303  0.0058224544          46,620    0.0057978188                             8,755
+  Prepaid          265,392  0.0082499095          66,100    0.0082204166                            55,601
+  Default            5,762  0.0001791161           1,420    0.0001765959                               301
+  TOTAL         32,169,080                     8,040,955
+  >>> TRAIN rows of the rare classes on the full window: Default 5,762, DQ90+ 187,303, DQ60 110,492   (selection window, diagnostic 44: Default 301, DQ90+ 8,755, DQ60 10,543)
+  held-out rows and events by from_period month (rows / DQ90+ / Default):
+    200601: 185/0/0                  200602: 11,498/0/0               200603: 25,648/0/0               200604: 41,013/4/0            
+    200605: 55,197/7/0               200606: 69,900/19/0              200607: 86,310/24/1              200608: 100,840/43/1          
+    200609: 115,835/64/0             200610: 128,532/84/1             200611: 143,342/119/2            200612: 157,099/150/6         
+    200701: 173,879/167/6            200702: 186,382/191/6            200703: 201,864/231/4            200704: 217,891/282/7         
+    200705: 234,175/362/15           200706: 250,406/406/16           200707: 265,032/509/29           200708: 281,172/653/18        
+    200709: 294,580/759/34           200710: 309,161/941/27           200711: 324,862/1183/23          200712: 336,232/1362/42       
+    200801: 349,901/1517/45          200802: 348,178/1661/52          200803: 343,219/1864/96          200804: 338,622/2098/93       
+    200805: 337,364/2438/83          200806: 336,413/2707/109         200807: 334,098/3058/134         200808: 332,295/3523/147      
+    200809: 330,554/3965/153         200810: 328,295/4603/117         200811: 326,735/5387/55          200812: 324,246/6239/98       
+
+======================================================================================================================
+POPULATION CURRENT: pass 2, feature matrix
+======================================================================================================================
+rows 39,360,873; loans 1,930,979; null/unknown labels dropped 0
+split consistency with pass 1: train and held-out class counts IDENTICAL
+prior-only reference on this window: held-out Brier 0.0332949 (train rows 0.0333072); train frequencies Current 0.98313399, DQ30 0.00852121, DQ60 0.00007269, DQ90+ 0.00003681, Prepaid 0.00823356, Default 0.00000175
+
+======================================================================================================================
+RUN CURRENT / R1 full features
+======================================================================================================================
+features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']   categorical: ['property_state']
+params: objective='multiclass', num_class=6, device_type='cpu', verbosity=0;  num_boost_round=100
+library messages: none
+wall-clock: lgb.train (Dataset construction included) 134.9 s (2.25 min = 1.35 s/round); held-out predict 23.2 s; train-side predict 89.6 s;  peak RSS in-run sampled 6.41 GB, process peak 6.41 GB;  min system available 2.57 GB
+check: max |softmax(raw) - predict()| on 100,000 held-out rows = 0.000e+00
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  prior-only reference, THIS window (train frequencies for every held-out row) : 0.0332949
+  held-out Brier                                                  : 0.0535804
+  held-out minus prior-only                                       : +0.0202854
+  train Brier                                                     : 0.0537421
+  gap (held-out - train)                                          : -0.0001618
+
+  PER-CLASS BRIER CONTRIBUTION, held-out  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.02702448    50.4373%        0.01657554     +0.01044895
+  DQ30          0.01216703    22.7080%        0.00844420     +0.00372283
+  DQ60          0.00075990     1.4182%        0.00006899     +0.00069091
+  DQ90+         0.00105438     1.9678%        0.00003430     +0.00102007
+  Prepaid       0.01255550    23.4330%        0.00816949     +0.00438601
+  Default       0.00001909     0.0356%        0.00000241     +0.00001668
+  TOTAL         0.05358038   100.0000%        0.03329493     +0.02028544   (sum of the six terms 0.05358038)
+
+  PER-CLASS DISTRIBUTION  (mean predicted probability on held-out rows vs the held-out actual frequency)
+  class        train rows     train freq  held-out rows  held-out freq  mean pred prob  pred / actual
+  Current      30,959,138   0.9831339875      7,737,923   0.9831402100    0.9814494803         0.998x
+  DQ30            268,335   0.0085212081         67,032   0.0085167369    0.0087685859         1.030x
+  DQ60              2,289   0.0000726892            543   0.0000689908    0.0007969493        11.552x
+  DQ90+             1,159   0.0000368050            270   0.0000343048    0.0012094273        35.255x
+  Prepaid         259,277   0.0082335636         64,833   0.0082373434    0.0077576379         0.942x
+  Default              55   0.0000017466             19   0.0000024140    0.0000179194         7.423x
+
+  RAW-SCORE SPREAD across held-out rows, per class (max - min of the class's raw score)
+  class              min raw         max raw          spread
+  Current      -2120886.5464   75984101.6923   78104988.2386
+  DQ30       -116079780.5882    2128672.4516  118208453.0398
+  DQ60        -34793408.2306      17448.3129   34810856.5435
+  DQ90+      -260297064.2812       8603.2103  260305667.4915
+  Prepaid     -25308412.1599    2840920.0183   28149332.1782
+  Default    -430308972.0955       2609.5064  430311581.6019
+  largest spread of any class: 430311581.6019   (for scale: the six log train frequencies span 13.24; diagnostic 46, 1 round, init ON: 194 on the same scale for CURRENT)
+
+======================================================================================================================
+WITHIN-MONTH DISCRIMINATION  (CURRENT, R1, held-out rows only, each month scored separately)
+======================================================================================================================
+Macro columns are constant within a calendar month, so skill measured inside one month cannot come from the calendar. Months are NOT pooled.
+top-3 held-out months by Default events: [200812, 200807, 200808] (Default events [4, 3, 3], rows [308325, 324707, 321149])
+three mid-window months by row count (middle third 200701..200712, excluding the above): [200712, 200711, 200710] (rows [329511, 319328, 304262], Default events [1, 0, 0])
+random ranking would capture 1% of events in the top 1% and 10% in the top 10%. 'tied' = rows sharing the predicted value at the cutoff (events in that block are credited pro rata). THIN = fewer than 10 events: read it as a count, not a share.
+
+  target DEFAULT: ranking by predicted DEFAULT probability, against actual DEFAULT
+  month   group              rows  events    top 1%: events (share)   tied@1%    top 10%: events (share)  tied@10%  note
+  200812  top-Default     308,325       4               0.04 (0.9%)   308,124                0.40 (9.9%)   308,124  THIN (<10 events)
+  200807  top-Default     324,707       3               0.03 (0.9%)   324,299                0.30 (9.9%)   324,299  THIN (<10 events)
+  200808  top-Default     321,149       3               0.03 (0.8%)   320,635                0.30 (9.9%)   320,635  THIN (<10 events)
+  200712  mid-window      329,511       1               0.01 (0.9%)   329,289                0.10 (9.9%)   329,289  THIN (<10 events)
+  200711  mid-window      319,328       0           n/a (no events)                      n/a (no events)            THIN (0 events)
+  200710  mid-window      304,262       0           n/a (no events)                      n/a (no events)            THIN (0 events)
+
+  target DQ90+: ranking by predicted DQ90+ probability, against actual DQ90+
+  month   group              rows  events    top 1%: events (share)   tied@1%    top 10%: events (share)  tied@10%  note
+  200812  top-Default     308,325      15               0.00 (0.0%)         1                0.00 (0.0%)         3  
+  200807  top-Default     324,707       6               0.00 (0.0%)         1               2.00 (33.3%)         1  THIN (<10 events)
+  200808  top-Default     321,149      16               0.00 (0.0%)         1                0.00 (0.0%)         1  
+  200712  mid-window      329,511       3               0.00 (0.0%)         1                0.00 (0.0%)         1  THIN (<10 events)
+  200711  mid-window      319,328      10               0.00 (0.0%)         1               1.00 (10.0%)         1  
+  200710  mid-window      304,262       1               0.00 (0.0%)         1                0.00 (0.0%)         1  THIN (<10 events)
+
+======================================================================================================================
+RUN CURRENT / R2 borrower-only features
+======================================================================================================================
+features (6): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv']   categorical: ['property_state']
+params: objective='multiclass', num_class=6, device_type='cpu', verbosity=0;  num_boost_round=100
+CAVEAT: est_ltv is borrower-level but contains an HPI component, so this run is NOT macro-free.
+library messages: none
+wall-clock: lgb.train (Dataset construction included) 123.7 s (2.06 min = 1.24 s/round); held-out predict 24.0 s; train-side predict 93.5 s;  peak RSS in-run sampled 6.88 GB, process peak 6.89 GB;  min system available 2.38 GB
+check: max |softmax(raw) - predict()| on 100,000 held-out rows = 0.000e+00
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  prior-only reference, THIS window (train frequencies for every held-out row) : 0.0332949
+  held-out Brier                                                  : 0.0428301
+  held-out minus prior-only                                       : +0.0095351
+  train Brier                                                     : 0.0421584
+  gap (held-out - train)                                          : +0.0006716
+
+  PER-CLASS BRIER CONTRIBUTION, held-out  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.02154110    50.2943%        0.01657554     +0.00496556
+  DQ30          0.00940689    21.9633%        0.00844420     +0.00096269
+  DQ60          0.00011214     0.2618%        0.00006899     +0.00004315
+  DQ90+         0.00011578     0.2703%        0.00003430     +0.00008148
+  Prepaid       0.01164244    27.1829%        0.00816949     +0.00347295
+  Default       0.00001172     0.0274%        0.00000241     +0.00000930
+  TOTAL         0.04283006   100.0000%        0.03329493     +0.00953513   (sum of the six terms 0.04283006)
+
+  PER-CLASS DISTRIBUTION  (mean predicted probability on held-out rows vs the held-out actual frequency)
+  class        train rows     train freq  held-out rows  held-out freq  mean pred prob  pred / actual
+  Current      30,959,138   0.9831339875      7,737,923   0.9831402100    0.9828331930         1.000x
+  DQ30            268,335   0.0085212081         67,032   0.0085167369    0.0084939446         0.997x
+  DQ60              2,289   0.0000726892            543   0.0000689908    0.0001197262         1.735x
+  DQ90+             1,159   0.0000368050            270   0.0000343048    0.0001410728         4.112x
+  Prepaid         259,277   0.0082335636         64,833   0.0082373434    0.0083990223         1.020x
+  Default              55   0.0000017466             19   0.0000024140    0.0000130412         5.402x
+
+  RAW-SCORE SPREAD across held-out rows, per class (max - min of the class's raw score)
+  class              min raw         max raw          spread
+  Current      -2770509.6341   17659593.4387   20430103.0728
+  DQ30         -4489093.5720     596168.1376    5085261.7096
+  DQ60       -188629947.0734       8899.1694  188638846.2428
+  DQ90+       -12737413.3865       1211.8748   12738625.2614
+  Prepaid      -6505605.0305    3209065.3213    9714670.3518
+  Default    -341901656.8445        568.2221  341902225.0666
+  largest spread of any class: 341902225.0666   (for scale: the six log train frequencies span 13.24; diagnostic 46, 1 round, init ON: 194 on the same scale for CURRENT)
+
+======================================================================================================================
+POPULATION POOLED: pass 2, feature matrix
+======================================================================================================================
+rows 40,210,035; loans 1,931,057; null/unknown labels dropped 0
+split consistency with pass 1: train and held-out class counts IDENTICAL
+prior-only reference on this window: held-out Brier 0.0616124 (train rows 0.0619805); train frequencies Current 0.96835474, DQ30 0.01395906, DQ60 0.00343473, DQ90+ 0.00582245, Prepaid 0.00824991, Default 0.00017912
+
+======================================================================================================================
+RUN POOLED / R1 full features
+======================================================================================================================
+features (9): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']   categorical: ['property_state', 'from_state']
+params: objective='multiclass', num_class=6, device_type='cpu', verbosity=0;  num_boost_round=100
+library messages: none
+wall-clock: lgb.train (Dataset construction included) 119.9 s (2.00 min = 1.20 s/round); held-out predict 19.7 s; train-side predict 77.5 s;  peak RSS in-run sampled 6.73 GB, process peak 6.89 GB;  min system available 2.43 GB
+check: max |softmax(raw) - predict()| on 100,000 held-out rows = 0.000e+00
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  prior-only reference, THIS window (train frequencies for every held-out row) : 0.0616124
+  held-out Brier                                                  : 0.0855608
+  held-out minus prior-only                                       : +0.0239484
+  train Brier                                                     : 0.0855396
+  gap (held-out - train)                                          : +0.0000212
+
+  PER-CLASS BRIER CONTRIBUTION, held-out  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.03922154    45.8406%        0.03046408     +0.00875746
+  DQ30          0.01622045    18.9578%        0.01367702     +0.00254342
+  DQ60          0.00443178     5.1797%        0.00337767     +0.00105411
+  DQ90+         0.00297666     3.4790%        0.00576420     -0.00278755
+  Prepaid       0.01085852    12.6910%        0.00815284     +0.00270568
+  Default       0.01185184    13.8520%        0.00017656     +0.01167528
+  TOTAL         0.08556078   100.0000%        0.06161237     +0.02394840   (sum of the six terms 0.08556078)
+
+  PER-CLASS DISTRIBUTION  (mean predicted probability on held-out rows vs the held-out actual frequency)
+  class        train rows     train freq  held-out rows  held-out freq  mean pred prob  pred / actual
+  Current      31,151,081   0.9683547369      7,788,040   0.9685466465    0.9581395162         0.989x
+  DQ30            449,050   0.0139590563        111,523   0.0138693725    0.0132029270         0.952x
+  DQ60            110,492   0.0034347268         27,252   0.0033891497    0.0034406851         1.015x
+  DQ90+           187,303   0.0058224544         46,620   0.0057978188    0.0057120933         0.985x
+  Prepaid         265,392   0.0082499095         66,100   0.0082204166    0.0072167676         0.878x
+  Default           5,762   0.0001791161          1,420   0.0001765959    0.0122880108        69.583x
+
+  RAW-SCORE SPREAD across held-out rows, per class (max - min of the class's raw score)
+  class              min raw         max raw          spread
+  Current      -8774428.1130  129557558.7891  138331986.9021
+  DQ30       -228355611.4991    8720856.2787  237076467.7778
+  DQ60         -5613206.9457    2443911.8408    8057118.7865
+  DQ90+        -6686954.4201    3736968.3519   10423922.7720
+  Prepaid    -126432854.7319    6036654.0370  132469508.7690
+  Default    -419900967.3670     878523.5717  420779490.9386
+  largest spread of any class: 420779490.9386   (for scale: the six log train frequencies span 8.60; diagnostic 46, 1 round, init ON: 194 on the same scale for CURRENT)
+
+======================================================================================================================
+WITHIN-MONTH DISCRIMINATION  (POOLED, R1, held-out rows only, each month scored separately)
+======================================================================================================================
+Macro columns are constant within a calendar month, so skill measured inside one month cannot come from the calendar. Months are NOT pooled.
+NOTE: POOLED rows within a month differ in from_state (a feature of the loan's own state, not a calendar feature); the ranking is not conditioned on from_state, so part of any within-month skill here can be the origin-state mix.
+top-3 held-out months by Default events: [200809, 200808, 200807] (Default events [153, 147, 134], rows [330554, 332295, 334098])
+three mid-window months by row count (middle third 200701..200712, excluding the above): [200712, 200711, 200710] (rows [336232, 324862, 309161], Default events [42, 23, 27])
+random ranking would capture 1% of events in the top 1% and 10% in the top 10%. 'tied' = rows sharing the predicted value at the cutoff (events in that block are credited pro rata). THIN = fewer than 10 events: read it as a count, not a share.
+
+  target DEFAULT: ranking by predicted DEFAULT probability, against actual DEFAULT
+  month   group              rows  events    top 1%: events (share)   tied@1%    top 10%: events (share)  tied@10%  note
+  200809  top-Default     330,554     153               3.00 (2.0%)         1                3.00 (2.0%)         1  
+  200808  top-Default     332,295     147               4.00 (2.7%)         1                4.00 (2.7%)         2  
+  200807  top-Default     334,098     134               2.00 (1.5%)         1                3.00 (2.2%)         1  
+  200712  mid-window      336,232      42               0.00 (0.0%)    10,115                0.00 (0.0%)         1  
+  200711  mid-window      324,862      23               0.00 (0.0%)     9,375                0.00 (0.0%)         2  
+  200710  mid-window      309,161      27               0.00 (0.0%)     8,529                0.00 (0.0%)         1  
+
+  target DQ90+: ranking by predicted DQ90+ probability, against actual DQ90+
+  month   group              rows  events    top 1%: events (share)   tied@1%    top 10%: events (share)  tied@10%  note
+  200809  top-Default     330,554    3965           2690.63 (67.9%)     3,578            3070.00 (77.4%)         1  
+  200808  top-Default     332,295    3523           2591.00 (73.5%)         1            2691.00 (76.4%)         1  
+  200807  top-Default     334,098    3058           2401.00 (78.5%)         1            2405.00 (78.6%)         2  
+  200712  mid-window      336,232    1362           1086.00 (79.7%)         1            1087.00 (79.8%)         2  
+  200711  mid-window      324,862    1183           1010.00 (85.4%)         1            1013.00 (85.6%)         2  
+  200710  mid-window      309,161     941            803.00 (85.3%)         1             804.00 (85.4%)         1  
+
+======================================================================================================================
+RUN POOLED / R2 borrower-only features
+======================================================================================================================
+features (7): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'from_state']   categorical: ['property_state', 'from_state']
+params: objective='multiclass', num_class=6, device_type='cpu', verbosity=0;  num_boost_round=100
+CAVEAT: est_ltv is borrower-level but contains an HPI component, so this run is NOT macro-free.
+library messages: none
+wall-clock: lgb.train (Dataset construction included) 101.7 s (1.70 min = 1.02 s/round); held-out predict 15.7 s; train-side predict 61.9 s;  peak RSS in-run sampled 7.27 GB, process peak 7.28 GB;  min system available 1.95 GB
+check: max |softmax(raw) - predict()| on 100,000 held-out rows = 0.000e+00
+
+  MULTICLASS BRIER SCORE  (Brier = (1/n) * sum_i sum_{j=1..6} ( p_ij - o_ij )^2,  where p_ij is the predicted probability of class j for row i and o_ij = 1 if class j is the actual class of row i, else 0.  Not divided by 6; range 0..2.)
+  prior-only reference, THIS window (train frequencies for every held-out row) : 0.0616124
+  held-out Brier                                                  : 0.0671080
+  held-out minus prior-only                                       : +0.0054957
+  train Brier                                                     : 0.0671073
+  gap (held-out - train)                                          : +0.0000008
+
+  PER-CLASS BRIER CONTRIBUTION, held-out  (term j = mean_i (p_ij - o_ij)^2; the six terms add to the total)
+  class         model term  % of total   prior-only term   model - prior
+  Current       0.03004827    44.7760%        0.03046408     -0.00041581
+  DQ30          0.01317095    19.6265%        0.01367702     -0.00050607
+  DQ60          0.00384671     5.7321%        0.00337767     +0.00046904
+  DQ90+         0.00587636     8.7566%        0.00576420     +0.00011216
+  Prepaid       0.00848064    12.6373%        0.00815284     +0.00032780
+  Default       0.00568511     8.4716%        0.00017656     +0.00550854
+  TOTAL         0.06710804   100.0000%        0.06161237     +0.00549567   (sum of the six terms 0.06710804)
+
+  PER-CLASS DISTRIBUTION  (mean predicted probability on held-out rows vs the held-out actual frequency)
+  class        train rows     train freq  held-out rows  held-out freq  mean pred prob  pred / actual
+  Current      31,151,081   0.9683547369      7,788,040   0.9685466465    0.9622314435         0.993x
+  DQ30            449,050   0.0139590563        111,523   0.0138693725    0.0136920094         0.987x
+  DQ60            110,492   0.0034347268         27,252   0.0033891497    0.0035415860         1.045x
+  DQ90+           187,303   0.0058224544         46,620   0.0057978188    0.0067278129         1.160x
+  Prepaid         265,392   0.0082499095         66,100   0.0082204166    0.0082057489         0.998x
+  Default           5,762   0.0001791161          1,420   0.0001765959    0.0056013993        31.719x
+
+  RAW-SCORE SPREAD across held-out rows, per class (max - min of the class's raw score)
+  class              min raw         max raw          spread
+  Current      -1106651.7488    1724167.2400    2830818.9889
+  DQ30         -1993446.2513    1073383.4602    3066829.7115
+  DQ60         -3510840.6989     992544.8869    4503385.5858
+  DQ90+       -79692079.5504    4317997.6323   84010077.1826
+  Prepaid      -4098480.7532      13613.0444    4112093.7976
+  Default      -4626561.3333       9216.1108    4635777.4441
+  largest spread of any class: 84010077.1826   (for scale: the six log train frequencies span 8.60; diagnostic 46, 1 round, init ON: 194 on the same scale for CURRENT)
+
+======================================================================================================================
+SUMMARY  (figures only)
+======================================================================================================================
+run                                 prior-only    held-out  held-out - prior  train Brier         gap  max raw spread  train s  RSS GB
+CURRENT / R1 full features           0.0332949   0.0535804        +0.0202854    0.0537421  -0.0001618    430311581.60    134.9    6.41
+CURRENT / R2 borrower-only features   0.0332949   0.0428301        +0.0095351    0.0421584  +0.0006716    341902225.07    123.7    6.89
+POOLED / R1 full features            0.0616124   0.0855608        +0.0239484    0.0855396  +0.0000212    420779490.94    119.9    6.89
+POOLED / R2 borrower-only features   0.0616124   0.0671080        +0.0054957    0.0671073  +0.0000008     84010077.18    101.7    7.28
+
+======================================================================================================================
+FINDINGS  (measured only; no interpretation, no recommendation)
+======================================================================================================================
+CURRENT:
+  - TRAIN rows on the full window: Default 55, DQ90+ 1,159, DQ60 2,289 (selection window: 3, 78, 381).
+  - R1 full features: held-out Brier 0.0535804 vs prior-only 0.0332949 (difference +0.0202854); train Brier 0.0537421 (gap -0.0001618); largest raw-score spread 430311581.60.
+    mean predicted / held-out actual by class: Current 1.00x, DQ30 1.03x, DQ60 11.55x, DQ90+ 35.26x, Prepaid 0.94x, Default 7.42x.
+  - R2 borrower-only features: held-out Brier 0.0428301 vs prior-only 0.0332949 (difference +0.0095351); train Brier 0.0421584 (gap +0.0006716); largest raw-score spread 341902225.07.
+    mean predicted / held-out actual by class: Current 1.00x, DQ30 1.00x, DQ60 1.74x, DQ90+ 4.11x, Prepaid 1.02x, Default 5.40x.
+  - R2 minus R1 held-out Brier: -0.0107503  (est_ltv carries an HPI component in both runs).
+  - library messages: none.
+POOLED:
+  - TRAIN rows on the full window: Default 5,762, DQ90+ 187,303, DQ60 110,492 (selection window: 301, 8755, 10543).
+  - R1 full features: held-out Brier 0.0855608 vs prior-only 0.0616124 (difference +0.0239484); train Brier 0.0855396 (gap +0.0000212); largest raw-score spread 420779490.94.
+    mean predicted / held-out actual by class: Current 0.99x, DQ30 0.95x, DQ60 1.02x, DQ90+ 0.99x, Prepaid 0.88x, Default 69.58x.
+  - R2 borrower-only features: held-out Brier 0.0671080 vs prior-only 0.0616124 (difference +0.0054957); train Brier 0.0671073 (gap +0.0000008); largest raw-score spread 84010077.18.
+    mean predicted / held-out actual by class: Current 0.99x, DQ30 0.99x, DQ60 1.04x, DQ90+ 1.16x, Prepaid 1.00x, Default 31.72x.
+  - R2 minus R1 held-out Brier: -0.0184527  (est_ltv carries an HPI component in both runs).
+  - library messages: none.
+  - within-month discrimination (R1): see the WITHIN-MONTH sections above; each month is reported separately.
+
+PEAK RSS (src.memwatch): process peak 7.28 GB; lowest system-available memory seen 1.95 GB

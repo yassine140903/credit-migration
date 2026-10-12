@@ -1,0 +1,481 @@
+
+======================================================================================================================
+EVENT COUNTS  (before any ordering number)
+======================================================================================================================
+held-out DQ90+ events: 270 (train 1,159)
+held-out DQ60 events : 543 (train 2,289)
+held-out Default events: 19 (train 55)   *** DEFAULT IS TOO THIN TO MEASURE ORDERING (19 HELD-OUT EVENTS) ***
+Every Default figure below is a count, carries a bootstrap interval, and is marked as too thin. The aggregate Brier cannot see DQ90+ or Default: in diagnostic 49 run 5 the Default term was 0.0000024 of 0.0331.
+
+DIAGNOSTIC 50: ordering on DQ90+, DQ60 and Default across the nine diagnostic-49 models (scoring only; measurement only; no selection, no recommendation)
+lightgbm 4.7.0   16 logical CPUs
+
+======================================================================================================================
+SETUP
+======================================================================================================================
+panel build 2026-10-08T09:41:19.866411; window role == 'fit', 200601 <= from_period <= 200812; from_state == Current; rows 39,360,873; loans 1,930,979
+split by loan_id: seed 40, train fraction 0.8 -> 1,544,783 of 1,930,979 loans to train, 386,196 held out; no loan on both sides (asserted)
+  class        HELD-OUT rows  expected (48/49)    TRAIN rows    expected
+  Current          7,737,923         7,737,923    30,959,138  30,959,138
+  DQ30                67,032            67,032       268,335     268,335
+  DQ60                   543               543         2,289       2,289
+  DQ90+                  270               270         1,159       1,159
+  Prepaid             64,833            64,833       259,277     259,277
+  Default                 19                19            55          55
+per-class counts vs diagnostic 48/49: IDENTICAL
+held-out frame built ONCE: 7,870,620 rows, 386,196 held-out loans (the bootstrap resamples these loans); features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv']; sidecar class order ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default'] == panel.STATES
+models: nine files in artifacts\diag49; lever values read from the sidecars. Bootstrap: 500 draws, loans resampled, seed 50.
+
+======================================================================================================================
+SANITY CHECK: rescore run 5 against diagnostic 49
+======================================================================================================================
+run 5 (min_sum_hessian_in_leaf 10, lambda_l2 10): held-out Brier 0.0330520 vs 0.0330520; DQ30 AUC 0.77469 vs 0.77469 -> MATCH
+bootstrap code check (unit loan weights vs plain AUC, DQ90+): 0.8832930386 vs 0.8832930386 -> MATCH
+
+======================================================================================================================
+RUN LOG  (one line per model, in scoring order)
+======================================================================================================================
+run 5 (10, 10): DQ90+ AUC 0.88329 [0.8639, 0.9059]; DQ60 AUC 0.80509; Default AUC 0.80675 (19 events, too thin); 137 s; process peak 4.14 GB; min system available 7.04 GB
+run 1 (0.001, 0): DQ90+ AUC 0.81295 [0.7861, 0.8429]; DQ60 AUC 0.76274; Default AUC 0.49628 (19 events, too thin); 111 s; process peak 4.14 GB; min system available 7.14 GB
+run 2 (0.001, 10): DQ90+ AUC 0.88564 [0.8669, 0.9063]; DQ60 AUC 0.80796; Default AUC 0.80494 (19 events, too thin); 138 s; process peak 4.14 GB; min system available 7.01 GB
+run 3 (0.001, 1000): DQ90+ AUC 0.88838 [0.8674, 0.9089]; DQ60 AUC 0.81243; Default AUC 0.78819 (19 events, too thin); 142 s; process peak 4.14 GB; min system available 7.33 GB
+run 4 (10, 0): DQ90+ AUC 0.88148 [0.8621, 0.9028]; DQ60 AUC 0.80617; Default AUC 0.81033 (19 events, too thin); 137 s; process peak 4.14 GB; min system available 7.19 GB
+run 6 (10, 1000): DQ90+ AUC 0.88846 [0.8673, 0.9088]; DQ60 AUC 0.81181; Default AUC 0.79952 (19 events, too thin); 136 s; process peak 4.14 GB; min system available 7.20 GB
+run 7 (1000, 0): DQ90+ AUC 0.86233 [0.8394, 0.8833]; DQ60 AUC 0.80136; Default AUC 0.63485 (19 events, too thin); 119 s; process peak 4.14 GB; min system available 7.24 GB
+run 8 (1000, 10): DQ90+ AUC 0.86217 [0.8391, 0.8831]; DQ60 AUC 0.80139; Default AUC 0.63408 (19 events, too thin); 119 s; process peak 4.14 GB; min system available 7.31 GB
+run 9 (1000, 1000): DQ90+ AUC 0.85276 [0.8287, 0.8752]; DQ60 AUC 0.80071; Default AUC 0.64733 (19 events, too thin); 121 s; process peak 4.14 GB; min system available 7.20 GB
+
+======================================================================================================================
+SUMMARY TABLE  (the deliverable; held-out rows, raw outputs; AUC with 95% bootstrap interval over held-out loans)
+======================================================================================================================
+run min_sum_hess lambda_l2  DQ30 AUC                DQ90+ AUC [95% CI]                 DQ60 AUC [95% CI]                Default AUC [95% CI] *  DQ90+ spread  DQ90+ raw AUC  Default spread  Default raw AUC  Brier (49)  flag
+  1        0.001         0   0.72976          0.81295 [0.7861, 0.8429]          0.76274 [0.7432, 0.7851]              0.49628 [0.4962, 0.4964]    1.2739e+07        0.81830       3.419e+08          0.76254   0.0428301  
+  2        0.001        10   0.77466          0.88564 [0.8669, 0.9063]          0.80796 [0.7895, 0.8260]              0.80494 [0.6933, 0.8913]        8.9882        0.87756          9.7828          0.79266   0.0330522  
+  3        0.001      1000   0.77461          0.88838 [0.8674, 0.9089]          0.81243 [0.7945, 0.8299]              0.78819 [0.6909, 0.8788]        3.4721        0.88110         0.64263          0.78416   0.0330535  
+  4           10         0   0.77469          0.88148 [0.8621, 0.9028]          0.80617 [0.7879, 0.8256]              0.81033 [0.6984, 0.8991]        10.026        0.87272          9.8148          0.80106   0.0330527  
+  5           10        10   0.77469          0.88329 [0.8639, 0.9059]          0.80509 [0.7871, 0.8226]              0.80675 [0.6996, 0.8979]        9.3151        0.87490          7.3708          0.78891   0.0330520  
+  6           10      1000   0.77465          0.88846 [0.8673, 0.9088]          0.81181 [0.7940, 0.8295]              0.79952 [0.7250, 0.8762]        3.4405        0.88125         0.58036          0.78617   0.0330528  
+  7         1000         0   0.77465          0.86233 [0.8394, 0.8833]          0.80136 [0.7812, 0.8212]              0.63485 [0.5033, 0.7623]             0        0.50000               0          0.50000   0.0330526  DQ90+ RAW COLUMN CONSTANT (says nothing class-specific); DEFAULT RAW COLUMN CONSTANT (says nothing class-specific)
+  8         1000        10   0.77472          0.86217 [0.8391, 0.8831]          0.80139 [0.7814, 0.8211]              0.63408 [0.5070, 0.7608]             0        0.50000               0          0.50000   0.0330526  DQ90+ RAW COLUMN CONSTANT (says nothing class-specific); DEFAULT RAW COLUMN CONSTANT (says nothing class-specific)
+  9         1000      1000   0.77459          0.85276 [0.8287, 0.8752]          0.80071 [0.7812, 0.8208]              0.64733 [0.5237, 0.7664]             0        0.50000               0          0.50000   0.0330537  DQ90+ RAW COLUMN CONSTANT (says nothing class-specific); DEFAULT RAW COLUMN CONSTANT (says nothing class-specific)
+* Default: 19 held-out events: TOO THIN TO MEASURE ORDERING (19 held-out events). DQ30 AUC and Brier are diagnostic 49's printed figures (rescored values agree: max |DQ30 AUC difference| 4.73e-06, max |Brier difference| 4.14e-08). [no ranking] = the score is one constant for every loan. 'raw AUC' = AUC of the class's own raw score (0.5 when the raw column is constant); the bracketed AUCs are of P(class), which also varies with the other classes' scores through the softmax normalisation.
+
+======================================================================================================================
+MODEL run 1: min_sum_hessian_in_leaf = 0.001, lambda_l2 = 0   (artifacts\diag49\current_R2_hess0.001_l20.txt)
+======================================================================================================================
+COST: wall-clock 111.0 s (model load + held-out scoring 21.9 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.16 GB, process peak 4.14 GB;  min system available 7.14 GB
+rescored: held-out Brier 0.0428301; DQ30 AUC 0.72976 (diagnostic 49: Brier 0.0428301, DQ30 AUC 0.72976)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.81295 [0.7861, 0.8429]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 1,551,137 distinct predicted values;  largest tie block 38.5851% of rows
+  the class's OWN raw score: spread (max - min) 1.27386e+07; 582,451 distinct values; AUC of the raw score 0.81830
+  top 1% (78,707 rows): 41.00 of 270 DQ90+ events = 15.19% (random: 1%); rows tied at the cutoff 5*
+  top 10% (787,062 rows): 151.00 of 270 DQ90+ events = 55.93% (random: 10%); rows tied at the cutoff 5*
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.76274 [0.7432, 0.7851]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 1,450,237 distinct predicted values;  largest tie block 41.4344% of rows
+  the class's OWN raw score: spread (max - min) 1.88639e+08; 677,453 distinct values; AUC of the raw score 0.74353
+  top 1% (78,707 rows): 49.00 of 543 DQ60 events = 9.02% (random: 1%); rows tied at the cutoff 10*
+  top 10% (787,062 rows): 225.00 of 543 DQ60 events = 41.44% (random: 10%); rows tied at the cutoff 14*
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.49628 [0.4962, 0.4964]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 32,785 distinct predicted values;  largest tie block 99.2566% of rows
+  the class's OWN raw score: spread (max - min) 3.41902e+08; 1,141,181 distinct values; AUC of the raw score 0.76254
+  top 1% (78,707 rows): 0.05 of 19 Default events = 0.26% (random: 1%); rows tied at the cutoff 7,812,112*  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 1.77 of 19 Default events = 9.33% (random: 10%); rows tied at the cutoff 7,812,112*  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0007%          1     0.0019%          1            1.91          1
+       2      0.0007%          1     0.0019%          1            1.91          1
+       3      0.0007%          1     0.0019%          1            1.91          1
+       4      0.0012%     56,409     0.0019%          1            1.91          1
+       5      0.0015%    261,945     0.0037%    207,430            1.91          1
+       6      0.0009%    174,040     0.0036%    186,380            1.91          1
+       7      0.0009%    212,929     0.0050%    219,878            1.91          1
+       8      0.0041%    302,446     0.0081%    297,978            1.91          1
+       9      0.0044%    231,793     0.0126%    255,599            1.91          1
+      10      0.0192%    311,581     0.0286%    282,976            1.77     32,785
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+MODEL run 2: min_sum_hessian_in_leaf = 0.001, lambda_l2 = 10   (artifacts\diag49\current_R2_hess0.001_l210.txt)
+======================================================================================================================
+COST: wall-clock 137.9 s (model load + held-out scoring 41.2 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.26 GB, process peak 4.14 GB;  min system available 7.01 GB
+rescored: held-out Brier 0.0330522; DQ30 AUC 0.77466 (diagnostic 49: Brier 0.0330522, DQ30 AUC 0.77466)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.88564 [0.8669, 0.9063]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 4,622,740 distinct predicted values;  largest tie block 0.0005% of rows
+  the class's OWN raw score: spread (max - min) 8.98824; 2,258,495 distinct values; AUC of the raw score 0.87756
+  top 1% (78,707 rows): 77.00 of 270 DQ90+ events = 28.52% (random: 1%); rows tied at the cutoff 1
+  top 10% (787,062 rows): 180.00 of 270 DQ90+ events = 66.67% (random: 10%); rows tied at the cutoff 1
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.80796 [0.7895, 0.8260]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 4,622,740 distinct predicted values;  largest tie block 0.0005% of rows
+  the class's OWN raw score: spread (max - min) 8.90614; 1,406,897 distinct values; AUC of the raw score 0.80019
+  top 1% (78,707 rows): 55.00 of 543 DQ60 events = 10.13% (random: 1%); rows tied at the cutoff 2*
+  top 10% (787,062 rows): 258.00 of 543 DQ60 events = 47.51% (random: 10%); rows tied at the cutoff 1
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.80494 [0.6933, 0.8913]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 4,622,740 distinct predicted values;  largest tie block 0.0005% of rows
+  the class's OWN raw score: spread (max - min) 9.78276; 1,162,139 distinct values; AUC of the raw score 0.79266
+  top 1% (78,707 rows): 0.00 of 19 Default events = 0.00% (random: 1%); rows tied at the cutoff 3*  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 8.00 of 19 Default events = 42.11% (random: 10%); rows tied at the cutoff 2*  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0001%    352,254     0.0004%    319,331            0.00    362,100
+       2      0.0000%    407,261     0.0011%    396,653            1.00    345,897
+       3      0.0004%    425,871     0.0014%    435,938            0.00    383,811
+       4      0.0006%    439,563     0.0019%    454,686            0.00    415,469
+       5      0.0006%    463,997     0.0025%    473,713            1.00    439,103
+       6      0.0004%    484,020     0.0032%    491,613            1.00    455,022
+       7      0.0013%    498,847     0.0050%    507,973            0.00    483,661
+       8      0.0036%    508,518     0.0076%    518,052            4.00    543,721
+       9      0.0044%    508,397     0.0131%    509,748            4.00    601,050
+      10      0.0229%    534,016     0.0328%    515,039            8.00    592,909
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+MODEL run 3: min_sum_hessian_in_leaf = 0.001, lambda_l2 = 1000   (artifacts\diag49\current_R2_hess0.001_l21000.txt)
+======================================================================================================================
+COST: wall-clock 142.0 s (model load + held-out scoring 44.6 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.14 GB, process peak 4.14 GB;  min system available 7.33 GB
+rescored: held-out Brier 0.0330535; DQ30 AUC 0.77461 (diagnostic 49: Brier 0.0330535, DQ30 AUC 0.77461)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.88838 [0.8674, 0.9089]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 4,563,973 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 3.47212; 501,065 distinct values; AUC of the raw score 0.88110
+  top 1% (78,707 rows): 74.00 of 270 DQ90+ events = 27.41% (random: 1%); rows tied at the cutoff 2
+  top 10% (787,062 rows): 181.00 of 270 DQ90+ events = 67.04% (random: 10%); rows tied at the cutoff 5*
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.81243 [0.7945, 0.8299]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 4,563,973 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 3.3465; 1,064,367 distinct values; AUC of the raw score 0.80687
+  top 1% (78,707 rows): 65.00 of 543 DQ60 events = 11.97% (random: 1%); rows tied at the cutoff 4*
+  top 10% (787,062 rows): 255.00 of 543 DQ60 events = 46.96% (random: 10%); rows tied at the cutoff 2*
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.78819 [0.6909, 0.8788]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 4,563,973 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 0.642633; 149 distinct values; AUC of the raw score 0.78416
+  top 1% (78,707 rows): 2.00 of 19 Default events = 10.53% (random: 1%); rows tied at the cutoff 8*  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 8.00 of 19 Default events = 42.11% (random: 10%); rows tied at the cutoff 1  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0004%    386,886     0.0009%    371,935            0.00    360,433
+       2      0.0003%    384,092     0.0009%    384,901            0.00    370,075
+       3      0.0001%    404,330     0.0005%    421,557            1.00    378,032
+       4      0.0001%    431,802     0.0019%    452,076            1.00    404,486
+       5      0.0005%    461,623     0.0028%    464,393            1.00    429,659
+       6      0.0005%    481,129     0.0034%    484,993            1.00    462,143
+       7      0.0017%    494,682     0.0051%    492,328            1.00    494,637
+       8      0.0025%    509,668     0.0074%    491,655            2.00    520,682
+       9      0.0052%    482,504     0.0137%    493,540            4.00    559,154
+      10      0.0230%    527,261     0.0324%    506,598            8.00    584,674
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+MODEL run 4: min_sum_hessian_in_leaf = 10, lambda_l2 = 0   (artifacts\diag49\current_R2_hess10_l20.txt)
+======================================================================================================================
+COST: wall-clock 136.7 s (model load + held-out scoring 39.3 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.25 GB, process peak 4.14 GB;  min system available 7.19 GB
+rescored: held-out Brier 0.0330527; DQ30 AUC 0.77469 (diagnostic 49: Brier 0.0330527, DQ30 AUC 0.77469)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.88148 [0.8621, 0.9028]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 4,744,461 distinct predicted values;  largest tie block 0.0005% of rows
+  the class's OWN raw score: spread (max - min) 10.0263; 2,410,539 distinct values; AUC of the raw score 0.87272
+  top 1% (78,707 rows): 68.00 of 270 DQ90+ events = 25.19% (random: 1%); rows tied at the cutoff 2
+  top 10% (787,062 rows): 177.00 of 270 DQ90+ events = 65.56% (random: 10%); rows tied at the cutoff 1
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.80617 [0.7879, 0.8256]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 4,744,461 distinct predicted values;  largest tie block 0.0005% of rows
+  the class's OWN raw score: spread (max - min) 9.06603; 2,237,227 distinct values; AUC of the raw score 0.79822
+  top 1% (78,707 rows): 59.00 of 543 DQ60 events = 10.87% (random: 1%); rows tied at the cutoff 1
+  top 10% (787,062 rows): 256.00 of 543 DQ60 events = 47.15% (random: 10%); rows tied at the cutoff 1
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.81033 [0.6984, 0.8991]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 4,744,464 distinct predicted values;  largest tie block 0.0005% of rows
+  the class's OWN raw score: spread (max - min) 9.81476; 480,044 distinct values; AUC of the raw score 0.80106
+  top 1% (78,707 rows): 2.00 of 19 Default events = 10.53% (random: 1%); rows tied at the cutoff 2*  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 10.00 of 19 Default events = 52.63% (random: 10%); rows tied at the cutoff 2*  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0003%    371,702     0.0004%    335,112            0.00    348,713
+       2      0.0000%    409,434     0.0014%    418,624            0.00    374,849
+       3      0.0004%    427,295     0.0014%    445,246            1.00    419,242
+       4      0.0005%    453,469     0.0015%    463,169            1.00    432,390
+       5      0.0004%    482,587     0.0019%    484,225            1.00    462,931
+       6      0.0006%    502,544     0.0038%    503,551            0.00    495,796
+       7      0.0019%    517,519     0.0061%    521,161            1.00    498,278
+       8      0.0038%    519,074     0.0074%    529,777            2.00    530,065
+       9      0.0039%    519,947     0.0126%    521,471            3.00    600,263
+      10      0.0225%    540,891     0.0325%    522,130           10.00    581,942
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+MODEL run 5: min_sum_hessian_in_leaf = 10, lambda_l2 = 10   (artifacts\diag49\current_R2_hess10_l210.txt)
+======================================================================================================================
+COST: wall-clock 136.9 s (model load + held-out scoring 39.6 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.25 GB, process peak 4.14 GB;  min system available 7.04 GB
+rescored: held-out Brier 0.0330520; DQ30 AUC 0.77469 (diagnostic 49: Brier 0.0330520, DQ30 AUC 0.77469)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.88329 [0.8639, 0.9059]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 4,660,061 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 9.31515; 2,354,388 distinct values; AUC of the raw score 0.87490
+  top 1% (78,707 rows): 69.00 of 270 DQ90+ events = 25.56% (random: 1%); rows tied at the cutoff 1
+  top 10% (787,062 rows): 182.00 of 270 DQ90+ events = 67.41% (random: 10%); rows tied at the cutoff 5*
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.80509 [0.7871, 0.8226]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 4,660,061 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 7.61663; 2,230,711 distinct values; AUC of the raw score 0.79713
+  top 1% (78,707 rows): 48.00 of 543 DQ60 events = 8.84% (random: 1%); rows tied at the cutoff 1
+  top 10% (787,062 rows): 256.00 of 543 DQ60 events = 47.15% (random: 10%); rows tied at the cutoff 2*
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.80675 [0.6996, 0.8979]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 4,660,061 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 7.37084; 196,448 distinct values; AUC of the raw score 0.78891
+  top 1% (78,707 rows): 2.00 of 19 Default events = 10.53% (random: 1%); rows tied at the cutoff 2  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 10.00 of 19 Default events = 52.63% (random: 10%); rows tied at the cutoff 1  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0001%    363,159     0.0008%    328,873            0.00    321,776
+       2      0.0003%    411,127     0.0006%    400,397            0.00    364,287
+       3      0.0003%    425,266     0.0017%    433,307            0.00    421,319
+       4      0.0006%    437,763     0.0015%    453,383            2.00    422,306
+       5      0.0005%    460,574     0.0023%    475,988            1.00    453,423
+       6      0.0004%    487,135     0.0038%    493,528            1.00    474,660
+       7      0.0018%    502,530     0.0060%    510,286            1.00    490,386
+       8      0.0033%    514,782     0.0065%    523,130            0.00    523,308
+       9      0.0039%    517,752     0.0133%    519,653            4.00    604,772
+      10      0.0231%    539,976     0.0325%    521,518           10.00    583,827
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+MODEL run 6: min_sum_hessian_in_leaf = 10, lambda_l2 = 1000   (artifacts\diag49\current_R2_hess10_l21000.txt)
+======================================================================================================================
+COST: wall-clock 136.0 s (model load + held-out scoring 38.9 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.20 GB, process peak 4.14 GB;  min system available 7.20 GB
+rescored: held-out Brier 0.0330528; DQ30 AUC 0.77465 (diagnostic 49: Brier 0.0330528, DQ30 AUC 0.77465)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.88846 [0.8673, 0.9088]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 4,600,859 distinct predicted values;  largest tie block 0.0007% of rows
+  the class's OWN raw score: spread (max - min) 3.44053; 511,513 distinct values; AUC of the raw score 0.88125
+  top 1% (78,707 rows): 72.00 of 270 DQ90+ events = 26.67% (random: 1%); rows tied at the cutoff 2*
+  top 10% (787,062 rows): 184.00 of 270 DQ90+ events = 68.15% (random: 10%); rows tied at the cutoff 16*
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.81181 [0.7940, 0.8295]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 4,600,859 distinct predicted values;  largest tie block 0.0007% of rows
+  the class's OWN raw score: spread (max - min) 3.33314; 1,206,510 distinct values; AUC of the raw score 0.80575
+  top 1% (78,707 rows): 60.00 of 543 DQ60 events = 11.05% (random: 1%); rows tied at the cutoff 2
+  top 10% (787,062 rows): 255.00 of 543 DQ60 events = 46.96% (random: 10%); rows tied at the cutoff 1
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.79952 [0.7250, 0.8762]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 4,600,859 distinct predicted values;  largest tie block 0.0007% of rows
+  the class's OWN raw score: spread (max - min) 0.580359; 10 distinct values; AUC of the raw score 0.78617
+  top 1% (78,707 rows): 2.00 of 19 Default events = 10.53% (random: 1%); rows tied at the cutoff 1  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 6.00 of 19 Default events = 31.58% (random: 10%); rows tied at the cutoff 5*  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0004%    382,741     0.0010%    371,863            0.00    363,374
+       2      0.0003%    387,224     0.0006%    388,202            0.00    368,537
+       3      0.0000%    408,365     0.0005%    425,534            0.00    376,787
+       4      0.0003%    438,768     0.0020%    457,347            1.00    399,928
+       5      0.0004%    466,654     0.0030%    468,295            0.00    425,141
+       6      0.0005%    482,463     0.0033%    488,062            1.00    464,185
+       7      0.0017%    499,774     0.0044%    494,493            1.00    499,717
+       8      0.0029%    512,147     0.0081%    495,844            6.00    537,449
+       9      0.0046%    487,945     0.0135%    497,635            4.00    570,615
+      10      0.0234%    534,783     0.0324%    513,588            6.00    595,131
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+MODEL run 7: min_sum_hessian_in_leaf = 1000, lambda_l2 = 0   (artifacts\diag49\current_R2_hess1000_l20.txt)
+======================================================================================================================
+COST: wall-clock 118.8 s (model load + held-out scoring 22.6 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.20 GB, process peak 4.14 GB;  min system available 7.24 GB
+rescored: held-out Brier 0.0330526; DQ30 AUC 0.77465 (diagnostic 49: Brier 0.0330526, DQ30 AUC 0.77465)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.86233 [0.8394, 0.8833]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 4,461,334 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 0; 1 distinct values; AUC of the raw score 0.50000
+  *** RAW SPREAD EXACTLY 0: this model assigns every loan the identical raw DQ90+ score, so its DQ90+ column says NOTHING about DQ90+ (raw-score AUC exactly 0.5, one distinct value: no class-specific ranking). P(DQ90+) above still differs between loans only because the softmax normalises by the other five classes' scores; its AUC of 0.86233 therefore measures how the OTHER classes order loans, not DQ90+-specific signal. ***
+  top 1% (78,707 rows): 37.00 of 270 DQ90+ events = 13.70% (random: 1%); rows tied at the cutoff 1
+  top 10% (787,062 rows): 164.00 of 270 DQ90+ events = 60.74% (random: 10%); rows tied at the cutoff 2
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.80136 [0.7812, 0.8212]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 4,461,334 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 3.39861; 119,278 distinct values; AUC of the raw score 0.79390
+  top 1% (78,707 rows): 60.00 of 543 DQ60 events = 11.05% (random: 1%); rows tied at the cutoff 3*
+  top 10% (787,062 rows): 259.00 of 543 DQ60 events = 47.70% (random: 10%); rows tied at the cutoff 5*
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.63485 [0.5033, 0.7623]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 4,461,334 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 0; 1 distinct values; AUC of the raw score 0.50000
+  *** RAW SPREAD EXACTLY 0: this model assigns every loan the identical raw Default score, so its Default column says NOTHING about Default (raw-score AUC exactly 0.5, one distinct value: no class-specific ranking). P(Default) above still differs between loans only because the softmax normalises by the other five classes' scores; its AUC of 0.63485 therefore measures how the OTHER classes order loans, not Default-specific signal. ***
+  top 1% (78,707 rows): 2.00 of 19 Default events = 10.53% (random: 1%); rows tied at the cutoff 1  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 4.00 of 19 Default events = 21.05% (random: 10%); rows tied at the cutoff 2  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0005%    406,936     0.0011%    334,219            0.00    406,936
+       2      0.0003%    406,760     0.0011%    361,700            1.00    406,760
+       3      0.0004%    405,632     0.0014%    394,589            2.00    405,632
+       4      0.0005%    415,859     0.0018%    433,265            2.00    415,859
+       5      0.0003%    434,213     0.0020%    469,002            3.00    434,213
+       6      0.0010%    448,264     0.0038%    493,401            1.00    448,264
+       7      0.0015%    470,537     0.0039%    512,612            1.00    470,537
+       8      0.0033%    490,281     0.0085%    505,171            1.00    490,281
+       9      0.0057%    489,859     0.0123%    473,529            4.00    489,859
+      10      0.0208%    492,994     0.0329%    483,850            4.00    492,994
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+MODEL run 8: min_sum_hessian_in_leaf = 1000, lambda_l2 = 10   (artifacts\diag49\current_R2_hess1000_l210.txt)
+======================================================================================================================
+COST: wall-clock 118.6 s (model load + held-out scoring 22.3 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.11 GB, process peak 4.14 GB;  min system available 7.31 GB
+rescored: held-out Brier 0.0330526; DQ30 AUC 0.77472 (diagnostic 49: Brier 0.0330526, DQ30 AUC 0.77472)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.86217 [0.8391, 0.8831]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 4,430,395 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 0; 1 distinct values; AUC of the raw score 0.50000
+  *** RAW SPREAD EXACTLY 0: this model assigns every loan the identical raw DQ90+ score, so its DQ90+ column says NOTHING about DQ90+ (raw-score AUC exactly 0.5, one distinct value: no class-specific ranking). P(DQ90+) above still differs between loans only because the softmax normalises by the other five classes' scores; its AUC of 0.86217 therefore measures how the OTHER classes order loans, not DQ90+-specific signal. ***
+  top 1% (78,707 rows): 36.00 of 270 DQ90+ events = 13.33% (random: 1%); rows tied at the cutoff 1
+  top 10% (787,062 rows): 171.00 of 270 DQ90+ events = 63.33% (random: 10%); rows tied at the cutoff 1
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.80139 [0.7814, 0.8211]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 4,430,395 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 3.39498; 114,483 distinct values; AUC of the raw score 0.79368
+  top 1% (78,707 rows): 59.00 of 543 DQ60 events = 10.87% (random: 1%); rows tied at the cutoff 3*
+  top 10% (787,062 rows): 257.00 of 543 DQ60 events = 47.33% (random: 10%); rows tied at the cutoff 2*
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.63408 [0.5070, 0.7608]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 4,430,395 distinct predicted values;  largest tie block 0.0006% of rows
+  the class's OWN raw score: spread (max - min) 0; 1 distinct values; AUC of the raw score 0.50000
+  *** RAW SPREAD EXACTLY 0: this model assigns every loan the identical raw Default score, so its Default column says NOTHING about Default (raw-score AUC exactly 0.5, one distinct value: no class-specific ranking). P(Default) above still differs between loans only because the softmax normalises by the other five classes' scores; its AUC of 0.63408 therefore measures how the OTHER classes order loans, not Default-specific signal. ***
+  top 1% (78,707 rows): 2.00 of 19 Default events = 10.53% (random: 1%); rows tied at the cutoff 1  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 4.00 of 19 Default events = 21.05% (random: 10%); rows tied at the cutoff 1  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0004%    404,058     0.0011%    327,014            0.00    404,058
+       2      0.0004%    403,621     0.0013%    352,722            1.00    403,621
+       3      0.0001%    402,433     0.0015%    388,102            2.00    402,433
+       4      0.0006%    413,335     0.0014%    428,684            1.00    413,335
+       5      0.0005%    431,424     0.0023%    465,799            4.00    431,424
+       6      0.0013%    446,376     0.0036%    492,160            0.00    446,376
+       7      0.0014%    465,731     0.0044%    513,826            2.00    465,731
+       8      0.0029%    485,596     0.0080%    504,340            2.00    485,596
+       9      0.0050%    484,425     0.0127%    473,052            3.00    484,425
+      10      0.0217%    493,401     0.0327%    484,700            4.00    493,401
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+MODEL run 9: min_sum_hessian_in_leaf = 1000, lambda_l2 = 1000   (artifacts\diag49\current_R2_hess1000_l21000.txt)
+======================================================================================================================
+COST: wall-clock 120.8 s (model load + held-out scoring 24.7 s, rest statistics and bootstrap);  peak RSS in-run sampled 2.26 GB, process peak 4.14 GB;  min system available 7.20 GB
+rescored: held-out Brier 0.0330537; DQ30 AUC 0.77459 (diagnostic 49: Brier 0.0330537, DQ30 AUC 0.77459)
+
+--- DQ90+ (PRIMARY)  events 270 of 7,870,620 held-out rows
+  AUC 0.85276 [0.8287, 0.8752]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ90+): 4,529,417 distinct predicted values;  largest tie block 0.0009% of rows
+  the class's OWN raw score: spread (max - min) 0; 1 distinct values; AUC of the raw score 0.50000
+  *** RAW SPREAD EXACTLY 0: this model assigns every loan the identical raw DQ90+ score, so its DQ90+ column says NOTHING about DQ90+ (raw-score AUC exactly 0.5, one distinct value: no class-specific ranking). P(DQ90+) above still differs between loans only because the softmax normalises by the other five classes' scores; its AUC of 0.85276 therefore measures how the OTHER classes order loans, not DQ90+-specific signal. ***
+  top 1% (78,707 rows): 28.00 of 270 DQ90+ events = 10.37% (random: 1%); rows tied at the cutoff 1
+  top 10% (787,062 rows): 163.00 of 270 DQ90+ events = 60.37% (random: 10%); rows tied at the cutoff 2
+
+--- DQ60 (SECONDARY)  events 543 of 7,870,620 held-out rows
+  AUC 0.80071 [0.7812, 0.8208]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(DQ60): 4,529,417 distinct predicted values;  largest tie block 0.0009% of rows
+  the class's OWN raw score: spread (max - min) 2.66971; 40,883 distinct values; AUC of the raw score 0.79057
+  top 1% (78,707 rows): 62.00 of 543 DQ60 events = 11.42% (random: 1%); rows tied at the cutoff 13*
+  top 10% (787,062 rows): 258.00 of 543 DQ60 events = 47.51% (random: 10%); rows tied at the cutoff 1
+
+--- Default (THIN)  events 19 of 7,870,620 held-out rows   *** TOO THIN TO MEASURE ORDERING (19 held-out events) ***
+  AUC 0.64733 [0.5237, 0.7664]   (95% bootstrap interval over held-out loans, 500 draws)
+  P(Default): 4,529,417 distinct predicted values;  largest tie block 0.0009% of rows
+  the class's OWN raw score: spread (max - min) 0; 1 distinct values; AUC of the raw score 0.50000
+  *** RAW SPREAD EXACTLY 0: this model assigns every loan the identical raw Default score, so its Default column says NOTHING about Default (raw-score AUC exactly 0.5, one distinct value: no class-specific ranking). P(Default) above still differs between loans only because the softmax normalises by the other five classes' scores; its AUC of 0.64733 therefore measures how the OTHER classes order loans, not Default-specific signal. ***
+  top 1% (78,707 rows): 2.00 of 19 Default events = 10.53% (random: 1%); rows tied at the cutoff 1  [Default: a count, not a rate; read with the interval above]
+  top 10% (787,062 rows): 3.00 of 19 Default events = 15.79% (random: 10%); rows tied at the cutoff 2  [Default: a count, not a rate; read with the interval above]
+
+DECILE TABLES (decile 1 = lowest predicted score; equal-count groups; tied blocks shared pro rata so counts can be fractional)
+           DQ90+ rate   distinct   DQ60 rate   distinct  Default events   distinct
+       1      0.0004%    415,445     0.0010%    346,382            0.00    415,445
+       2      0.0005%    415,485     0.0015%    364,874            1.00    415,485
+       3      0.0004%    413,459     0.0006%    398,374            1.00    413,459
+       4      0.0003%    423,111     0.0027%    434,561            2.00    423,111
+       5      0.0006%    440,014     0.0019%    480,880            2.00    440,014
+       6      0.0015%    453,590     0.0046%    507,916            3.00    453,590
+       7      0.0009%    473,663     0.0029%    527,274            1.00    473,663
+       8      0.0033%    495,801     0.0089%    512,638            2.00    495,801
+       9      0.0057%    495,719     0.0121%    467,800            4.00    495,719
+      10      0.0207%    503,131     0.0328%    488,722            3.00    503,131
+  rows per decile 787,062; DQ90+ events per decile sum to 270.0, DQ60 543.0, Default 19.0
+
+======================================================================================================================
+DOES DQ90+ ORDERING VARY WITH min_sum_hessian_in_leaf, lambda_l2, BOTH, OR NEITHER?  (descriptive, from the nine cells)
+======================================================================================================================
+DQ90+ AUC by cell (rows = min_sum_hessian_in_leaf, columns = lambda_l2); constant-score cells show 0.5 with no interval
+                       lambda_l2 0    lambda_l2 10  lambda_l2 1000    row mean
+  hess 0.001               0.81295         0.88564         0.88838     0.86232
+  hess 10                  0.88148         0.88329         0.88846     0.88441
+  hess 1000                0.86233         0.86217         0.85276     0.85909
+  column mean              0.85225         0.87704         0.87653
+DQ90+ AUC of the class's OWN raw score by cell (0.5 exactly = constant raw column)
+                       lambda_l2 0    lambda_l2 10  lambda_l2 1000
+  hess 0.001               0.81830         0.87756         0.88110
+  hess 10                  0.87272         0.87490         0.88125
+  hess 1000                0.50000         0.50000         0.50000
+95% interval width by cell: (0.001, 0) 0.0568; (0.001, 10) 0.0395; (0.001, 1000) 0.0415; (10, 0) 0.0407; (10, 10) 0.0419; (10, 1000) 0.0415; (1000, 0) 0.0439; (1000, 10) 0.0441; (1000, 1000) 0.0464
+spread (max - min) of the marginal means: across min_sum_hessian_in_leaf 0.02532; across lambda_l2 0.02479; largest interaction residual |cell - row mean - column mean + grand mean| 0.03302; range of the nine cells 0.07551; mean interval width of the non-constant cells 0.0440
+  within min_sum_hessian_in_leaf = 0.001: AUC range across lambda_l2 0.07543
+  within min_sum_hessian_in_leaf = 10: AUC range across lambda_l2 0.00698
+  within min_sum_hessian_in_leaf = 1000: AUC range across lambda_l2 0.00957
+  within lambda_l2 = 0: AUC range across min_sum_hessian_in_leaf 0.06853
+  within lambda_l2 = 10: AUC range across min_sum_hessian_in_leaf 0.02347
+  within lambda_l2 = 1000: AUC range across min_sum_hessian_in_leaf 0.03570
+raw-score DQ90+ AUC: spread of the marginal means across min_sum_hessian_in_leaf 0.37629; across lambda_l2 0.02377; range of the nine cells 0.38125
+cells whose DQ90+ raw spread is exactly 0 (constant score): [(1000.0, 0.0), (1000.0, 10.0), (1000.0, 1000.0)]; whose Default raw spread is exactly 0: [(1000.0, 0.0), (1000.0, 10.0), (1000.0, 1000.0)]
+
+======================================================================================================================
+FINDINGS  (measured only; no interpretation, no recommendation)
+======================================================================================================================
+- Held-out events: DQ90+ 270 (train 1,159); DQ60 543 (train 2,289); Default 19 (train 55): TOO THIN TO MEASURE ORDERING (19 held-out events).
+- Sanity: run 5 rescored to Brier 0.0330520 and DQ30 AUC 0.77469 (diagnostic 49: 0.0330520, 0.77469).
+- run 1 (min_sum_hessian_in_leaf 0.001, lambda_l2 0): Brier 0.0428301, DQ30 AUC 0.72976; DQ90+ AUC 0.81295 [0.7861, 0.8429], own raw-score AUC 0.81830, raw spread 1.2739e+07, 1,551,137 distinct P values, top 1% holds 41.0 of 270 events, top 10% 151.0; DQ60 AUC 0.76274 [0.7432, 0.7851]; Default AUC 0.49628 [0.4962, 0.4964] (19 events, too thin), own raw-score AUC 0.76254, raw spread 3.419e+08, top 10% holds 1.77 of 19.
+- run 2 (min_sum_hessian_in_leaf 0.001, lambda_l2 10): Brier 0.0330522, DQ30 AUC 0.77466; DQ90+ AUC 0.88564 [0.8669, 0.9063], own raw-score AUC 0.87756, raw spread 8.9882, 4,622,740 distinct P values, top 1% holds 77.0 of 270 events, top 10% 180.0; DQ60 AUC 0.80796 [0.7895, 0.8260]; Default AUC 0.80494 [0.6933, 0.8913] (19 events, too thin), own raw-score AUC 0.79266, raw spread 9.7828, top 10% holds 8.00 of 19.
+- run 3 (min_sum_hessian_in_leaf 0.001, lambda_l2 1000): Brier 0.0330535, DQ30 AUC 0.77461; DQ90+ AUC 0.88838 [0.8674, 0.9089], own raw-score AUC 0.88110, raw spread 3.4721, 4,563,973 distinct P values, top 1% holds 74.0 of 270 events, top 10% 181.0; DQ60 AUC 0.81243 [0.7945, 0.8299]; Default AUC 0.78819 [0.6909, 0.8788] (19 events, too thin), own raw-score AUC 0.78416, raw spread 0.64263, top 10% holds 8.00 of 19.
+- run 4 (min_sum_hessian_in_leaf 10, lambda_l2 0): Brier 0.0330527, DQ30 AUC 0.77469; DQ90+ AUC 0.88148 [0.8621, 0.9028], own raw-score AUC 0.87272, raw spread 10.026, 4,744,461 distinct P values, top 1% holds 68.0 of 270 events, top 10% 177.0; DQ60 AUC 0.80617 [0.7879, 0.8256]; Default AUC 0.81033 [0.6984, 0.8991] (19 events, too thin), own raw-score AUC 0.80106, raw spread 9.8148, top 10% holds 10.00 of 19.
+- run 5 (min_sum_hessian_in_leaf 10, lambda_l2 10): Brier 0.0330520, DQ30 AUC 0.77469; DQ90+ AUC 0.88329 [0.8639, 0.9059], own raw-score AUC 0.87490, raw spread 9.3151, 4,660,061 distinct P values, top 1% holds 69.0 of 270 events, top 10% 182.0; DQ60 AUC 0.80509 [0.7871, 0.8226]; Default AUC 0.80675 [0.6996, 0.8979] (19 events, too thin), own raw-score AUC 0.78891, raw spread 7.3708, top 10% holds 10.00 of 19.
+- run 6 (min_sum_hessian_in_leaf 10, lambda_l2 1000): Brier 0.0330528, DQ30 AUC 0.77465; DQ90+ AUC 0.88846 [0.8673, 0.9088], own raw-score AUC 0.88125, raw spread 3.4405, 4,600,859 distinct P values, top 1% holds 72.0 of 270 events, top 10% 184.0; DQ60 AUC 0.81181 [0.7940, 0.8295]; Default AUC 0.79952 [0.7250, 0.8762] (19 events, too thin), own raw-score AUC 0.78617, raw spread 0.58036, top 10% holds 6.00 of 19.
+- run 7 (min_sum_hessian_in_leaf 1000, lambda_l2 0): Brier 0.0330526, DQ30 AUC 0.77465; DQ90+ AUC 0.86233 [0.8394, 0.8833], own raw-score AUC 0.50000, raw spread 0, 4,461,334 distinct P values, top 1% holds 37.0 of 270 events, top 10% 164.0; DQ60 AUC 0.80136 [0.7812, 0.8212]; Default AUC 0.63485 [0.5033, 0.7623] (19 events, too thin), own raw-score AUC 0.50000, raw spread 0, top 10% holds 4.00 of 19.
+- run 8 (min_sum_hessian_in_leaf 1000, lambda_l2 10): Brier 0.0330526, DQ30 AUC 0.77472; DQ90+ AUC 0.86217 [0.8391, 0.8831], own raw-score AUC 0.50000, raw spread 0, 4,430,395 distinct P values, top 1% holds 36.0 of 270 events, top 10% 171.0; DQ60 AUC 0.80139 [0.7814, 0.8211]; Default AUC 0.63408 [0.5070, 0.7608] (19 events, too thin), own raw-score AUC 0.50000, raw spread 0, top 10% holds 4.00 of 19.
+- run 9 (min_sum_hessian_in_leaf 1000, lambda_l2 1000): Brier 0.0330537, DQ30 AUC 0.77459; DQ90+ AUC 0.85276 [0.8287, 0.8752], own raw-score AUC 0.50000, raw spread 0, 4,529,417 distinct P values, top 1% holds 28.0 of 270 events, top 10% 163.0; DQ60 AUC 0.80071 [0.7812, 0.8208]; Default AUC 0.64733 [0.5237, 0.7664] (19 events, too thin), own raw-score AUC 0.50000, raw spread 0, top 10% holds 3.00 of 19.
+- For a class whose raw column is constant, P(class) still varies between loans through the softmax normalisation by the other classes' scores; its AUC is then the other classes' ordering, and the class's own raw-score AUC is exactly 0.5. Both are listed per model above.
+- Models with a raw-score spread of exactly 0 (a constant class column: nothing class-specific): DQ90+ [7, 8, 9]; DQ60 none; Default [7, 8, 9].
+- DQ90+ AUC across the nine cells: min 0.81295, max 0.88846; marginal-mean spread across min_sum_hessian_in_leaf 0.02532, across lambda_l2 0.02479; mean interval width of non-constant cells 0.0440.
+
+PEAK RSS (src.memwatch): process peak 4.14 GB; lowest system-available memory seen 7.01 GB; total scoring wall-clock 19.3 min

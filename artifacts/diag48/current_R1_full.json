@@ -1,0 +1,42 @@
+{
+ "origin_states": [
+  "Current"
+ ],
+ "features": [
+  "fico",
+  "ltv",
+  "dti",
+  "rate_spread",
+  "property_state",
+  "est_ltv",
+  "unemp_level",
+  "unemp_chg_12m"
+ ],
+ "categorical": [
+  "property_state"
+ ],
+ "class_order": [
+  "Current",
+  "DQ30",
+  "DQ60",
+  "DQ90+",
+  "Prepaid",
+  "Default"
+ ],
+ "params": {
+  "objective": "multiclass",
+  "num_class": 6,
+  "device_type": "cpu",
+  "verbosity": 0
+ },
+ "num_boost_round": 100,
+ "window": [
+  200601,
+  200812
+ ],
+ "split_seed": 40,
+ "train_fraction": 0.8,
+ "train_rows": 31490253,
+ "held_out_rows": 7870620,
+ "made_by": "diagnostics/48_ordering_vs_level.py"
+}
