@@ -1,0 +1,45 @@
+-m src.train_ml --origin-states Current DQ30 DQ60 DQ90+ --from-period-max 200806 --name arch6_pooled --overwrite --min-sum-hessian-in-leaf 10 --lambda-l2 10
+
+model name:            arch6_pooled
+origin states:         ['Current', 'DQ30', 'DQ60', 'DQ90+']
+from_state feature:    INCLUDED (several origin states)
+loan_age feature:      OMITTED (default)
+features, matrix order: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+categorical features:  ['property_state', 'from_state']
+class order:           ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+training window:       role == fit, from_period <= 200806
+  scan 2006Q1: 5,853,673 training rows
+  scan 2006Q2: 5,379,365 training rows
+  scan 2006Q3: 4,419,756 training rows
+  scan 2006Q4: 4,201,247 training rows
+  scan 2007Q1: 3,470,559 training rows
+  scan 2007Q2: 3,379,717 training rows
+  scan 2007Q3: 2,080,857 training rows
+  scan 2007Q4: 1,548,802 training rows
+training rows 30,333,976; null/unknown labels dropped 0; loan_age in the rows (provenance) -1 .. 30; from_period 200512 .. 200806
+  label Current      29,559,666
+  label DQ30            349,050
+  label DQ60             70,665
+  label DQ90+            98,784
+  label Prepaid         252,124
+  label Default           3,687
+  matrix 2006Q1: 5,853,673 rows
+  matrix 2006Q2: 5,379,365 rows
+  matrix 2006Q3: 4,419,756 rows
+  matrix 2006Q4: 4,201,247 rows
+  matrix 2007Q1: 3,470,559 rows
+  matrix 2007Q2: 3,379,717 rows
+  matrix 2007Q3: 2,080,857 rows
+  matrix 2007Q4: 1,548,802 rows
+matrix 30,333,976 x 9, 0.85 GB
+lightgbm params:       {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}
+Dataset constructed in 1.8 s
+
+training wall-clock:   130.7 s (2.2 min) for 100 rounds, 1.31 s/round;  Dataset construction 1.8 s
+total wall-clock:      142.0 s
+peak RSS:              5.38 GB   min system available 1.73 GB
+loan_age is not a feature: no clamp bound written (training rows span -1 .. 30, recorded as provenance)
+saved: artifacts/ml/arch6_pooled/model.txt
+       artifacts/ml/arch6_pooled/model.json
+
+--- stderr ---

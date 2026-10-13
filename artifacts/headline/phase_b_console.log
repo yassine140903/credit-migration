@@ -1,0 +1,638 @@
+HEADLINE RUN  lifetime forecast to h = 60 from the 2008-12 cut: ML (pooled) vs homogeneous baseline, with prior-only, persistence and ORACLE references
+run date 2026-10-13   panel build 2026-10-08T09:41:19.866411   partitions 2006Q1..2007Q4
+
+==========================================================================================================================================
+0. DEFINITIONS FIXED BEFORE ANY NUMBER WAS READ
+==========================================================================================================================================
+  Arms      ML pooled (fresh model, artifacts/ml/headline_pooled, full fit window); BASELINE (src.baseline --fit-only, same fit rows);
+            PRIOR-ONLY (to_state frequencies over all fit rows, every loan, every h >= 1: src.nulls.marginal_distribution);
+            references: PERSISTENCE (identity matrix through src.horizon.chain), ORACLE (not achievable; src.nulls.oracle_distribution
+            per h on the scored cohort, so its error is zero by construction). src.nulls holds persistence / marginal / oracle; they
+            are not in src.horizon and only persistence is chained.
+  Loans     the loans with a `condition` row at 2008-12 (405,672), the forecaster's population. The harness's eligible set is 33 loans
+            larger (loans observed at the cut only as the to_state of a 2008-11 row); those 33 are not scored and are reported
+            separately. Decision taken with the user before the run.
+  Cohort    at each h the scored cohort is the loans whose realised state at h is not CENSORED (harness `varying` convention);
+            censored loans are their own column, never redistributed. Predicted shares are summed over the scored cohort only.
+  Error     |predicted share - realised share| in percentage points, per state; TOTAL = sum over the six states.
+  Closest   per state, the arm with the smallest error among ML / baseline / prior-only (and, second column, among those plus persistence).
+  Gap       ML minus baseline, ML minus prior-only, in TOTAL percentage points, at h = 6, 12, 24, 60 and at every h.
+  Trend     'widens' if |gap| strictly increases at each successive reporting horizon, 'narrows' if it strictly decreases at each,
+            otherwise 'non-monotone'. No threshold defines 'holds'; the ratio |gap(60)| / |gap(6)| and the signed values are printed.
+  h = 0     the common starting state of every arm (a one-hot on the state at the cut); no arm forecasts there.
+  No winner-takes-all rule. No sampling uncertainty is attached (none was specified).
+
+Order of operations: phase A (train_ml on fit rows, baseline --fit-only, forecast from the condition rows at the cut) ran and finished before this phase;
+only here is the harness's read of `evaluate` rows performed, for realised outcomes alone.
+
+==========================================================================================================================================
+1. THE ARMS' TRAINING DATA (all from fit rows; read before any outcome)
+==========================================================================================================================================
+ML model artifacts/ml/headline_pooled   sha256 360761955780a5da
+  origin states ['Current', 'DQ30', 'DQ60', 'DQ90+']; features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']; categorical ['property_state', 'from_state']
+  training window: role fit, from_period_max argument None; observed from_period 200512 .. 200812 (train_ml has no lower bound and none was added)
+  training rows 40,210,036; loan_age is a feature: False; rounds 100; panel build of the training run 2026-10-08T09:41:19.866411
+  label counts: Current 38,939,122  DQ30 560,573  DQ60 137,744  DQ90+ 233,923  Prepaid 331,492  Default 7,182
+  from_state counts: Current 39,360,874  DQ30 523,364  DQ60 124,006  DQ90+ 201,792
+  parameters as stored in model.txt vs the brief:
+    num_leaves                 brief 31           stored 31           PASS
+    min_data_in_leaf           brief 20           stored 20           PASS
+    min_sum_hessian_in_leaf    brief 10           stored 10           PASS
+    lambda_l2                  brief 10           stored 10           PASS
+    objective                  brief multiclass   stored multiclass   PASS
+  lgb_params in the sidecar: {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}
+  train_ml wall-clock: Dataset construction 2.5 s + training 170.7 s; sidecar peak RSS 6.54 GB
+
+BASELINE re-estimated by src.baseline --fit-only into artifacts/baseline_headline
+  build stamp : 2026-10-08T09:41:19.866411
+  fit from_period range                                        200512 - 200812
+  fit rows with from_period after 200812                                     0   PASS
+  identical training data: baseline count matrix total 40,210,036 vs ML training rows 40,210,036; row totals vs the ML from_state counts and column totals vs the ML label counts: PASS
+  fresh count matrix (rows = from, columns = to):
+                    Current          DQ30          DQ60         DQ90+       Prepaid       Default
+    Current      38,697,062       335,367         2,832         1,429       324,110            74
+    DQ30            212,900       204,213       100,056           839         5,306            50
+    DQ60             16,795        18,359        30,974        56,818           993            67
+    DQ90+            12,365         2,634         3,882       174,837         1,083         6,991
+  fresh probability matrix:
+    Current        0.983135      0.008520      0.000072      0.000036      0.008234      0.000002
+    DQ30           0.406791      0.390193      0.191179      0.001603      0.010138      0.000096
+    DQ60           0.135437      0.148049      0.249778      0.458188      0.008008      0.000540
+    DQ90+          0.061276      0.013053      0.019238      0.866422      0.005367      0.034645
+
+STORED artifacts/baseline vs the fresh estimate (the stored one carries 'build stamp : 2026-10-05T11:50:54.525429'; this run's panel build is 2026-10-08T09:41:19.866411)
+  stored count total 40,385,650 vs fresh 40,210,036; max |count difference| in a cell 168,621
+  stored probability matrix:
+    Current        0.983142      0.008533      0.000072      0.000036      0.008214      0.000002
+    DQ30           0.406893      0.390246      0.191018      0.001603      0.010144      0.000095
+    DQ60           0.135893      0.148489      0.249819      0.457270      0.007991      0.000538
+    DQ90+          0.061308      0.013098      0.019338      0.866321      0.005385      0.034550
+  (fresh - stored):
+    Current       -0.000007     -0.000013     -0.000000     -0.000000     +0.000020     +0.000000
+    DQ30          -0.000102     -0.000053     +0.000160     +0.000000     -0.000006     +0.000001
+    DQ60          -0.000456     -0.000440     -0.000041     +0.000918     +0.000017     +0.000003
+    DQ90+         -0.000032     -0.000045     -0.000100     +0.000101     -0.000018     +0.000095
+  MAX ABSOLUTE CELL DIFFERENCE (probabilities, all 36 cells): 0.000918   they DIFFER; the fresh estimate is the one used
+
+PRIOR-ONLY: to_state frequencies over all 40,210,036 fit rows (src.nulls.fit_to_state_counts / marginal_distribution), the same vector for every loan at every h >= 1:
+  Current 38,939,122 (96.8393%)  DQ30 560,573 (1.3941%)  DQ60 137,744 (0.3426%)  DQ90+ 233,923 (0.5818%)  Prepaid 331,492 (0.8244%)  Default 7,182 (0.0179%)
+  equals the ML model's training label counts and row count: PASS
+  this is the same vector as the harness's marginal null; it is carried once below as 'prior-only'.
+
+==========================================================================================================================================
+2. LOANS AND REALISED OUTCOMES   (the harness read: realised states come from condition + evaluate rows of the test split)
+==========================================================================================================================================
+independent list: 405,672 loans with a condition row at 200812 (read through panel_io.load_panel); expected 405,672: PASS
+  by start state: Current 385,996, DQ30 9,377, DQ60 3,367, DQ90+ 6,932
+harness read 17 s: 484,145 test-split loans; absorbed at or before the cut 76,928; enters the panel after the cut 1,090; follow-up ends before the cut 415; reporting hole at the cut 7; eligible 405,705
+cross-check: the harness's state at the cut equals the cut row's from_state for all 405,672 loans: PASS
+harness-eligible loans WITHOUT a cut row (not scored, not forecast): 33
+  start state: Current 8, DQ30 0, DQ60 0, DQ90+ 25
+  realised at h = 6 : Current 0, DQ30 0, DQ60 0, DQ90+ 1, Prepaid 0, Default 0, CENSORED 32
+  realised at h = 12: Current 0, DQ30 0, DQ60 0, DQ90+ 2, Prepaid 0, Default 0, CENSORED 31
+  realised at h = 24: Current 0, DQ30 0, DQ60 0, DQ90+ 2, Prepaid 0, Default 0, CENSORED 31
+  realised at h = 60: Current 0, DQ30 0, DQ60 0, DQ90+ 1, Prepaid 1, Default 0, CENSORED 31
+
+SCORED AND CENSORED loans at the reporting horizons (censored: no observation at the target month and no absorbing state reached by then; their own column, never redistributed):
+     h     month     eligible       scored     censored   scored-cohort start-state mix (Current / DQ30 / DQ60 / DQ90+)
+     0   2008-12      405,672      405,672  0 (0.0000%)   385,996 (95.15%) / 9,377 (2.31%) / 3,367 (0.83%) / 6,932 (1.71%)
+     6   2009-06      405,672      405,448 224 (0.0552%)   385,910 (95.18%) / 9,369 (2.31%) / 3,360 (0.83%) / 6,809 (1.68%)
+    12   2009-12      405,672      405,219 453 (0.1117%)   385,869 (95.22%) / 9,356 (2.31%) / 3,350 (0.83%) / 6,644 (1.64%)
+    24   2010-12      405,672      404,317 1,355 (0.3340%)   385,551 (95.36%) / 9,237 (2.28%) / 3,223 (0.80%) / 6,306 (1.56%)
+    60   2013-12      405,672      402,720 2,952 (0.7277%)   384,360 (95.44%) / 8,995 (2.23%) / 3,146 (0.78%) / 6,219 (1.54%)
+  all-eligible start-state mix: 385,996 (95.15%) / 9,377 (2.31%) / 3,367 (0.83%) / 6,932 (1.71%)
+
+==========================================================================================================================================
+3. THE ARMS OVER THE SAME LOANS IN THE SAME ORDER   (ML read back from storage; baseline, persistence chained by src.horizon.chain)
+==========================================================================================================================================
+the ML forecast's loan ids read back from storage (405,672 loans, 9 batches) equal the independently loaded list, same order: PASS
+  the arrays used for the realised outcomes, the baseline chain, the persistence chain and the scored masks are all indexed by that same list (positions asserted above): PASS
+  ML run.json: {"batch_size": 50000, "horizon": 60, "n_loans": 405672, "cut": 200812, "panel_build_stamp": "2026-10-08T09:41:19.866411"}
+
+CHECKS per arm   (float64 = as computed in memory; float32 = as stored, summed in float64; the stored tolerance 1e-05 is not loosened)
+  arm                    worst |sum-1| float64      worst |sum-1| float32 stored smallest prob.     Prepaid,Default step   Prepaid+Default step    
+  ML (pooled)            2.598e-14 (forecaster)     5.242e-08 within           0.000e+00          0.000e+00              0.000e+00               
+  baseline               1.998e-15                  n/a (not stored)           0.000e+00          1.880e-06              3.777e-03               
+  persistence            0.000e+00                  n/a (not stored)           0.000e+00          0.000e+00              0.000e+00               
+  prior-only: one vector summing to 1.00000000000000000 (|sum-1| 0.000e+00); smallest entry 1.786e-04; constant in h, so Prepaid and Default mass cannot fall for h >= 1
+  ORACLE: reproduces the realised counts it was built from at every h (relative 1e-9): PASS
+  every vector sums to one (float64): ML PASS, baseline/persistence PASS;  no negative probability: ML PASS, baseline/persistence PASS;  Prepaid & Default mass non-decreasing in h: ML PASS, baseline/persistence PASS
+  stored float32 vectors sum to one within 1e-05: PASS (worst 5.242e-08)
+  ML sums of the stored float32 values over all loans vs the forecaster's in-memory float64 sums, largest |difference| in expected loans over h and state: 2.278e-05
+
+==========================================================================================================================================
+4. PRIMARY: PREDICTED VS REALISED SHARE OF THE BOOK AT h = 6, 12, 24, 60   (scored cohort; shares in %, errors in percentage points)
+==========================================================================================================================================
+
+h = 6  (2009-06)   eligible 405,672, scored 405,448, censored 224 (0.0552%)
+  state         realised |          ML    baseline  prior-only persistence |    err ML  err base err prior err persist | closest    closest+pers.
+  Current       79.4260% |    83.0245%    91.0758%    96.8393%    95.1811% |    3.5985   11.6498   17.4133   15.7552 | ML         ML          
+  DQ30           2.3024% |     2.2113%     1.4467%     1.3941%     2.3108% |    0.0911    0.8556    0.9083    0.0084 | ML         persistence 
+  DQ60           0.9182% |     0.9937%     0.4353%     0.3426%     0.8287% |    0.0755    0.4829    0.5757    0.0895 | ML         ML          
+  DQ90+          3.1153% |     3.7868%     1.8326%     0.5818%     1.6794% |    0.6715    1.2827    2.5336    1.4359 | ML         ML          
+  Prepaid       13.8553% |     9.9082%     4.8194%     0.8244%     0.0000% |    3.9471    9.0359   13.0309   13.8553 | ML         ML          
+  Default        0.3828% |     0.0755%     0.3901%     0.0179%     0.0000% |    0.3073    0.0073    0.3649    0.3828 | baseline   baseline    
+  TOTAL                  |                                                 |    8.6909   23.3143   34.8267   31.5271   (TOTAL absolute error, sum over six states; ORACLE 0.00e+00)
+  context (not scored): ML predicted share over ALL 405,672 eligible loans: Current 83.0011% DQ30 2.2113% DQ60 0.9937% DQ90+ 3.8138% Prepaid 9.9047% Default 0.0754%
+                        baseline over all eligible loans:            Current 91.0570% DQ30 1.4470% DQ60 0.4358% DQ90+ 1.8466% Prepaid 4.8189% Default 0.3947%
+
+h = 12  (2009-12)   eligible 405,672, scored 405,219, censored 453 (0.1117%)
+  state         realised |          ML    baseline  prior-only persistence |    err ML  err base err prior err persist | closest    closest+pers.
+  Current       68.5143% |    72.8557%    86.4898%    96.8393%    95.2248% |    4.3413   17.9755   28.3250   26.7105 | ML         ML          
+  DQ30           2.5959% |     1.9812%     1.3608%     1.3941%     2.3089% |    0.6146    1.2351    1.2018    0.2870 | ML         persistence 
+  DQ60           1.1690% |     0.9890%     0.4019%     0.3426%     0.8267% |    0.1800    0.7671    0.8264    0.3423 | ML         ML          
+  DQ90+          4.8403% |     5.8246%     1.6152%     0.5818%     1.6396% |    0.9843    3.2252    4.2586    3.2007 | ML         ML          
+  Prepaid       21.9067% |    18.2078%     9.3868%     0.8244%     0.0000% |    3.6989   12.5199   21.0823   21.9067 | ML         ML          
+  Default        0.9738% |     0.1416%     0.7456%     0.0179%     0.0000% |    0.8322    0.2282    0.9559    0.9738 | baseline   baseline    
+  TOTAL                  |                                                 |   10.6513   35.9510   56.6500   53.4210   (TOTAL absolute error, sum over six states; ORACLE 0.00e+00)
+  context (not scored): ML predicted share over ALL 405,672 eligible loans: Current 72.8071% DQ30 1.9811% DQ60 0.9891% DQ90+ 5.8883% Prepaid 18.1927% Default 0.1415%
+                        baseline over all eligible loans:            Current 86.4596% DQ30 1.3609% DQ60 0.4024% DQ90+ 1.6308% Prepaid 9.3846% Default 0.7616%
+
+h = 24  (2010-12)   eligible 405,672, scored 404,317, censored 1,355 (0.3340%)
+  state         realised |          ML    baseline  prior-only persistence |    err ML  err base err prior err persist | closest    closest+pers.
+  Current       53.1472% |    56.9442%    77.8728%    96.8393%    95.3586% |    3.7971   24.7256   43.6922   42.2114 | ML         ML          
+  DQ30           2.1676% |     1.6000%     1.2221%     1.3941%     2.2846% |    0.5676    0.9455    0.7735    0.1170 | ML         persistence 
+  DQ60           0.8798% |     0.9177%     0.3584%     0.3426%     0.7971% |    0.0379    0.5214    0.5372    0.0826 | ML         ML          
+  DQ90+          4.6038% |     9.0896%     1.3717%     0.5818%     1.5597% |    4.4858    3.2321    4.0221    3.0441 | baseline   persistence 
+  Prepaid       36.3930% |    31.1980%    17.8307%     0.8244%     0.0000% |    5.1949   18.5622   35.5686   36.3930 | ML         ML          
+  Default        2.8087% |     0.2505%     1.3443%     0.0179%     0.0000% |    2.5582    1.4644    2.7908    2.8087 | baseline   baseline    
+  TOTAL                  |                                                 |   16.6415   49.4512   87.3843   84.6568   (TOTAL absolute error, sum over six states; ORACLE 0.00e+00)
+  context (not scored): ML predicted share over ALL 405,672 eligible loans: Current 56.8559% DQ30 1.6011% DQ60 0.9196% DQ90+ 9.2490% Prepaid 31.1231% Default 0.2512%
+                        baseline over all eligible loans:            Current 77.8261% DQ30 1.2217% DQ60 0.3586% DQ90+ 1.3801% Prepaid 17.8213% Default 1.3922%
+
+h = 60  (2013-12)   eligible 405,672, scored 402,720, censored 2,952 (0.7277%)
+  state         realised |          ML    baseline  prior-only persistence |    err ML  err base err prior err persist | closest    closest+pers.
+  Current       21.1743% |    29.6005%    56.6678%    96.8393%    95.4410% |    8.4262   35.4935   75.6650   74.2667 | ML         ML          
+  DQ30           1.3247% |     0.9145%     0.8888%     1.3941%     2.2336% |    0.4102    0.4359    0.0694    0.9088 | prior-only prior-only  
+  DQ60           0.4584% |     0.7047%     0.2602%     0.3426%     0.7812% |    0.2463    0.1982    0.1158    0.3228 | prior-only prior-only  
+  DQ90+          2.2206% |    15.0232%     0.9836%     0.5818%     1.5442% |   12.8026    1.2371    1.6389    0.6764 | baseline   persistence 
+  Prepaid       67.3463% |    53.3001%    38.3952%     0.8244%     0.0000% |   14.0462   28.9510   66.5219   67.3463 | ML         ML          
+  Default        7.4757% |     0.4569%     2.8043%     0.0179%     0.0000% |    7.0187    4.6713    7.4578    7.4757 | baseline   baseline    
+  TOTAL                  |                                                 |   42.9503   70.9871  151.4688  150.9967   (TOTAL absolute error, sum over six states; ORACLE 5.55e-17)
+  context (not scored): ML predicted share over ALL 405,672 eligible loans: Current 29.5690% DQ30 0.9194% DQ60 0.7128% DQ90+ 15.2625% Prepaid 53.0775% Default 0.4589%
+                        baseline over all eligible loans:            Current 56.6328% DQ30 0.8883% DQ60 0.2601% DQ90+ 0.9831% Prepaid 38.3713% Default 2.8645%
+
+==========================================================================================================================================
+5. THE COMPOUNDING FINDING: TOTAL ABSOLUTE ERROR (sum over the six states, percentage points) AND THE GAPS
+==========================================================================================================================================
+   h           ML     baseline   prior-only  persistence       ORACLE |  ML - baseline     ML - prior |    scored  censored
+   6       8.6909      23.3143      34.8267      31.5271     0.00e+00 |       -14.6233       -26.1358 |   405,448       224
+  12      10.6513      35.9510      56.6500      53.4210     0.00e+00 |       -25.2997       -45.9987 |   405,219       453
+  24      16.6415      49.4512      87.3843      84.6568     0.00e+00 |       -32.8097       -70.7428 |   404,317     1,355
+  60      42.9503      70.9871     151.4688     150.9967     5.55e-17 |       -28.0368      -108.5185 |   402,720     2,952
+
+ML minus baseline at h = 6, 12, 24, 60: -14.6233 / -25.2997 / -32.8097 / -28.0368 -> non-monotone; the gap keeps one sign; |gap(60)|/|gap(6)| = 1.917
+ML minus prior-only at h = 6, 12, 24, 60: -26.1358 / -45.9987 / -70.7428 / -108.5185 -> widens; the gap keeps one sign; |gap(60)|/|gap(6)| = 4.152
+(negative = ML has the smaller total error. 'holds' has no threshold; read the signed values and the ratio.)
+
+TOTAL absolute error and gaps at every h (the compounding curve):
+   h           ML     baseline   prior-only  persistence |  ML - baseline     ML - prior |    scored  censored
+   0       0.0000       0.0000       0.0000       0.0000 |        +0.0000        +0.0000 |   405,672         0
+   1       0.1505       3.4842       7.6939       4.3148 |        -3.3337        -7.5434 |   405,672         0
+   2       1.7878       7.6924      13.1948       9.8609 |        -5.9046       -11.4070 |   405,644        28
+   3       3.4789      10.9874      17.8488      15.2686 |        -7.5085       -14.3699 |   405,525       147
+   4       4.9381      14.9749      23.3456      20.4940 |       -10.0368       -18.4074 |   405,495       177
+   5       6.8496      19.4193      29.3473      26.0221 |       -12.5697       -22.4976 |   405,471       201
+   6       8.6909      23.3143      34.8267      31.5271 |       -14.6233       -26.1358 |   405,448       224
+   7       9.4490      26.0583      39.1296      36.0613 |       -16.6093       -29.6806 |   405,404       268
+   8      11.0208      29.5731      44.1881      40.8959 |       -18.5523       -33.1673 |   405,385       287
+   9      10.3430      30.7381      46.8877      43.6095 |       -20.3952       -36.5447 |   405,352       320
+  10      10.0163      32.1531      49.8257      46.5684 |       -22.1368       -39.8095 |   405,296       376
+  11      10.4672      34.2538      53.4466      50.1990 |       -23.7866       -42.9794 |   405,267       405
+  12      10.6513      35.9510      56.6500      53.4210 |       -25.2997       -45.9987 |   405,219       453
+  13      10.7864      37.4059      59.5985      56.3956 |       -26.6195       -48.8121 |   405,113       559
+  14      10.2551      37.9490      61.6313      58.4382 |       -27.6939       -51.3761 |   405,088       584
+  15       9.2926      37.6092      62.7679      59.9560 |       -28.3166       -53.4753 |   405,047       625
+  16       9.4997      38.2777      64.9009      62.1095 |       -28.7780       -55.4013 |   404,991       681
+  17       9.9114      39.4269      67.5036      64.3732 |       -29.5154       -57.5922 |   404,917       755
+  18      10.2399      40.0970      69.6168      66.5810 |       -29.8571       -59.3770 |   404,866       806
+  19      10.7677      41.1730      72.1208      69.1133 |       -30.4053       -61.3531 |   404,767       905
+  20      11.8436      42.7558      75.1239      72.1815 |       -30.9122       -63.2803 |   404,694       978
+  21      13.3049      44.6233      78.3988      75.3641 |       -31.3184       -65.0939 |   404,612     1,060
+  22      14.5653      46.5062      81.6786      78.6683 |       -31.9409       -67.1133 |   404,516     1,156
+  23      15.5283      47.9962      84.5538      81.7064 |       -32.4679       -69.0255 |   404,414     1,258
+  24      16.6415      49.4512      87.3843      84.6568 |       -32.8097       -70.7428 |   404,317     1,355
+  25      17.5595      50.7303      90.0237      87.2866 |       -33.1708       -72.4642 |   404,087     1,585
+  26      17.9057      51.2502      91.8985      89.1713 |       -33.3446       -73.9928 |   404,018     1,654
+  27      17.6396      50.6954      92.6867      90.7721 |       -33.0558       -75.0470 |   403,959     1,713
+  28      17.9474      51.1387      94.4620      92.3951 |       -33.1913       -76.5146 |   403,900     1,772
+  29      18.0383      51.3363      95.9805      93.8794 |       -33.2980       -77.9422 |   403,848     1,824
+  30      18.1586      51.6222      97.5751      95.4369 |       -33.4636       -79.4164 |   403,804     1,868
+  31      18.5132      52.2282      99.4787      96.9755 |       -33.7149       -80.9654 |   403,739     1,933
+  32      18.6955      52.4821     101.0196      98.8117 |       -33.7866       -82.3241 |   403,695     1,977
+  33      18.8217      52.8063     102.6196     100.5398 |       -33.9846       -83.7979 |   403,659     2,013
+  34      19.1829      53.3469     104.4243     102.3535 |       -34.1639       -85.2414 |   403,613     2,059
+  35      19.8322      54.1466     106.4776     104.2965 |       -34.3144       -86.6454 |   403,580     2,092
+  36      20.2328      54.6068     108.1803     106.1003 |       -34.3740       -87.9474 |   403,554     2,118
+  37      20.5044      54.9002     109.7053     107.8510 |       -34.3958       -89.2010 |   403,514     2,158
+  38      20.7900      55.0603     111.0865     109.6882 |       -34.2703       -90.2965 |   403,489     2,183
+  39      21.4914      55.5559     112.7926     111.8226 |       -34.0645       -91.3012 |   403,464     2,208
+  40      22.6356      56.6333     115.0697     114.1165 |       -33.9976       -92.4341 |   403,430     2,242
+  41      24.2583      58.1574     117.7834     116.8042 |       -33.8991       -93.5251 |   403,398     2,274
+  42      25.7442      59.4705     120.2755     119.1055 |       -33.7263       -94.5313 |   403,370     2,302
+  43      26.8756      60.3322     122.3060     121.2462 |       -33.4566       -95.4304 |   403,348     2,324
+  44      28.0324      61.2854     124.4175     123.4586 |       -33.2530       -96.3851 |   403,314     2,358
+  45      29.4459      62.7317     127.0123     125.5696 |       -33.2858       -97.5664 |   403,295     2,377
+  46      30.5194      63.4346     128.8534     127.8624 |       -32.9152       -98.3341 |   403,260     2,412
+  47      31.4670      64.1792     130.7265     129.7989 |       -32.7122       -99.2594 |   403,230     2,442
+  48      32.5996      65.1128     132.7781     131.7657 |       -32.5132      -100.1785 |   403,202     2,470
+  49      33.5264      65.7208     134.4943     133.6839 |       -32.1944      -100.9679 |   403,151     2,521
+  50      34.6521      66.5071     136.3795     135.6605 |       -31.8550      -101.7273 |   403,102     2,570
+  51      35.7835      67.1648     138.1874     137.6472 |       -31.3814      -102.4039 |   403,058     2,614
+  52      36.9223      67.8160     140.0960     139.6487 |       -30.8938      -103.1738 |   403,017     2,655
+  53      37.9715      68.5900     142.0639     141.5874 |       -30.6185      -104.0924 |   402,978     2,694
+  54      39.3869      69.7566     143.9283     143.3702 |       -30.3697      -104.5414 |   402,940     2,732
+  55      40.2608      70.2327     145.6644     145.1461 |       -29.9719      -105.4037 |   402,914     2,758
+  56      41.1560      70.7532     147.2493     146.7407 |       -29.5971      -106.0933 |   402,889     2,783
+  57      41.7545      71.0083     148.5206     148.0115 |       -29.2538      -106.7661 |   402,843     2,829
+  58      42.1849      70.9860     149.6308     149.1483 |       -28.8011      -107.4459 |   402,822     2,850
+  59      42.6565      71.0162     150.5180     150.0668 |       -28.3597      -107.8616 |   402,722     2,950
+  60      42.9503      70.9871     151.4688     150.9967 |       -28.0368      -108.5185 |   402,720     2,952
+
+==========================================================================================================================================
+6. FULL TRAJECTORIES h = 0..60, six states, share of the scored cohort in % (feeds the fan chart; the long-format CSV is artifacts/headline/trajectory.csv)
+==========================================================================================================================================
+h = 0 is the common starting state of every arm. ORACLE equals the realised table by construction and is not printed separately. Prior-only is the single vector printed in section 1 for every h >= 1.
+
+REALISED (scored cohort at each h; every month is observable here up to the data's end, the censored count says how many loans drop out)
+     h    scored  censored     Current        DQ30        DQ60       DQ90+     Prepaid     Default
+     0   405,672         0    95.1498%     2.3115%     0.8300%     1.7088%     0.0000%     0.0000%
+     1   405,672         0    92.9924%     2.3460%     0.8307%     1.9992%     1.8037%     0.0281%
+     2   405,644        28    90.2419%     2.3020%     0.8212%     2.2103%     4.3149%     0.1097%
+     3   405,525       147    87.9149%     1.9967%     0.7649%     2.3666%     6.8048%     0.1521%
+     4   405,495       177    85.1665%     2.0701%     0.8535%     2.5870%     9.1017%     0.2212%
+     5   405,471       201    82.1657%     2.3457%     0.8637%     2.8532%    11.4731%     0.2987%
+     6   405,448       224    79.4260%     2.3024%     0.9182%     3.1153%    13.8553%     0.3828%
+     7   405,404       268    77.2745%     2.1936%     0.9729%     3.3752%    15.6979%     0.4859%
+     8   405,385       287    74.7452%     2.9424%     1.0563%     3.6785%    16.9996%     0.5780%
+     9   405,352       320    73.3955%     2.6833%     1.1624%     3.9943%    18.0966%     0.6678%
+    10   405,296       376    71.9264%     2.5641%     1.1555%     4.2944%    19.2817%     0.7779%
+    11   405,267       405    70.1160%     2.6960%     1.1923%     4.5869%    20.5351%     0.8737%
+    12   405,219       453    68.5143%     2.5959%     1.1690%     4.8403%    21.9067%     0.9738%
+    13   405,113       559    67.0401%     2.6879%     1.1757%     5.0250%    22.9650%     1.1064%
+    14   405,088       584    66.0237%     2.6431%     1.0800%     5.1219%    23.9034%     1.2279%
+    15   405,047       625    65.4554%     2.1247%     0.9666%     5.0263%    25.0554%     1.3717%
+    16   404,991       681    64.3888%     2.1235%     0.8892%     4.9396%    26.1226%     1.5363%
+    17   404,917       755    63.0875%     2.3022%     0.9244%     4.9022%    27.0900%     1.6937%
+    18   404,866       806    62.0309%     2.2632%     0.9080%     4.7438%    28.1664%     1.8878%
+    19   404,767       905    60.7789%     2.2638%     0.8990%     4.6995%    29.3045%     2.0543%
+    20   404,694       978    59.2774%     2.2400%     0.9219%     4.6274%    30.6857%     2.2476%
+    21   404,612     1,060    57.6399%     2.3269%     0.9298%     4.5399%    32.1337%     2.4297%
+    22   404,516     1,156    56.0000%     2.3868%     0.9367%     4.5872%    33.5292%     2.5601%
+    23   404,414     1,258    54.5624%     2.2220%     0.9302%     4.6128%    34.9980%     2.6745%
+    24   404,317     1,355    53.1472%     2.1676%     0.8798%     4.6038%    36.3930%     2.8087%
+    25   404,087     1,585    51.8275%     2.1847%     0.9015%     4.5470%    37.6043%     2.9350%
+    26   404,018     1,654    50.8901%     2.1811%     0.8415%     4.5047%    38.5396%     3.0429%
+    27   403,959     1,713    50.4960%     1.8353%     0.7308%     4.2992%    39.4317%     3.2070%
+    28   403,900     1,772    49.6083%     1.9322%     0.7106%     4.2310%    40.1604%     3.3575%
+    29   403,848     1,824    48.8491%     1.9488%     0.7107%     4.1434%    40.8441%     3.5040%
+    30   403,804     1,868    48.0518%     1.9472%     0.7323%     4.0772%    41.5367%     3.6547%
+    31   403,739     1,933    47.1000%     2.0798%     0.7824%     4.0383%    42.2025%     3.7970%
+    32   403,695     1,977    46.3295%     1.9790%     0.7357%     4.0206%    42.9824%     3.9527%
+    33   403,659     2,013    45.5295%     1.9031%     0.7474%     4.0205%    43.7012%     4.0983%
+    34   403,613     2,059    44.6272%     1.8991%     0.7477%     4.0336%    44.4671%     4.2253%
+    35   403,580     2,092    43.6005%     1.9466%     0.7552%     4.0371%    45.2770%     4.3835%
+    36   403,554     2,118    42.7492%     1.8989%     0.7528%     4.0161%    46.0506%     4.5325%
+    37   403,514     2,158    41.9866%     1.8153%     0.7236%     4.0127%    46.7743%     4.6873%
+    38   403,489     2,183    41.2960%     1.6466%     0.6645%     3.9773%    47.5916%     4.8239%
+    39   403,464     2,208    40.4430%     1.5020%     0.5953%     3.9210%    48.5706%     4.9680%
+    40   403,430     2,242    39.3045%     1.5024%     0.5870%     3.8825%    49.6193%     5.1045%
+    41   403,398     2,274    37.9476%     1.5208%     0.5816%     3.8344%    50.8585%     5.2571%
+    42   403,370     2,302    36.7015%     1.6050%     0.5925%     3.7412%    51.9580%     5.4017%
+    43   403,348     2,324    35.6863%     1.5773%     0.5655%     3.6462%    52.9756%     5.5491%
+    44   403,314     2,358    34.6306%     1.5281%     0.5648%     3.5655%    54.0137%     5.6973%
+    45   403,295     2,377    33.3332%     1.6901%     0.6447%     3.5304%    54.9615%     5.8401%
+    46   403,260     2,412    32.4126%     1.5303%     0.5788%     3.4459%    56.0393%     5.9932%
+    47   403,230     2,442    31.4761%     1.4937%     0.5835%     3.3814%    56.9370%     6.1283%
+    48   403,202     2,470    30.4502%     1.5459%     0.5746%     3.3390%    57.8479%     6.2423%
+    49   403,151     2,521    29.5921%     1.4600%     0.5601%     3.2477%    58.7748%     6.3654%
+    50   403,102     2,570    28.6496%     1.4316%     0.5428%     3.1560%    59.7390%     6.4810%
+    51   403,058     2,614    27.7762%     1.3636%     0.4912%     3.0375%    60.7394%     6.5921%
+    52   403,017     2,655    26.9108%     1.2746%     0.4449%     2.9118%    61.7510%     6.7069%
+    53   402,978     2,694    25.9888%     1.2127%     0.4598%     2.8366%    62.7022%     6.7999%
+    54   402,940     2,732    24.8752%     1.4176%     0.4772%     2.7768%    63.5519%     6.9013%
+    55   402,914     2,758    24.1113%     1.2899%     0.4807%     2.6629%    64.4351%     7.0201%
+    56   402,889     2,783    23.3300%     1.2788%     0.4758%     2.5734%    65.2165%     7.1255%
+    57   402,843     2,829    22.6860%     1.2871%     0.4764%     2.4970%    65.8386%     7.2150%
+    58   402,822     2,850    22.1852%     1.2328%     0.4632%     2.3854%    66.4194%     7.3139%
+    59   402,722     2,950    21.6628%     1.3116%     0.4484%     2.2807%    66.8913%     7.4051%
+    60   402,720     2,952    21.1743%     1.3247%     0.4584%     2.2206%    67.3463%     7.4757%
+
+ML (pooled)
+     h     Current        DQ30        DQ60       DQ90+     Prepaid     Default
+     0    95.1498%     2.3115%     0.8300%     1.7088%     0.0000%     0.0000%
+     1    93.0390%     2.3621%     0.8432%     1.9626%     1.7785%     0.0146%
+     2    90.9040%     2.3474%     0.9100%     2.3079%     3.5037%     0.0270%
+     3    88.8454%     2.3208%     0.9485%     2.6678%     5.1782%     0.0393%
+     4    86.8419%     2.2877%     0.9717%     3.0448%     6.8023%     0.0515%
+     5    84.9029%     2.2506%     0.9861%     3.4184%     8.3784%     0.0636%
+     6    83.0245%     2.2113%     0.9937%     3.7868%     9.9082%     0.0755%
+     7    81.2045%     2.1720%     0.9976%     4.1449%    11.3939%     0.0871%
+     8    79.4348%     2.1328%     0.9987%     4.4993%    12.8360%     0.0984%
+     9    77.7183%     2.0938%     0.9982%     4.8430%    14.2371%     0.1096%
+    10    76.0528%     2.0556%     0.9960%     5.1761%    15.5989%     0.1205%
+    11    74.4297%     2.0180%     0.9930%     5.5067%    16.9214%     0.1312%
+    12    72.8557%     1.9812%     0.9890%     5.8246%    18.2078%     0.1416%
+    13    71.3259%     1.9452%     0.9849%     6.1324%    19.4598%     0.1519%
+    14    69.8334%     1.9102%     0.9798%     6.4397%    20.6750%     0.1619%
+    15    68.3838%     1.8759%     0.9748%     6.7359%    21.8578%     0.1717%
+    16    66.9730%     1.8424%     0.9690%     7.0254%    23.0089%     0.1813%
+    17    65.6011%     1.8095%     0.9634%     7.3053%    24.1299%     0.1907%
+    18    64.2644%     1.7775%     0.9573%     7.5809%    25.2199%     0.2000%
+    19    62.9655%     1.7462%     0.9511%     7.8447%    26.2835%     0.2090%
+    20    61.6980%     1.7156%     0.9445%     8.1061%    27.3180%     0.2178%
+    21    60.4639%     1.6858%     0.9379%     8.3603%    28.3259%     0.2262%
+    22    59.2606%     1.6565%     0.9313%     8.6092%    29.3081%     0.2342%
+    23    58.0883%     1.6280%     0.9248%     8.8511%    30.2655%     0.2424%
+    24    56.9442%     1.6000%     0.9177%     9.0896%    31.1980%     0.2505%
+    25    55.8325%     1.5721%     0.9103%     9.3130%    32.1136%     0.2585%
+    26    54.7430%     1.5454%     0.9026%     9.5436%    32.9991%     0.2662%
+    27    53.6800%     1.5194%     0.8962%     9.7695%    33.8612%     0.2736%
+    28    52.6428%     1.4939%     0.8890%     9.9918%    34.7014%     0.2812%
+    29    51.6313%     1.4691%     0.8825%    10.2085%    35.5201%     0.2885%
+    30    50.6450%     1.4450%     0.8759%    10.4197%    36.3187%     0.2957%
+    31    49.6826%     1.4212%     0.8694%    10.6253%    37.0989%     0.3026%
+    32    48.7432%     1.3980%     0.8628%    10.8275%    37.8589%     0.3095%
+    33    47.8265%     1.3754%     0.8564%    11.0254%    38.6001%     0.3163%
+    34    46.9309%     1.3530%     0.8498%    11.2193%    39.3242%     0.3228%
+    35    46.0572%     1.3314%     0.8437%    11.4080%    40.0303%     0.3293%
+    36    45.2041%     1.3103%     0.8370%    11.5933%    40.7195%     0.3357%
+    37    44.3713%     1.2896%     0.8309%    11.7730%    41.3933%     0.3419%
+    38    43.5568%     1.2693%     0.8247%    11.9513%    42.0500%     0.3478%
+    39    42.7614%     1.2495%     0.8187%    12.1250%    42.6915%     0.3539%
+    40    41.9839%     1.2301%     0.8125%    12.2953%    43.3185%     0.3598%
+    41    41.2247%     1.2111%     0.8067%    12.4614%    43.9308%     0.3654%
+    42    40.4825%     1.1924%     0.8005%    12.6245%    44.5291%     0.3711%
+    43    39.7576%     1.1743%     0.7949%    12.7834%    45.1134%     0.3765%
+    44    39.0485%     1.1564%     0.7888%    12.9398%    45.6845%     0.3820%
+    45    38.3555%     1.1390%     0.7833%    13.0924%    46.2424%     0.3874%
+    46    37.6777%     1.1218%     0.7774%    13.2419%    46.7886%     0.3927%
+    47    37.0152%     1.1050%     0.7718%    13.3875%    47.3224%     0.3980%
+    48    36.3680%     1.0886%     0.7662%    13.5296%    47.8445%     0.4031%
+    49    35.7338%     1.0725%     0.7610%    13.6683%    48.3564%     0.4080%
+    50    35.1137%     1.0567%     0.7553%    13.8055%    48.8560%     0.4129%
+    51    34.5073%     1.0412%     0.7502%    13.9391%    49.3444%     0.4177%
+    52    33.9142%     1.0260%     0.7450%    14.0695%    49.8230%     0.4224%
+    53    33.3338%     1.0111%     0.7398%    14.1974%    50.2909%     0.4271%
+    54    32.7661%     0.9965%     0.7345%    14.3221%    50.7492%     0.4316%
+    55    32.2102%     0.9822%     0.7296%    14.4455%    51.1965%     0.4360%
+    56    31.6662%     0.9682%     0.7244%    14.5667%    51.6343%     0.4403%
+    57    31.1334%     0.9544%     0.7195%    14.6837%    52.0644%     0.4446%
+    58    30.6122%     0.9410%     0.7145%    14.7996%    52.4839%     0.4488%
+    59    30.1003%     0.9275%     0.7096%    14.9103%    52.8994%     0.4529%
+    60    29.6005%     0.9145%     0.7047%    15.0232%    53.3001%     0.4569%
+
+BASELINE (homogeneous six-by-six)
+     h     Current        DQ30        DQ60       DQ90+     Prepaid     Default
+     0    95.1498%     2.3115%     0.8300%     1.7088%     0.0000%     0.0000%
+     1    94.7025%     1.8578%     0.6889%     1.8680%     0.8227%     0.0600%
+     2    94.0726%     1.6582%     0.5699%     1.9372%     1.6370%     0.1252%
+     3    93.3692%     1.5579%     0.5030%     1.9349%     2.4435%     0.1915%
+     4    92.6162%     1.5031%     0.4674%     1.9118%     3.2425%     0.2590%
+     5    91.8487%     1.4697%     0.4475%     1.8743%     4.0345%     0.3253%
+     6    91.0758%     1.4467%     0.4353%     1.8326%     4.8194%     0.3901%
+     7    90.3037%     1.4288%     0.4270%     1.7901%     5.5974%     0.4530%
+     8    89.5318%     1.4135%     0.4207%     1.7506%     6.3686%     0.5147%
+     9    88.7645%     1.3995%     0.4154%     1.7129%     7.1331%     0.5746%
+    10    88.0030%     1.3862%     0.4105%     1.6770%     7.8910%     0.6323%
+    11    87.2429%     1.3734%     0.4061%     1.6455%     8.6421%     0.6901%
+    12    86.4898%     1.3608%     0.4019%     1.6152%     9.3868%     0.7456%
+    13    85.7430%     1.3485%     0.3978%     1.5865%    10.1250%     0.7993%
+    14    84.9982%     1.3363%     0.3938%     1.5614%    10.8565%     0.8538%
+    15    84.2600%     1.3243%     0.3900%     1.5374%    11.5818%     0.9066%
+    16    83.5277%     1.3125%     0.3862%     1.5147%    12.3007%     0.9582%
+    17    82.8009%     1.3007%     0.3825%     1.4934%    13.0134%     1.0090%
+    18    82.0794%     1.2892%     0.3789%     1.4735%    13.7198%     1.0593%
+    19    81.3654%     1.2777%     0.3753%     1.4540%    14.4203%     1.1073%
+    20    80.6553%     1.2664%     0.3718%     1.4361%    15.1144%     1.1561%
+    21    79.9516%     1.2551%     0.3684%     1.4188%    15.8025%     1.2036%
+    22    79.2531%     1.2440%     0.3650%     1.4024%    16.4846%     1.2508%
+    23    78.5605%     1.2330%     0.3617%     1.3867%    17.1607%     1.2974%
+    24    77.8728%     1.2221%     0.3584%     1.3717%    17.8307%     1.3443%
+    25    77.1926%     1.2114%     0.3551%     1.3568%    18.4952%     1.3888%
+    26    76.5152%     1.2007%     0.3519%     1.3430%    19.1534%     1.4359%
+    27    75.8437%     1.1901%     0.3488%     1.3295%    19.8057%     1.4823%
+    28    75.1777%     1.1796%     0.3457%     1.3163%    20.4523%     1.5285%
+    29    74.5172%     1.1692%     0.3426%     1.3035%    21.0931%     1.5744%
+    30    73.8629%     1.1588%     0.3395%     1.2909%    21.7285%     1.6194%
+    31    73.2141%     1.1486%     0.3365%     1.2785%    22.3582%     1.6641%
+    32    72.5706%     1.1385%     0.3335%     1.2664%    22.9822%     1.7088%
+    33    71.9327%     1.1285%     0.3305%     1.2545%    23.6008%     1.7530%
+    34    71.3006%     1.1185%     0.3276%     1.2428%    24.2141%     1.7964%
+    35    70.6738%     1.1087%     0.3247%     1.2312%    24.8219%     1.8397%
+    36    70.0526%     1.0989%     0.3218%     1.2199%    25.4244%     1.8825%
+    37    69.4367%     1.0892%     0.3190%     1.2087%    26.0215%     1.9248%
+    38    68.8262%     1.0796%     0.3162%     1.1976%    26.6134%     1.9669%
+    39    68.2210%     1.0701%     0.3134%     1.1868%    27.2001%     2.0087%
+    40    67.6211%     1.0607%     0.3106%     1.1760%    27.7817%     2.0499%
+    41    67.0263%     1.0514%     0.3079%     1.1654%    28.3580%     2.0910%
+    42    66.4368%     1.0421%     0.3051%     1.1549%    28.9293%     2.1317%
+    43    65.8524%     1.0329%     0.3024%     1.1445%    29.4956%     2.1721%
+    44    65.2733%     1.0238%     0.2998%     1.1342%    30.0570%     2.2119%
+    45    64.6990%     1.0148%     0.2971%     1.1241%    30.6133%     2.2516%
+    46    64.1299%     1.0059%     0.2945%     1.1141%    31.1648%     2.2909%
+    47    63.5657%     0.9970%     0.2919%     1.1041%    31.7114%     2.3298%
+    48    63.0067%     0.9883%     0.2893%     1.0943%    32.2533%     2.3681%
+    49    62.4525%     0.9796%     0.2868%     1.0846%    32.7904%     2.4061%
+    50    61.9031%     0.9710%     0.2843%     1.0749%    33.3228%     2.4439%
+    51    61.3586%     0.9624%     0.2818%     1.0654%    33.8504%     2.4814%
+    52    60.8188%     0.9539%     0.2793%     1.0560%    34.3734%     2.5186%
+    53    60.2838%     0.9455%     0.2768%     1.0466%    34.8919%     2.5554%
+    54    59.7535%     0.9372%     0.2744%     1.0373%    35.4057%     2.5918%
+    55    59.2277%     0.9290%     0.2720%     1.0282%    35.9150%     2.6282%
+    56    58.7066%     0.9208%     0.2696%     1.0191%    36.4198%     2.6641%
+    57    58.1902%     0.9127%     0.2672%     1.0101%    36.9203%     2.6996%
+    58    57.6782%     0.9047%     0.2648%     1.0012%    37.4163%     2.7348%
+    59    57.1709%     0.8967%     0.2625%     0.9923%    37.9080%     2.7695%
+    60    56.6678%     0.8888%     0.2602%     0.9836%    38.3952%     2.8043%
+
+PERSISTENCE (reference)
+     h     Current        DQ30        DQ60       DQ90+     Prepaid     Default
+     0    95.1498%     2.3115%     0.8300%     1.7088%     0.0000%     0.0000%
+     1    95.1498%     2.3115%     0.8300%     1.7088%     0.0000%     0.0000%
+     2    95.1541%     2.3116%     0.8298%     1.7045%     0.0000%     0.0000%
+     3    95.1712%     2.3106%     0.8290%     1.6892%     0.0000%     0.0000%
+     4    95.1728%     2.3108%     0.8289%     1.6876%     0.0000%     0.0000%
+     5    95.1767%     2.3106%     0.8289%     1.6837%     0.0000%     0.0000%
+     6    95.1811%     2.3108%     0.8287%     1.6794%     0.0000%     0.0000%
+     7    95.1890%     2.3098%     0.8283%     1.6729%     0.0000%     0.0000%
+     8    95.1932%     2.3099%     0.8283%     1.6685%     0.0000%     0.0000%
+     9    95.2002%     2.3098%     0.8279%     1.6620%     0.0000%     0.0000%
+    10    95.2107%     2.3099%     0.8278%     1.6516%     0.0000%     0.0000%
+    11    95.2155%     2.3091%     0.8274%     1.6480%     0.0000%     0.0000%
+    12    95.2248%     2.3089%     0.8267%     1.6396%     0.0000%     0.0000%
+    13    95.2379%     2.3082%     0.8254%     1.6284%     0.0000%     0.0000%
+    14    95.2428%     2.3076%     0.8248%     1.6248%     0.0000%     0.0000%
+    15    95.2507%     2.3074%     0.8236%     1.6183%     0.0000%     0.0000%
+    16    95.2601%     2.3070%     0.8220%     1.6109%     0.0000%     0.0000%
+    17    95.2711%     2.3052%     0.8194%     1.6043%     0.0000%     0.0000%
+    18    95.2804%     2.3042%     0.8163%     1.5990%     0.0000%     0.0000%
+    19    95.2975%     2.3018%     0.8121%     1.5886%     0.0000%     0.0000%
+    20    95.3083%     2.2998%     0.8085%     1.5834%     0.0000%     0.0000%
+    21    95.3219%     2.2968%     0.8060%     1.5753%     0.0000%     0.0000%
+    22    95.3342%     2.2939%     0.8029%     1.5690%     0.0000%     0.0000%
+    23    95.3481%     2.2895%     0.7992%     1.5632%     0.0000%     0.0000%
+    24    95.3586%     2.2846%     0.7971%     1.5597%     0.0000%     0.0000%
+    25    95.3842%     2.2713%     0.7909%     1.5536%     0.0000%     0.0000%
+    26    95.3876%     2.2692%     0.7901%     1.5531%     0.0000%     0.0000%
+    27    95.3919%     2.2666%     0.7897%     1.5519%     0.0000%     0.0000%
+    28    95.3942%     2.2652%     0.7893%     1.5514%     0.0000%     0.0000%
+    29    95.3963%     2.2632%     0.7887%     1.5518%     0.0000%     0.0000%
+    30    95.4000%     2.2615%     0.7883%     1.5503%     0.0000%     0.0000%
+    31    95.4047%     2.2579%     0.7874%     1.5500%     0.0000%     0.0000%
+    32    95.4054%     2.2574%     0.7872%     1.5499%     0.0000%     0.0000%
+    33    95.4070%     2.2561%     0.7868%     1.5501%     0.0000%     0.0000%
+    34    95.4102%     2.2544%     0.7861%     1.5493%     0.0000%     0.0000%
+    35    95.4126%     2.2526%     0.7855%     1.5494%     0.0000%     0.0000%
+    36    95.4147%     2.2515%     0.7848%     1.5490%     0.0000%     0.0000%
+    37    95.4175%     2.2497%     0.7839%     1.5489%     0.0000%     0.0000%
+    38    95.4190%     2.2491%     0.7832%     1.5487%     0.0000%     0.0000%
+    39    95.4197%     2.2488%     0.7832%     1.5483%     0.0000%     0.0000%
+    40    95.4223%     2.2467%     0.7830%     1.5480%     0.0000%     0.0000%
+    41    95.4234%     2.2454%     0.7833%     1.5479%     0.0000%     0.0000%
+    42    95.4253%     2.2433%     0.7832%     1.5482%     0.0000%     0.0000%
+    43    95.4258%     2.2430%     0.7834%     1.5478%     0.0000%     0.0000%
+    44    95.4271%     2.2422%     0.7835%     1.5472%     0.0000%     0.0000%
+    45    95.4272%     2.2420%     0.7835%     1.5473%     0.0000%     0.0000%
+    46    95.4278%     2.2415%     0.7836%     1.5471%     0.0000%     0.0000%
+    47    95.4282%     2.2412%     0.7834%     1.5473%     0.0000%     0.0000%
+    48    95.4296%     2.2408%     0.7832%     1.5464%     0.0000%     0.0000%
+    49    95.4315%     2.2401%     0.7826%     1.5458%     0.0000%     0.0000%
+    50    95.4329%     2.2386%     0.7827%     1.5458%     0.0000%     0.0000%
+    51    95.4334%     2.2386%     0.7825%     1.5454%     0.0000%     0.0000%
+    52    95.4344%     2.2379%     0.7823%     1.5453%     0.0000%     0.0000%
+    53    95.4357%     2.2368%     0.7824%     1.5450%     0.0000%     0.0000%
+    54    95.4370%     2.2361%     0.7820%     1.5449%     0.0000%     0.0000%
+    55    95.4367%     2.2362%     0.7821%     1.5450%     0.0000%     0.0000%
+    56    95.4372%     2.2359%     0.7819%     1.5451%     0.0000%     0.0000%
+    57    95.4387%     2.2349%     0.7817%     1.5448%     0.0000%     0.0000%
+    58    95.4394%     2.2345%     0.7815%     1.5446%     0.0000%     0.0000%
+    59    95.4415%     2.2336%     0.7812%     1.5437%     0.0000%     0.0000%
+    60    95.4410%     2.2336%     0.7812%     1.5442%     0.0000%     0.0000%
+
+==========================================================================================================================================
+7. STORED ORACLE / NULL NUMBERS (artifacts/horizon_nulls) vs this run   (cohort 'varying'; Default and Prepaid)
+==========================================================================================================================================
+stored: panel        : data/panel/panel_*.parquet via src.panel_io (build 2026-10-05T11:50:54.525429)
+this run's panel build: 2026-10-08T09:41:19.866411.  'harness-eligible' = all 405,705 eligible loans (the stored runs' population definition); 'scored' = the 405,672 loans of this run.
+    h quantity                 model             stored  fresh, eligible    fresh, scored  (elig - stored) (scored - stored)
+    6 default predicted n      persistence            0.0              0.0              0.0             +0.0           +0.0
+    6 prepaid predicted n      persistence            0.0              0.0              0.0             +0.0           +0.0
+    6 default predicted n      marginal            72.5             72.4             72.4             -0.0           -0.0
+    6 prepaid predicted n      marginal         3,349.7          3,342.5          3,342.5             -7.2           -7.2
+    6 default predicted n      oracle           1,553.0          1,552.0          1,552.0             -1.0           -1.0
+    6 prepaid predicted n      oracle          56,274.0         56,176.0         56,176.0            -98.0          -98.0
+    6 default predicted n      baseline         1,581.4          1,581.7          1,581.6             +0.3           +0.2
+    6 prepaid predicted n      baseline        19,585.0         19,540.1         19,540.1            -44.9          -44.9
+    6 default realised n       (realised)        1,553.0          1,552.0          1,552.0             -1.0           -1.0
+    6 prepaid realised n       (realised)       56,274.0         56,176.0         56,176.0            -98.0          -98.0
+    6 n scored                 (cohort)       407,298.0        405,449.0        405,448.0          -1849.0        -1850.0
+    6 default predicted n      baseline  (stored matrix)          1,576.1   <- the stored matrix chained over today's eligible loans
+   12 default predicted n      persistence            0.0              0.0              0.0             +0.0           +0.0
+   12 prepaid predicted n      persistence            0.0              0.0              0.0             +0.0           +0.0
+   12 default predicted n      marginal            72.4             72.4             72.4             -0.0           -0.0
+   12 prepaid predicted n      marginal         3,347.9          3,340.6          3,340.6             -7.2           -7.2
+   12 default predicted n      oracle           3,947.0          3,946.0          3,946.0             -1.0           -1.0
+   12 prepaid predicted n      oracle          88,918.0         88,770.0         88,770.0           -148.0         -148.0
+   12 default predicted n      baseline         3,021.2          3,021.8          3,021.3             +0.6           +0.1
+   12 prepaid predicted n      baseline        38,126.7         38,037.0         38,036.9            -89.6          -89.8
+   12 default realised n       (realised)        3,947.0          3,946.0          3,946.0             -1.0           -1.0
+   12 prepaid realised n       (realised)       88,918.0         88,770.0         88,770.0           -148.0         -148.0
+   12 n scored                 (cohort)       407,069.0        405,221.0        405,219.0          -1848.0        -1850.0
+   12 default predicted n      baseline  (stored matrix)          3,010.3   <- the stored matrix chained over today's eligible loans
+   24 default predicted n      persistence            0.0              0.0              0.0             +0.0           +0.0
+   24 prepaid predicted n      persistence            0.0              0.0              0.0             +0.0           +0.0
+   24 default predicted n      marginal            72.3             72.2             72.2             -0.0           -0.0
+   24 prepaid predicted n      marginal         3,340.4          3,333.2          3,333.2             -7.2           -7.2
+   24 default predicted n      oracle          11,360.0         11,356.0         11,356.0             -4.0           -4.0
+   24 prepaid predicted n      oracle         147,404.0        147,143.0        147,143.0           -261.0         -261.0
+   24 default predicted n      baseline         5,436.0          5,435.9          5,435.3             -0.1           -0.7
+   24 prepaid predicted n      baseline        72,271.2         72,092.9         72,092.7           -178.3         -178.6
+   24 default realised n       (realised)       11,360.0         11,356.0         11,356.0             -4.0           -4.0
+   24 prepaid realised n       (realised)      147,404.0        147,143.0        147,143.0           -261.0         -261.0
+   24 n scored                 (cohort)       406,162.0        404,319.0        404,317.0          -1843.0        -1845.0
+   24 default predicted n      baseline  (stored matrix)          5,414.8   <- the stored matrix chained over today's eligible loans
+   60 default predicted n      persistence            0.0              0.0              0.0             +0.0           +0.0
+   60 prepaid predicted n      persistence            0.0              0.0              0.0             +0.0           +0.0
+   60 default predicted n      marginal            72.0             71.9             71.9             -0.0           -0.0
+   60 prepaid predicted n      marginal         3,327.1          3,320.0          3,320.0             -7.0           -7.0
+   60 default predicted n      oracle          30,132.0         30,106.0         30,106.0            -26.0          -26.0
+   60 prepaid predicted n      oracle         271,906.0        271,218.0        271,217.0           -688.0         -689.0
+   60 default predicted n      baseline        11,299.3         11,294.3         11,293.7             -5.1           -5.7
+   60 prepaid predicted n      baseline       155,055.2        154,625.9        154,625.3           -429.3         -429.9
+   60 default realised n       (realised)       30,132.0         30,106.0         30,106.0            -26.0          -26.0
+   60 prepaid realised n       (realised)      271,906.0        271,218.0        271,217.0           -688.0         -689.0
+   60 n scored                 (cohort)       404,541.0        402,722.0        402,720.0          -1819.0        -1821.0
+   60 default predicted n      baseline  (stored matrix)         11,252.6   <- the stored matrix chained over today's eligible loans
+
+The stored runs were produced on the 2026-10-05 panel build and the panel was rebuilt on 2026-10-08, so n and the realised counts are expected to differ; the table records by how much.
+persistence predicts 0 Default and 0 Prepaid at every h by construction; the oracle's prediction equals its realised count by construction (the 'fresh, scored' oracle column is the scored cohort's realised count).
+
+==========================================================================================================================================
+8. RESOURCES
+==========================================================================================================================================
+  train     wall-clock    185.0 s (  3.1 min)   peak RSS (sampled over the child process)   6.53 GB   min system available   1.60 GB   log artifacts/headline/logs/train.log
+  baseline  wall-clock      4.1 s (  0.1 min)   peak RSS (sampled over the child process)   0.70 GB   min system available   8.06 GB   log artifacts/headline/logs/baseline.log
+  forecast  wall-clock    595.2 s (  9.9 min)   peak RSS (sampled over the child process)   1.31 GB   min system available   7.36 GB   log artifacts/headline/logs/forecast.log
+  forecaster's own report (diagnostics/54_headline_forecaster_build.txt): wall clock 593.8 s, peak RSS 1.50 GB, min available 7.26 GB
+  forecast output data/forecast/headline_pooled: 19 files, 630.9 MB, 148,475,952 rows (one per loan, h and state)
+  phase B (this analysis, incl. the harness read): wall-clock 32.4 s, peak RSS 2.79 GB, min system available 5.89 GB
+  artifacts: model artifacts/ml/headline_pooled (model.txt, model.json); baseline artifacts/baseline_headline; forecast data/forecast/headline_pooled (long format loan_id, h, state, probability); trajectory CSV artifacts/headline/trajectory.csv
+
+==========================================================================================================================================
+FINDINGS   (measured; nothing interpreted)
+==========================================================================================================================================
+Scored cohort at each horizon: h=6: 405,448 scored, 224 censored (0.0552% of 405,672); h=12: 405,219 scored, 453 censored (0.1117% of 405,672); h=24: 404,317 scored, 1,355 censored (0.3340% of 405,672); h=60: 402,720 scored, 2,952 censored (0.7277% of 405,672)
+Training: ML 40,210,036 rows from_period 200512..200812, fit rows only; baseline estimated on the same 40,210,036 rows (identical); prior-only from the same fit rows.
+Stored baseline vs fresh: max absolute cell difference 0.000918 (max count difference 168,621).
+
+h = 6 (2009-06)
+  state        realised | ML (err)                 baseline (err)           prior-only (err)         persistence (err)       
+  Current      79.4260% |   83.0245% (3.5985)        91.0758% (11.6498)       96.8393% (17.4133)       95.1811% (15.7552)    
+  DQ30          2.3024% |    2.2113% (0.0911)         1.4467% (0.8556)         1.3941% (0.9083)         2.3108% (0.0084)     
+  DQ60          0.9182% |    0.9937% (0.0755)         0.4353% (0.4829)         0.3426% (0.5757)         0.8287% (0.0895)     
+  DQ90+         3.1153% |    3.7868% (0.6715)         1.8326% (1.2827)         0.5818% (2.5336)         1.6794% (1.4359)     
+  Prepaid      13.8553% |    9.9082% (3.9471)         4.8194% (9.0359)         0.8244% (13.0309)        0.0000% (13.8553)    
+  Default       0.3828% |    0.0755% (0.3073)         0.3901% (0.0073)         0.0179% (0.3649)         0.0000% (0.3828)     
+  TOTAL absolute error (pp): ML 8.6909, baseline 23.3143, prior-only 34.8267, persistence 31.5271
+  closest per state among ML / baseline / prior-only: Current ML, DQ30 ML, DQ60 ML, DQ90+ ML, Prepaid ML, Default baseline
+h = 12 (2009-12)
+  state        realised | ML (err)                 baseline (err)           prior-only (err)         persistence (err)       
+  Current      68.5143% |   72.8557% (4.3413)        86.4898% (17.9755)       96.8393% (28.3250)       95.2248% (26.7105)    
+  DQ30          2.5959% |    1.9812% (0.6146)         1.3608% (1.2351)         1.3941% (1.2018)         2.3089% (0.2870)     
+  DQ60          1.1690% |    0.9890% (0.1800)         0.4019% (0.7671)         0.3426% (0.8264)         0.8267% (0.3423)     
+  DQ90+         4.8403% |    5.8246% (0.9843)         1.6152% (3.2252)         0.5818% (4.2586)         1.6396% (3.2007)     
+  Prepaid      21.9067% |   18.2078% (3.6989)         9.3868% (12.5199)        0.8244% (21.0823)        0.0000% (21.9067)    
+  Default       0.9738% |    0.1416% (0.8322)         0.7456% (0.2282)         0.0179% (0.9559)         0.0000% (0.9738)     
+  TOTAL absolute error (pp): ML 10.6513, baseline 35.9510, prior-only 56.6500, persistence 53.4210
+  closest per state among ML / baseline / prior-only: Current ML, DQ30 ML, DQ60 ML, DQ90+ ML, Prepaid ML, Default baseline
+h = 24 (2010-12)
+  state        realised | ML (err)                 baseline (err)           prior-only (err)         persistence (err)       
+  Current      53.1472% |   56.9442% (3.7971)        77.8728% (24.7256)       96.8393% (43.6922)       95.3586% (42.2114)    
+  DQ30          2.1676% |    1.6000% (0.5676)         1.2221% (0.9455)         1.3941% (0.7735)         2.2846% (0.1170)     
+  DQ60          0.8798% |    0.9177% (0.0379)         0.3584% (0.5214)         0.3426% (0.5372)         0.7971% (0.0826)     
+  DQ90+         4.6038% |    9.0896% (4.4858)         1.3717% (3.2321)         0.5818% (4.0221)         1.5597% (3.0441)     
+  Prepaid      36.3930% |   31.1980% (5.1949)        17.8307% (18.5622)        0.8244% (35.5686)        0.0000% (36.3930)    
+  Default       2.8087% |    0.2505% (2.5582)         1.3443% (1.4644)         0.0179% (2.7908)         0.0000% (2.8087)     
+  TOTAL absolute error (pp): ML 16.6415, baseline 49.4512, prior-only 87.3843, persistence 84.6568
+  closest per state among ML / baseline / prior-only: Current ML, DQ30 ML, DQ60 ML, DQ90+ baseline, Prepaid ML, Default baseline
+h = 60 (2013-12)
+  state        realised | ML (err)                 baseline (err)           prior-only (err)         persistence (err)       
+  Current      21.1743% |   29.6005% (8.4262)        56.6678% (35.4935)       96.8393% (75.6650)       95.4410% (74.2667)    
+  DQ30          1.3247% |    0.9145% (0.4102)         0.8888% (0.4359)         1.3941% (0.0694)         2.2336% (0.9088)     
+  DQ60          0.4584% |    0.7047% (0.2463)         0.2602% (0.1982)         0.3426% (0.1158)         0.7812% (0.3228)     
+  DQ90+         2.2206% |   15.0232% (12.8026)        0.9836% (1.2371)         0.5818% (1.6389)         1.5442% (0.6764)     
+  Prepaid      67.3463% |   53.3001% (14.0462)       38.3952% (28.9510)        0.8244% (66.5219)        0.0000% (67.3463)    
+  Default       7.4757% |    0.4569% (7.0187)         2.8043% (4.6713)         0.0179% (7.4578)         0.0000% (7.4757)     
+  TOTAL absolute error (pp): ML 42.9503, baseline 70.9871, prior-only 151.4688, persistence 150.9967
+  closest per state among ML / baseline / prior-only: Current ML, DQ30 prior-only, DQ60 prior-only, DQ90+ baseline, Prepaid ML, Default baseline
+
+COMPOUNDING TABLE (TOTAL absolute error, percentage points)
+     h         ML   baseline prior-only persistence |  ML - baseline     ML - prior
+     6     8.6909    23.3143    34.8267    31.5271 |       -14.6233       -26.1358
+    12    10.6513    35.9510    56.6500    53.4210 |       -25.2997       -45.9987
+    24    16.6415    49.4512    87.3843    84.6568 |       -32.8097       -70.7428
+    60    42.9503    70.9871   151.4688   150.9967 |       -28.0368      -108.5185
+  ML - baseline: non-monotone; the gap keeps one sign; |gap(60)|/|gap(6)| = 1.917
+  ML - prior-only: widens; the gap keeps one sign; |gap(60)|/|gap(6)| = 4.152
+Checks: ids read back from storage equal the independent list: PASS; sums to one (float64): ML PASS; stored float32 within 1e-05: PASS (worst 5.242e-08); no negatives: PASS; absorbing mass non-decreasing: PASS.

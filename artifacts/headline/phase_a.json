@@ -1,0 +1,52 @@
+{
+  "train": {
+    "seconds": 184.95453780000025,
+    "peak_rss_bytes": 7008206848,
+    "min_avail_bytes": 1720496128,
+    "returncode": 0,
+    "log": "artifacts/headline/logs/train.log",
+    "args": [
+      "-m",
+      "src.train_ml",
+      "--name",
+      "headline_pooled",
+      "--min-sum-hessian-in-leaf",
+      "10",
+      "--lambda-l2",
+      "10"
+    ]
+  },
+  "baseline": {
+    "seconds": 4.061247899997397,
+    "peak_rss_bytes": 749400064,
+    "min_avail_bytes": 8654757888,
+    "returncode": 0,
+    "log": "artifacts/headline/logs/baseline.log",
+    "args": [
+      "-m",
+      "src.baseline",
+      "--fit-only",
+      "--out-dir",
+      "artifacts\\baseline_headline"
+    ]
+  },
+  "forecast": {
+    "seconds": 595.1586605000011,
+    "peak_rss_bytes": 1404170240,
+    "min_avail_bytes": 7905456128,
+    "returncode": 0,
+    "log": "artifacts/headline/logs/forecast.log",
+    "args": [
+      "-m",
+      "src.forecast",
+      "--run",
+      "headline_pooled",
+      "--model",
+      "artifacts/ml/headline_pooled",
+      "--expect-loans",
+      "405672",
+      "--report",
+      "diagnostics\\54_headline_forecaster_build.txt"
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+-m src.train_ml --origin-states Current --from-period-max 200806 --name arch6_grouped_current --overwrite --min-sum-hessian-in-leaf 10 --lambda-l2 10
+
+model name:            arch6_grouped_current
+origin states:         ['Current']
+from_state feature:    OMITTED (single origin state: it is constant)
+loan_age feature:      OMITTED (default)
+features, matrix order: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+categorical features:  ['property_state']
+class order:           ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+training window:       role == fit, from_period <= 200806
+  scan 2006Q1: 5,753,210 training rows
+  scan 2006Q2: 5,286,946 training rows
+  scan 2006Q3: 4,344,262 training rows
+  scan 2006Q4: 4,137,081 training rows
+  scan 2007Q1: 3,424,171 training rows
+  scan 2007Q2: 3,331,473 training rows
+  scan 2007Q3: 2,052,392 training rows
+  scan 2007Q4: 1,531,534 training rows
+training rows 29,861,069; null/unknown labels dropped 0; loan_age in the rows (provenance) -1 .. 30; from_period 200512 .. 200806
+  label Current      29,392,048
+  label DQ30            220,057
+  label DQ60              1,844
+  label DQ90+               525
+  label Prepaid         246,560
+  label Default              35
+  matrix 2006Q1: 5,753,210 rows
+  matrix 2006Q2: 5,286,946 rows
+  matrix 2006Q3: 4,344,262 rows
+  matrix 2006Q4: 4,137,081 rows
+  matrix 2007Q1: 3,424,171 rows
+  matrix 2007Q2: 3,331,473 rows
+  matrix 2007Q3: 2,052,392 rows
+  matrix 2007Q4: 1,531,534 rows
+matrix 29,861,069 x 8, 0.81 GB
+lightgbm params:       {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}
+Dataset constructed in 1.7 s
+
+training wall-clock:   147.9 s (2.5 min) for 100 rounds, 1.48 s/round;  Dataset construction 1.7 s
+total wall-clock:      158.5 s
+peak RSS:              5.26 GB   min system available 1.84 GB
+loan_age is not a feature: no clamp bound written (training rows span -1 .. 30, recorded as provenance)
+saved: artifacts/ml/arch6_grouped_current/model.txt
+       artifacts/ml/arch6_grouped_current/model.json
+
+--- stderr ---

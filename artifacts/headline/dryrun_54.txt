@@ -1,0 +1,227 @@
+HEADLINE RUN  lifetime forecast to h = 6 from the 2008-06 cut: ML (pooled) vs homogeneous baseline, with prior-only, persistence and ORACLE references   [DRY RUN: code-path test on the arch6 fit-role outputs; no evaluate row read]
+run date 2026-10-13   panel build 2026-10-08T09:41:19.866411   partitions 2006Q1..2007Q4
+
+==========================================================================================================================================
+0. DEFINITIONS FIXED BEFORE ANY NUMBER WAS READ
+==========================================================================================================================================
+  Arms      ML pooled (fresh model, artifacts/ml/headline_pooled, full fit window); BASELINE (src.baseline --fit-only, same fit rows);
+            PRIOR-ONLY (to_state frequencies over all fit rows, every loan, every h >= 1: src.nulls.marginal_distribution);
+            references: PERSISTENCE (identity matrix through src.horizon.chain), ORACLE (not achievable; src.nulls.oracle_distribution
+            per h on the scored cohort, so its error is zero by construction). src.nulls holds persistence / marginal / oracle; they
+            are not in src.horizon and only persistence is chained.
+  Loans     the loans with a `condition` row at 2008-12 (405,672), the forecaster's population. The harness's eligible set is 33 loans
+            larger (loans observed at the cut only as the to_state of a 2008-11 row); those 33 are not scored and are reported
+            separately. Decision taken with the user before the run.
+  Cohort    at each h the scored cohort is the loans whose realised state at h is not CENSORED (harness `varying` convention);
+            censored loans are their own column, never redistributed. Predicted shares are summed over the scored cohort only.
+  Error     |predicted share - realised share| in percentage points, per state; TOTAL = sum over the six states.
+  Closest   per state, the arm with the smallest error among ML / baseline / prior-only (and, second column, among those plus persistence).
+  Gap       ML minus baseline, ML minus prior-only, in TOTAL percentage points, at h = 6, 12, 24, 60 and at every h.
+  Trend     'widens' if |gap| strictly increases at each successive reporting horizon, 'narrows' if it strictly decreases at each,
+            otherwise 'non-monotone'. No threshold defines 'holds'; the ratio |gap(60)| / |gap(6)| and the signed values are printed.
+  h = 0     the common starting state of every arm (a one-hot on the state at the cut); no arm forecasts there.
+  No winner-takes-all rule. No sampling uncertainty is attached (none was specified).
+
+Order of operations: phase A (train_ml on fit rows, baseline --fit-only, forecast from the condition rows at the cut) ran and finished before this phase;
+only here is the harness's read of `evaluate` rows performed, for realised outcomes alone.
+
+==========================================================================================================================================
+1. THE ARMS' TRAINING DATA (all from fit rows; read before any outcome)
+==========================================================================================================================================
+ML model artifacts/ml/arch6_pooled   sha256 2a5c5dae78e3bf21
+  origin states ['Current', 'DQ30', 'DQ60', 'DQ90+']; features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']; categorical ['property_state', 'from_state']
+  training window: role fit, from_period_max argument 200806; observed from_period 200512 .. 200806 (train_ml has no lower bound and none was added)
+  training rows 30,333,976; loan_age is not a feature (True); rounds 100; panel build of the training run 2026-10-08T09:41:19.866411
+  label counts: Current 29,559,666  DQ30 349,050  DQ60 70,665  DQ90+ 98,784  Prepaid 252,124  Default 3,687
+  from_state counts: Current 29,861,069  DQ30 324,015  DQ60 63,691  DQ90+ 85,201
+  parameters as stored in model.txt vs the brief:
+    num_leaves                 brief 31           stored 31           PASS
+    min_data_in_leaf           brief 20           stored 20           PASS
+    min_sum_hessian_in_leaf    brief 10           stored 10           PASS
+    lambda_l2                  brief 10           stored 10           PASS
+    objective                  brief multiclass   stored multiclass   PASS
+  lgb_params in the sidecar: {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}
+  train_ml wall-clock: Dataset construction 1.8 s + training 130.7 s; sidecar peak RSS 5.38 GB
+
+BASELINE re-estimated by src.baseline --fit-only into artifacts/baseline_to200806
+  build stamp : 2026-10-08T09:41:19.866411
+  fit from_period range                                        200512 - 200806
+  fit rows with from_period after 200812                                     0   PASS
+  identical training data: baseline count matrix total 30,333,976 vs ML training rows 30,333,976; row totals vs the ML from_state counts and column totals vs the ML label counts: PASS
+  fresh count matrix (rows = from, columns = to):
+                    Current          DQ30          DQ60         DQ90+       Prepaid       Default
+    Current      29,392,048       220,057         1,844           525       246,560            35
+    DQ30            151,153       116,677        51,569           475         4,130            11
+    DQ60             11,097        10,782        15,191        25,851           745            25
+    DQ90+             5,368         1,534         2,061        71,933           689         3,616
+  fresh probability matrix:
+    Current        0.984293      0.007369      0.000062      0.000018      0.008257      0.000001
+    DQ30           0.466500      0.360098      0.159156      0.001466      0.012746      0.000034
+    DQ60           0.174232      0.169286      0.238511      0.405882      0.011697      0.000393
+    DQ90+          0.063004      0.018004      0.024190      0.844274      0.008087      0.042441
+
+STORED artifacts/baseline vs the fresh estimate (the stored one carries 'build stamp : 2026-10-05T11:50:54.525429'; this run's panel build is 2026-10-08T09:41:19.866411)
+  stored count total 40,385,650 vs fresh 30,333,976; max |count difference| in a cell 9,473,635
+  stored probability matrix:
+    Current        0.983142      0.008533      0.000072      0.000036      0.008214      0.000002
+    DQ30           0.406893      0.390246      0.191018      0.001603      0.010144      0.000095
+    DQ60           0.135893      0.148489      0.249819      0.457270      0.007991      0.000538
+    DQ90+          0.061308      0.013098      0.019338      0.866321      0.005385      0.034550
+  (fresh - stored):
+    Current       +0.001151     -0.001164     -0.000010     -0.000019     +0.000043     -0.000001
+    DQ30          +0.059607     -0.030148     -0.031862     -0.000137     +0.002602     -0.000061
+    DQ60          +0.038339     +0.020797     -0.011309     -0.051388     +0.003706     -0.000145
+    DQ90+         +0.001696     +0.004907     +0.004852     -0.022047     +0.002701     +0.007891
+  MAX ABSOLUTE CELL DIFFERENCE (probabilities, all 36 cells): 0.059607   they DIFFER; the fresh estimate is the one used
+
+PRIOR-ONLY: to_state frequencies over all 40,210,036 fit rows (src.nulls.fit_to_state_counts / marginal_distribution), the same vector for every loan at every h >= 1:
+  Current 38,939,122 (96.8393%)  DQ30 560,573 (1.3941%)  DQ60 137,744 (0.3426%)  DQ90+ 233,923 (0.5818%)  Prepaid 331,492 (0.8244%)  Default 7,182 (0.0179%)
+  equals the ML model's training label counts and row count: *** DIFFERENT ***
+  this is the same vector as the harness's marginal null; it is carried once below as 'prior-only'.
+
+==========================================================================================================================================
+2. LOANS AND REALISED OUTCOMES   (the harness read: realised states come from condition + evaluate rows of the test split)
+==========================================================================================================================================
+independent list: 1,681,267 loans with a fit row at 200806 (read through panel_io.load_panel); expected 1,681,267: PASS
+  by start state: Current 1,637,228, DQ30 25,596, DQ60 6,298, DQ90+ 12,145
+harness read 11 s: 1,700,667 test-split loans; absorbed at or before the cut 14,237; enters the panel after the cut 5,069; follow-up ends before the cut 0; reporting hole at the cut 0; eligible 1,681,361
+cross-check: the harness's state at the cut equals the cut row's from_state for all 1,681,267 loans: PASS
+harness-eligible loans WITHOUT a cut row (not scored, not forecast): 94
+  start state: Current 76, DQ30 0, DQ60 3, DQ90+ 15
+  realised at h = 6 : Current 1, DQ30 0, DQ60 0, DQ90+ 0, Prepaid 0, Default 0, CENSORED 93
+
+SCORED AND CENSORED loans at the reporting horizons (censored: no observation at the target month and no absorbing state reached by then; their own column, never redistributed):
+     h     month     eligible       scored     censored   scored-cohort start-state mix (Current / DQ30 / DQ60 / DQ90+)
+     0   2008-06    1,681,267    1,681,267  0 (0.0000%)   1,637,228 (97.38%) / 25,596 (1.52%) / 6,298 (0.37%) / 12,145 (0.72%)
+     6   2008-12    1,681,267    1,680,795 472 (0.0281%)   1,636,958 (97.39%) / 25,574 (1.52%) / 6,272 (0.37%) / 11,991 (0.71%)
+  all-eligible start-state mix: 1,637,228 (97.38%) / 25,596 (1.52%) / 6,298 (0.37%) / 12,145 (0.72%)
+
+==========================================================================================================================================
+3. THE ARMS OVER THE SAME LOANS IN THE SAME ORDER   (ML read back from storage; baseline, persistence chained by src.horizon.chain)
+==========================================================================================================================================
+the ML forecast's loan ids read back from storage (1,681,267 loans, 34 batches) equal the independently loaded list, same order: PASS
+  the arrays used for the realised outcomes, the baseline chain, the persistence chain and the scored masks are all indexed by that same list (positions asserted above): PASS
+  ML run.json: {"batch_size": 50000, "horizon": 6, "n_loans": 1681267, "cut": 200806, "panel_build_stamp": "2026-10-08T09:41:19.866411"}
+
+CHECKS per arm   (float64 = as computed in memory; float32 = as stored, summed in float64; the stored tolerance 1e-05 is not loosened)
+  arm                    worst |sum-1| float64      worst |sum-1| float32 stored smallest prob.     Prepaid,Default step   Prepaid+Default step    
+  ML (pooled)            3.553e-15 (forecaster)     5.041e-08 within           0.000e+00          0.000e+00              0.000e+00               
+  baseline               2.220e-16                  n/a (not stored)           0.000e+00          1.172e-06              8.070e-03               
+  persistence            0.000e+00                  n/a (not stored)           0.000e+00          0.000e+00              0.000e+00               
+  prior-only: one vector summing to 1.00000000000000000 (|sum-1| 0.000e+00); smallest entry 1.786e-04; constant in h, so Prepaid and Default mass cannot fall for h >= 1
+  ORACLE: reproduces the realised counts it was built from at every h (relative 1e-9): PASS
+  every vector sums to one (float64): ML PASS, baseline/persistence PASS;  no negative probability: ML PASS, baseline/persistence PASS;  Prepaid & Default mass non-decreasing in h: ML PASS, baseline/persistence PASS
+  stored float32 vectors sum to one within 1e-05: PASS (worst 5.041e-08)
+  ML sums of the stored float32 values over all loans vs the forecaster's in-memory float64 sums, largest |difference| in expected loans over h and state: 5.637e-05
+
+==========================================================================================================================================
+4. PRIMARY: PREDICTED VS REALISED SHARE OF THE BOOK AT h = 6   (scored cohort; shares in %, errors in percentage points)
+==========================================================================================================================================
+
+h = 6  (2008-12)   eligible 1,681,267, scored 1,680,795, censored 472 (0.0281%)
+  state         realised |          ML    baseline  prior-only persistence |    err ML  err base err prior err persist | closest    closest+pers.
+  Current       91.4374% |    92.2497%    92.6506%    96.8393%    97.3919% |    0.8124    1.2132    5.4019    5.9545 | ML         ML          
+  DQ30           2.2649% |     1.6525%     1.1821%     1.3941%     1.5215% |    0.6124    1.0828    0.8708    0.7433 | ML         ML          
+  DQ60           0.7830% |     0.4632%     0.2839%     0.3426%     0.3732% |    0.3198    0.4990    0.4404    0.4098 | ML         ML          
+  DQ90+          1.6295% |     1.2747%     0.7951%     0.5818%     0.7134% |    0.3548    0.8344    1.0478    0.9161 | ML         ML          
+  Prepaid        3.6690% |     4.1416%     4.8889%     0.8244%     0.0000% |    0.4727    1.2199    2.8446    3.6690 | ML         ML          
+  Default        0.2163% |     0.2182%     0.1994%     0.0179%     0.0000% |    0.0020    0.0169    0.1984    0.2163 | ML         ML          
+  TOTAL                  |                                                 |    2.5739    4.8662   10.8039   11.9090   (TOTAL absolute error, sum over six states; ORACLE 6.66e-16)
+  context (not scored): ML predicted share over ALL 1,681,267 eligible loans: Current 92.2411% DQ30 1.6528% DQ60 0.4635% DQ90+ 1.2815% Prepaid 4.1414% Default 0.2196%
+                        baseline over all eligible loans:            Current 92.6445% DQ30 1.1823% DQ60 0.2841% DQ90+ 0.7991% Prepaid 4.8889% Default 0.2011%
+
+==========================================================================================================================================
+5. THE COMPOUNDING FINDING: TOTAL ABSOLUTE ERROR (sum over the six states, percentage points) AND THE GAPS
+==========================================================================================================================================
+   h           ML     baseline   prior-only  persistence       ORACLE |  ML - baseline     ML - prior |    scored  censored
+   6       2.5739       4.8662      10.8039      11.9090     6.66e-16 |        -2.2922        -8.2299 | 1,680,795       472
+
+ML minus baseline at h = 6: -2.2922 -> n/a (fewer than two reporting horizons)
+ML minus prior-only at h = 6: -8.2299 -> n/a (fewer than two reporting horizons)
+(negative = ML has the smaller total error. 'holds' has no threshold; read the signed values and the ratio.)
+
+TOTAL absolute error and gaps at every h (the compounding curve):
+   h           ML     baseline   prior-only  persistence |  ML - baseline     ML - prior |    scored  censored
+   0       0.0000       0.0000       0.0000       0.0000 |        +0.0000        +0.0000 | 1,681,267         0
+   1       0.0497       0.6136       0.9295       1.7445 |        -0.5639        -0.8798 | 1,681,267         0
+   2       0.7100       1.7567       2.7677       3.8532 |        -1.0468        -2.0577 | 1,681,167       100
+   3       0.8999       2.3273       4.3652       5.4554 |        -1.4274        -3.4654 | 1,681,092       175
+   4       1.0736       2.8170       6.2707       7.3664 |        -1.7434        -5.1972 | 1,680,959       308
+   5       2.5008       4.5307       8.8897       9.9893 |        -2.0299        -6.3889 | 1,680,864       403
+   6       2.5739       4.8662      10.8039      11.9090 |        -2.2922        -8.2299 | 1,680,795       472
+
+==========================================================================================================================================
+6. FULL TRAJECTORIES h = 0..6, six states, share of the scored cohort in % (feeds the fan chart; the long-format CSV is artifacts/headline/trajectory_dryrun.csv)
+==========================================================================================================================================
+h = 0 is the common starting state of every arm. ORACLE equals the realised table by construction and is not printed separately. Prior-only is the single vector printed in section 1 for every h >= 1.
+
+REALISED (scored cohort at each h; every month is observable here up to the data's end, the censored count says how many loans drop out)
+     h    scored  censored     Current        DQ30        DQ60       DQ90+     Prepaid     Default
+     0 1,681,267         0    97.3806%     1.5224%     0.3746%     0.7224%     0.0000%     0.0000%
+     1 1,681,267         0    96.5083%     1.5517%     0.4138%     0.8005%     0.6906%     0.0350%
+     2 1,681,167       100    95.4555%     1.8407%     0.5146%     0.9002%     1.2167%     0.0723%
+     3 1,681,092       175    94.6567%     1.8932%     0.5512%     1.0429%     1.7423%     0.1137%
+     4 1,680,959       308    93.7040%     1.8918%     0.6028%     1.1935%     2.4481%     0.1599%
+     5 1,680,864       403    92.3944%     2.4111%     0.7229%     1.3814%     2.8914%     0.1987%
+     6 1,680,795       472    91.4374%     2.2649%     0.7830%     1.6295%     3.6690%     0.2163%
+
+ML (pooled)
+     h     Current        DQ30        DQ60       DQ90+     Prepaid     Default
+     0    97.3806%     1.5224%     0.3746%     0.7224%     0.0000%     0.0000%
+     1    96.4889%     1.5482%     0.4180%     0.8034%     0.7083%     0.0331%
+     2    95.6104%     1.5860%     0.4214%     0.9088%     1.4082%     0.0653%
+     3    94.7478%     1.6095%     0.4375%     1.0037%     2.1011%     0.1003%
+     4    93.9012%     1.6293%     0.4471%     1.0974%     2.7876%     0.1374%
+     5    93.0686%     1.6421%     0.4568%     1.1880%     3.4677%     0.1768%
+     6    92.2497%     1.6525%     0.4632%     1.2747%     4.1416%     0.2182%
+
+BASELINE (homogeneous six-by-six)
+     h     Current        DQ30        DQ60       DQ90+     Prepaid     Default
+     0    97.3806%     1.5224%     0.3746%     0.7224%     0.0000%     0.0000%
+     1    96.6721%     1.3423%     0.3551%     0.7659%     0.8337%     0.0310%
+     2    95.8911%     1.2696%     0.3228%     0.7934%     1.6594%     0.0637%
+     3    95.0852%     1.2327%     0.3041%     0.8031%     2.4775%     0.0974%
+     4    94.2721%     1.2105%     0.2940%     0.8036%     3.2884%     0.1314%
+     5    93.4591%     1.1948%     0.2880%     0.8004%     4.0921%     0.1655%
+     6    92.6506%     1.1821%     0.2839%     0.7951%     4.8889%     0.1994%
+
+PERSISTENCE (reference)
+     h     Current        DQ30        DQ60       DQ90+     Prepaid     Default
+     0    97.3806%     1.5224%     0.3746%     0.7224%     0.0000%     0.0000%
+     1    97.3806%     1.5224%     0.3746%     0.7224%     0.0000%     0.0000%
+     2    97.3821%     1.5224%     0.3745%     0.7210%     0.0000%     0.0000%
+     3    97.3844%     1.5223%     0.3740%     0.7193%     0.0000%     0.0000%
+     4    97.3871%     1.5221%     0.3738%     0.7169%     0.0000%     0.0000%
+     5    97.3891%     1.5220%     0.3735%     0.7154%     0.0000%     0.0000%
+     6    97.3919%     1.5215%     0.3732%     0.7134%     0.0000%     0.0000%
+
+==========================================================================================================================================
+8. RESOURCES
+==========================================================================================================================================
+  phase B (this analysis, incl. the harness read): wall-clock 24.3 s, peak RSS 1.89 GB, min system available 6.22 GB
+  artifacts: model artifacts/ml/arch6_pooled (model.txt, model.json); baseline artifacts/baseline_to200806; forecast data/forecast/arch6_pooled (long format loan_id, h, state, probability); trajectory CSV artifacts/headline/trajectory.csv
+
+==========================================================================================================================================
+FINDINGS   (measured; nothing interpreted)
+==========================================================================================================================================
+Scored cohort at each horizon: h=6: 1,680,795 scored, 472 censored (0.0281% of 1,681,267)
+Training: ML 30,333,976 rows from_period 200512..200806, fit rows only; baseline estimated on the same 30,333,976 rows (identical); prior-only from the same fit rows.
+Stored baseline vs fresh: max absolute cell difference 0.059607 (max count difference 9,473,635).
+
+h = 6 (2008-12)
+  state        realised | ML (err)                 baseline (err)           prior-only (err)         persistence (err)       
+  Current      91.4374% |   92.2497% (0.8124)        92.6506% (1.2132)        96.8393% (5.4019)        97.3919% (5.9545)     
+  DQ30          2.2649% |    1.6525% (0.6124)         1.1821% (1.0828)         1.3941% (0.8708)         1.5215% (0.7433)     
+  DQ60          0.7830% |    0.4632% (0.3198)         0.2839% (0.4990)         0.3426% (0.4404)         0.3732% (0.4098)     
+  DQ90+         1.6295% |    1.2747% (0.3548)         0.7951% (0.8344)         0.5818% (1.0478)         0.7134% (0.9161)     
+  Prepaid       3.6690% |    4.1416% (0.4727)         4.8889% (1.2199)         0.8244% (2.8446)         0.0000% (3.6690)     
+  Default       0.2163% |    0.2182% (0.0020)         0.1994% (0.0169)         0.0179% (0.1984)         0.0000% (0.2163)     
+  TOTAL absolute error (pp): ML 2.5739, baseline 4.8662, prior-only 10.8039, persistence 11.9090
+  closest per state among ML / baseline / prior-only: Current ML, DQ30 ML, DQ60 ML, DQ90+ ML, Prepaid ML, Default ML
+
+COMPOUNDING TABLE (TOTAL absolute error, percentage points)
+     h         ML   baseline prior-only persistence |  ML - baseline     ML - prior
+     6     2.5739     4.8662    10.8039    11.9090 |        -2.2922        -8.2299
+  ML - baseline: n/a (fewer than two reporting horizons)
+  ML - prior-only: n/a (fewer than two reporting horizons)
+Checks: ids read back from storage equal the independent list: PASS; sums to one (float64): ML PASS; stored float32 within 1e-05: PASS (worst 5.041e-08); no negatives: PASS; absorbing mass non-decreasing: PASS.

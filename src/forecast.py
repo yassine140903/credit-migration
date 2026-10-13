@@ -3,10 +3,13 @@
     python -m src.forecast --run pooled_v1 --model artifacts/ml/pooled --canary
     python -m src.forecast --run pooled_v1 --model artifacts/ml/pooled
     python -m src.forecast --run grouped_v1 --model-map Current=artifacts/ml/a DQ30=artifacts/ml/b DQ60=... DQ90+=...
+    python -m src.forecast --run arch_h6 --model-map ... --cut 200806 --cut-role fit --horizon 6 --expect-loans N   # an in-window cut
 
 PROPAGATION, NOT SIMULATION. Each loan carries a six-element probability vector over
 {Current, DQ30, DQ60, DQ90+, Prepaid, Default}. h = 0 is the initial vector: probability 1 on the from_state of the
-loan's condition row at from_period == 2008-12 (one row per loan). Each month, for every loan, one feature row is built
+loan's row at from_period == the cut (one row per loan). By default the cut is 2008-12 and the rows are the test-split
+`condition` rows; --cut YYYYMM --cut-role ROLE reads the rows of another role at another month instead (the architecture
+comparison starts at 2008-06 from `fit` rows). Everything below that says 2008-12 means "the cut". Each month, for every loan, one feature row is built
 per TRANSIENT origin state (4 rows) and scored; the four probability rows are that loan's transition rows, and
 
     new[j] = sum over transient o of  old[o] * P_o[j]   +   old[j] if j is Prepaid or Default
@@ -178,17 +181,19 @@ def unique_models(models):
 # ==========================================================================
 # the loans at the cut
 # ==========================================================================
-def load_initial(expect_loans):
-    """One row per loan from the condition rows at from_period == 2008-12, with est_ltv derived from the unrounded ratio."""
+def load_initial(expect_loans, cut=CUT_YYYYMM, role="condition"):
+    """One row per loan from the `role` rows at from_period == cut (default: the condition rows at 2008-12), with est_ltv
+    derived from the unrounded ratio."""
     hpi = panel.Hpi()
+    cut_idx = panel.mi(cut // 100, cut % 100)
     manifest = panel_io.read_manifest()
     cols = ["loan_id", "from_period", "from_state", "fico", "ltv", "dti", "rate_spread", "property_state", "loan_age",
             "est_ltv", "unemp_level", "unemp_chg_12m"]
     parts = []
     for p in manifest["partitions"]:
         q = p["quarter"]
-        d = panel_io.load_panel(roles=["condition"], columns=cols, quarters=[q])
-        d = d[d["from_period"] == CUT_YYYYMM].reset_index(drop=True)
+        d = panel_io.load_panel(roles=[role], columns=cols, quarters=[q])
+        d = d[d["from_period"] == cut].reset_index(drop=True)
         if not len(d):
             continue
         ps = d["property_state"]
@@ -196,7 +201,7 @@ def load_initial(expect_loans):
         if (codes < 0).any():
             raise ForecastError("%s: null property_state at the cut" % q)
         age = d["loan_age"].to_numpy(dtype=np.int64)
-        from_month = np.full(len(d), panel.CUT, dtype=np.int64)
+        from_month = np.full(len(d), cut_idx, dtype=np.int64)
         ltv = d["ltv"].to_numpy(dtype=np.float32, na_value=np.nan)
         hf = panel.hpi_features(hpi, q, "", np.zeros(len(d), np.int64), codes, [str(c) for c in ps.cat.categories],
                                 from_month, from_month - age, ltv)          # tails/prefix only name loans in errors
@@ -217,18 +222,18 @@ def load_initial(expect_loans):
         say("  initial %s: %s loans" % (q, f(len(d))))
     init = pd.concat(parts, ignore_index=True).sort_values("loan_id", kind="stable").reset_index(drop=True)
     if init["loan_id"].duplicated().any():
-        raise ForecastError("%d loans have more than one condition row at %d"
-                            % (int(init["loan_id"].duplicated().sum()), CUT_YYYYMM))
+        raise ForecastError("%d loans have more than one %s row at %d"
+                            % (int(init["loan_id"].duplicated().sum()), role, cut))
     if len(init) != expect_loans:
-        raise ForecastError("%s loans at %d, expected %s (--expect-loans)" % (f(len(init)), CUT_YYYYMM, f(expect_loans)))
+        raise ForecastError("%s loans at %d, expected %s (--expect-loans)" % (f(len(init)), cut, f(expect_loans)))
     bad = sorted(set(init["from_state"]) - set(TRANSIENT))
     if bad:
-        raise ForecastError("condition rows start in non-transient state(s) %s" % bad)
+        raise ForecastError("%s rows start in non-transient state(s) %s" % (role, bad))
     frozen = {}
     for c in ("unemp_level", "unemp_chg_12m"):
         vals = init[c].unique()
         if len(vals) != 1 or not np.isfinite(vals[0]):
-            raise ForecastError("%s at %d is not a single finite value: %s" % (c, CUT_YYYYMM, vals[:5]))
+            raise ForecastError("%s at %d is not a single finite value: %s" % (c, cut, vals[:5]))
         frozen[c] = np.float32(vals[0])
     return init, frozen, manifest["build_stamp"]
 
@@ -336,12 +341,15 @@ def write_batch(path, ids, P32):
 # the run
 # ==========================================================================
 def run_config(models, args, n_loans, build_stamp):
-    return {"models": {o: {"directory": models[o].directory.replace(os.sep, "/"), "sha256": models[o].sha256}
-                       for o in TRANSIENT},
-            "probability_dtype": "float32",
-            "clamp_bounds": {o: {c: list(b) for c, b in models[o].clamp.items()} for o in TRANSIENT},
-            "batch_size": args.batch_size, "horizon": HORIZON, "n_loans": n_loans, "cut": CUT_YYYYMM,
-            "panel_build_stamp": build_stamp}
+    cfg = {"models": {o: {"directory": models[o].directory.replace(os.sep, "/"), "sha256": models[o].sha256}
+                      for o in TRANSIENT},
+           "probability_dtype": "float32",
+           "clamp_bounds": {o: {c: list(b) for c, b in models[o].clamp.items()} for o in TRANSIENT},
+           "batch_size": args.batch_size, "horizon": HORIZON, "n_loans": n_loans, "cut": args.cut,
+           "panel_build_stamp": build_stamp}
+    if args.cut_role != "condition":                  # only when non-default, so run.json files written before the option still match
+        cfg["cut_role"] = args.cut_role
+    return cfg
 
 
 def dir_size(root):
@@ -363,8 +371,8 @@ def build_report(run, run_dir, models, cfg, args, n_batches, markers, wall, watc
         w("*** %s ***" % status)
         w("=" * 112)
     w("run: %s    output: %s" % (run, run_dir.replace(os.sep, "/")))
-    w("panel build %s; cut %d; horizon h = 0..%d inclusive (h = 0 is the initial vector)" % (
-        cfg["panel_build_stamp"], CUT_YYYYMM, HORIZON))
+    w("panel build %s; cut %d%s; horizon h = 0..%d inclusive (h = 0 is the initial vector)" % (
+        cfg["panel_build_stamp"], cfg["cut"], " (rows of role %s)" % cfg["cut_role"] if "cut_role" in cfg else "", HORIZON))
     w("")
     w("MODELS   (origin state -> model)")
     for m in unique_models(models):
@@ -438,7 +446,7 @@ def build_report(run, run_dir, models, cfg, args, n_batches, markers, wall, watc
     if done:
         tot = np.sum([np.array(markers[b]["state_sums"]) for b in done], axis=0) / loans_done
         w("  %4s %s" % ("h", " ".join("%10s" % s for s in STATES)))
-        for h in REPORT_H:
+        for h in sorted({h for h in REPORT_H if h <= HORIZON} | {HORIZON}):
             w("  %4d %s   (sum %.9f)" % (h, " ".join("%10.6f" % x for x in tot[h]), tot[h].sum()))
     w("")
     over = done and max(markers[b]["checks"]["worst_sum_deviation_f32"] for b in done) > STORED_TOL
@@ -449,6 +457,7 @@ def build_report(run, run_dir, models, cfg, args, n_batches, markers, wall, watc
 
 
 def main(argv=None):
+    global HORIZON, OUT_ROOT, REPORT
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--run", required=True, help="output name: data/forecast/<run>/")
     g = ap.add_mutually_exclusive_group(required=True)
@@ -457,9 +466,19 @@ def main(argv=None):
     ap.add_argument("--batch-size", type=int, default=50_000)
     ap.add_argument("--canary", action="store_true", help="write the first batch and stop")
     ap.add_argument("--expect-loans", type=int, default=EXPECT_LOANS)
+    ap.add_argument("--cut", type=int, default=CUT_YYYYMM, metavar="YYYYMM",
+                    help="the month whose rows give the initial vector (default %(default)s)")
+    ap.add_argument("--cut-role", choices=panel.ROLES, default="condition",
+                    help="the role of the rows read at the cut (default %(default)s)")
+    ap.add_argument("--horizon", type=int, default=HORIZON, help="months forecast (default %(default)s)")
+    ap.add_argument("--out-root", default=OUT_ROOT, help="output root (default %(default)s)")
+    ap.add_argument("--report", default=REPORT, help="where the build report is written (default %(default)s)")
     args = ap.parse_args(argv)
     if args.batch_size < 1:
         raise SystemExit("--batch-size must be positive")
+    if args.horizon < 1:
+        raise SystemExit("--horizon must be positive")
+    HORIZON, OUT_ROOT, REPORT = args.horizon, args.out_root, args.report
 
     models = load_models(args)
     run_dir = os.path.join(OUT_ROOT, args.run)
@@ -474,7 +493,7 @@ def main(argv=None):
     watch.start()
 
     say("loading the loans at the cut")
-    init, frozen, build_stamp = load_initial(args.expect_loans)
+    init, frozen, build_stamp = load_initial(args.expect_loans, args.cut, args.cut_role)
     n = len(init)
     for m in unique_models(models):
         m.bind(init["property_state"].to_numpy())

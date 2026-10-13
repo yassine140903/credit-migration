@@ -1,0 +1,45 @@
+-m src.train_ml --origin-states DQ30 DQ60 --from-period-max 200806 --name arch6_grouped_dq30_dq60 --overwrite --min-sum-hessian-in-leaf 10 --lambda-l2 10
+
+model name:            arch6_grouped_dq30_dq60
+origin states:         ['DQ30', 'DQ60']
+from_state feature:    INCLUDED (several origin states)
+loan_age feature:      OMITTED (default)
+features, matrix order: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+categorical features:  ['property_state', 'from_state']
+class order:           ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+training window:       role == fit, from_period <= 200806
+  scan 2006Q1: 81,466 training rows
+  scan 2006Q2: 75,151 training rows
+  scan 2006Q3: 61,232 training rows
+  scan 2006Q4: 52,196 training rows
+  scan 2007Q1: 38,834 training rows
+  scan 2007Q2: 40,082 training rows
+  scan 2007Q3: 23,872 training rows
+  scan 2007Q4: 14,873 training rows
+training rows 387,706; null/unknown labels dropped 0; loan_age in the rows (provenance) 0 .. 29; from_period 200602 .. 200806
+  label Current         162,250
+  label DQ30            127,459
+  label DQ60             66,760
+  label DQ90+            26,326
+  label Prepaid           4,875
+  label Default              36
+  matrix 2006Q1: 81,466 rows
+  matrix 2006Q2: 75,151 rows
+  matrix 2006Q3: 61,232 rows
+  matrix 2006Q4: 52,196 rows
+  matrix 2007Q1: 38,834 rows
+  matrix 2007Q2: 40,082 rows
+  matrix 2007Q3: 23,872 rows
+  matrix 2007Q4: 14,873 rows
+matrix 387,706 x 9, 0.01 GB
+lightgbm params:       {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}
+Dataset constructed in 0.1 s
+
+training wall-clock:   2.6 s (0.0 min) for 100 rounds, 0.03 s/round;  Dataset construction 0.1 s
+total wall-clock:      6.2 s
+peak RSS:              1.46 GB   min system available 5.74 GB
+loan_age is not a feature: no clamp bound written (training rows span 0 .. 29, recorded as provenance)
+saved: artifacts/ml/arch6_grouped_dq30_dq60/model.txt
+       artifacts/ml/arch6_grouped_dq30_dq60/model.json
+
+--- stderr ---

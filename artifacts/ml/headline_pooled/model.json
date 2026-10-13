@@ -1,0 +1,141 @@
+{
+  "name": "headline_pooled",
+  "features": [
+    "fico",
+    "ltv",
+    "dti",
+    "rate_spread",
+    "property_state",
+    "est_ltv",
+    "unemp_level",
+    "unemp_chg_12m",
+    "from_state"
+  ],
+  "categorical_features": [
+    "property_state",
+    "from_state"
+  ],
+  "categories": {
+    "property_state": [
+      "AK",
+      "AL",
+      "AR",
+      "AZ",
+      "CA",
+      "CO",
+      "CT",
+      "DC",
+      "DE",
+      "FL",
+      "GA",
+      "GU",
+      "HI",
+      "IA",
+      "ID",
+      "IL",
+      "IN",
+      "KS",
+      "KY",
+      "LA",
+      "MA",
+      "MD",
+      "ME",
+      "MI",
+      "MN",
+      "MO",
+      "MS",
+      "MT",
+      "NC",
+      "ND",
+      "NE",
+      "NH",
+      "NJ",
+      "NM",
+      "NV",
+      "NY",
+      "OH",
+      "OK",
+      "OR",
+      "PA",
+      "PR",
+      "RI",
+      "SC",
+      "SD",
+      "TN",
+      "TX",
+      "UT",
+      "VA",
+      "VI",
+      "VT",
+      "WA",
+      "WI",
+      "WV",
+      "WY"
+    ],
+    "from_state": [
+      "Current",
+      "DQ30",
+      "DQ60",
+      "DQ90+"
+    ]
+  },
+  "class_order": [
+    "Current",
+    "DQ30",
+    "DQ60",
+    "DQ90+",
+    "Prepaid",
+    "Default"
+  ],
+  "origin_states": [
+    "Current",
+    "DQ30",
+    "DQ60",
+    "DQ90+"
+  ],
+  "from_state_is_feature": true,
+  "training_window": {
+    "role": "fit",
+    "from_period_max_arg": null,
+    "from_period_min_observed": 200512,
+    "from_period_max_observed": 200812
+  },
+  "n_rows": 40210036,
+  "label_counts": {
+    "Current": 38939122,
+    "DQ30": 560573,
+    "DQ60": 137744,
+    "DQ90+": 233923,
+    "Prepaid": 331492,
+    "Default": 7182
+  },
+  "from_state_counts": {
+    "Current": 39360874,
+    "DQ30": 523364,
+    "DQ60": 124006,
+    "DQ90+": 201792
+  },
+  "loan_age_is_feature": false,
+  "loan_age_in_training_rows": {
+    "min": -18,
+    "max": 36,
+    "note": "PROVENANCE ONLY: the loan_age range present in the training rows; not a clamp bound unless loan_age is a feature"
+  },
+  "clamp_bounds": {},
+  "n_rounds": 100,
+  "objective": "multiclass",
+  "lgb_params": {
+    "objective": "multiclass",
+    "num_class": 6,
+    "device_type": "cpu",
+    "verbosity": -1,
+    "min_sum_hessian_in_leaf": 10.0,
+    "lambda_l2": 10.0
+  },
+  "lightgbm_version": "4.7.0",
+  "panel_build_stamp": "2026-10-08T09:41:19.866411",
+  "matrix_bytes": 1206306922,
+  "dataset_construct_seconds": 2.45,
+  "train_seconds": 170.68,
+  "peak_rss_bytes": 7019282432
+}

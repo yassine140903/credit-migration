@@ -1,0 +1,352 @@
+--- before/src/train_ml.py
++++ after/src/train_ml.py
+@@ -16,7 +16,10 @@
+ run_length_censored. property_state and from_state are native LightGBM categoricals with a fixed, stated category list
+ (no integer or FIPS encoding). Nulls are left as-is, numerics are float32.
+ 
+-LightGBM: multiclass, CPU, 100 rounds, library defaults, no tuning, no early stopping, no validation set.
++LightGBM: multiclass, CPU, 100 rounds, library defaults, no tuning, no early stopping, no validation set. The only
++parameters that can be changed from the command line are the two leaf-value bounds of diagnostic 49,
++--min-sum-hessian-in-leaf and --lambda-l2; left unset (the default) they are not passed and the library defaults apply,
++so every earlier invocation trains exactly as before. When set they are written to the sidecar ("lgb_params").
+ 
+ Two passes, as in diagnostics/34_thinned_training.py: a label scan that reads only the state columns, then the feature
+ read that builds the matrix one partition at a time; the matrix is handed to a Dataset whose raw reference is dropped
+@@ -151,6 +154,10 @@
+                     help="from_state values to train on (default: all four transient states)")
+     ap.add_argument("--from-period-max", type=int, default=None, metavar="YYYYMM",
+                     help="last from_period to train on, inclusive (default: the whole fit window)")
++    ap.add_argument("--min-sum-hessian-in-leaf", type=float, default=None, metavar="X",
++                    help="LightGBM min_sum_hessian_in_leaf (default: not passed, library default 1e-3)")
++    ap.add_argument("--lambda-l2", type=float, default=None, metavar="X",
++                    help="LightGBM lambda_l2 (default: not passed, library default 0)")
+     ap.add_argument("--overwrite", action="store_true", help="replace an existing artifacts/ml/<name>/")
+     args = ap.parse_args(argv)
+ 
+@@ -195,7 +202,13 @@
+ 
+     watch.phase = "Dataset construction"
+     params = {"objective": "multiclass", "num_class": len(STATES), "device_type": "cpu", "verbosity": -1}
+-    ds = lgb.Dataset(X, label=y, categorical_feature=categorical, free_raw_data=True)
++    if args.min_sum_hessian_in_leaf is not None:
++        params["min_sum_hessian_in_leaf"] = args.min_sum_hessian_in_leaf
++    if args.lambda_l2 is not None:
++        params["lambda_l2"] = args.lambda_l2
++    say("lightgbm params:       %s" % params)
++    ds = lgb.Dataset(X, label=y, categorical_feature=categorical, free_raw_data=True,
++                     params=params if len(params) > 4 else None)
+     del X, y
+     gc.collect()
+     t0 = time.perf_counter()
+@@ -230,7 +243,7 @@
+                                           "note": "PROVENANCE ONLY: the loan_age range present in the training rows; "
+                                                   "not a clamp bound unless loan_age is a feature"},
+             "clamp_bounds": ({"loan_age": [S["age_min"], S["age_max"]]} if args.with_loan_age else {}),
+-            "n_rounds": N_ROUNDS, "objective": "multiclass", "lightgbm_version": lgb.__version__,
++            "n_rounds": N_ROUNDS, "objective": "multiclass", "lgb_params": params, "lightgbm_version": lgb.__version__,
+             "panel_build_stamp": manifest["build_stamp"], "matrix_bytes": matrix_bytes,
+             "dataset_construct_seconds": round(construct_s, 2), "train_seconds": round(train_s, 2),
+             "peak_rss_bytes": int(watch.peak_rss())}
+--- before/src/forecast.py
++++ after/src/forecast.py
+@@ -3,10 +3,13 @@
+     python -m src.forecast --run pooled_v1 --model artifacts/ml/pooled --canary
+     python -m src.forecast --run pooled_v1 --model artifacts/ml/pooled
+     python -m src.forecast --run grouped_v1 --model-map Current=artifacts/ml/a DQ30=artifacts/ml/b DQ60=... DQ90+=...
++    python -m src.forecast --run arch_h6 --model-map ... --cut 200806 --cut-role fit --horizon 6 --expect-loans N   # an in-window cut
+ 
+ PROPAGATION, NOT SIMULATION. Each loan carries a six-element probability vector over
+ {Current, DQ30, DQ60, DQ90+, Prepaid, Default}. h = 0 is the initial vector: probability 1 on the from_state of the
+-loan's condition row at from_period == 2008-12 (one row per loan). Each month, for every loan, one feature row is built
++loan's row at from_period == the cut (one row per loan). By default the cut is 2008-12 and the rows are the test-split
++`condition` rows; --cut YYYYMM --cut-role ROLE reads the rows of another role at another month instead (the architecture
++comparison starts at 2008-06 from `fit` rows). Everything below that says 2008-12 means "the cut". Each month, for every loan, one feature row is built
+ per TRANSIENT origin state (4 rows) and scored; the four probability rows are that loan's transition rows, and
+ 
+     new[j] = sum over transient o of  old[o] * P_o[j]   +   old[j] if j is Prepaid or Default
+@@ -178,17 +181,19 @@
+ # ==========================================================================
+ # the loans at the cut
+ # ==========================================================================
+-def load_initial(expect_loans):
+-    """One row per loan from the condition rows at from_period == 2008-12, with est_ltv derived from the unrounded ratio."""
++def load_initial(expect_loans, cut=CUT_YYYYMM, role="condition"):
++    """One row per loan from the `role` rows at from_period == cut (default: the condition rows at 2008-12), with est_ltv
++    derived from the unrounded ratio."""
+     hpi = panel.Hpi()
++    cut_idx = panel.mi(cut // 100, cut % 100)
+     manifest = panel_io.read_manifest()
+     cols = ["loan_id", "from_period", "from_state", "fico", "ltv", "dti", "rate_spread", "property_state", "loan_age",
+             "est_ltv", "unemp_level", "unemp_chg_12m"]
+     parts = []
+     for p in manifest["partitions"]:
+         q = p["quarter"]
+-        d = panel_io.load_panel(roles=["condition"], columns=cols, quarters=[q])
+-        d = d[d["from_period"] == CUT_YYYYMM].reset_index(drop=True)
++        d = panel_io.load_panel(roles=[role], columns=cols, quarters=[q])
++        d = d[d["from_period"] == cut].reset_index(drop=True)
+         if not len(d):
+             continue
+         ps = d["property_state"]
+@@ -196,7 +201,7 @@
+         if (codes < 0).any():
+             raise ForecastError("%s: null property_state at the cut" % q)
+         age = d["loan_age"].to_numpy(dtype=np.int64)
+-        from_month = np.full(len(d), panel.CUT, dtype=np.int64)
++        from_month = np.full(len(d), cut_idx, dtype=np.int64)
+         ltv = d["ltv"].to_numpy(dtype=np.float32, na_value=np.nan)
+         hf = panel.hpi_features(hpi, q, "", np.zeros(len(d), np.int64), codes, [str(c) for c in ps.cat.categories],
+                                 from_month, from_month - age, ltv)          # tails/prefix only name loans in errors
+@@ -217,18 +222,18 @@
+         say("  initial %s: %s loans" % (q, f(len(d))))
+     init = pd.concat(parts, ignore_index=True).sort_values("loan_id", kind="stable").reset_index(drop=True)
+     if init["loan_id"].duplicated().any():
+-        raise ForecastError("%d loans have more than one condition row at %d"
+-                            % (int(init["loan_id"].duplicated().sum()), CUT_YYYYMM))
++        raise ForecastError("%d loans have more than one %s row at %d"
++                            % (int(init["loan_id"].duplicated().sum()), role, cut))
+     if len(init) != expect_loans:
+-        raise ForecastError("%s loans at %d, expected %s (--expect-loans)" % (f(len(init)), CUT_YYYYMM, f(expect_loans)))
++        raise ForecastError("%s loans at %d, expected %s (--expect-loans)" % (f(len(init)), cut, f(expect_loans)))
+     bad = sorted(set(init["from_state"]) - set(TRANSIENT))
+     if bad:
+-        raise ForecastError("condition rows start in non-transient state(s) %s" % bad)
++        raise ForecastError("%s rows start in non-transient state(s) %s" % (role, bad))
+     frozen = {}
+     for c in ("unemp_level", "unemp_chg_12m"):
+         vals = init[c].unique()
+         if len(vals) != 1 or not np.isfinite(vals[0]):
+-            raise ForecastError("%s at %d is not a single finite value: %s" % (c, CUT_YYYYMM, vals[:5]))
++            raise ForecastError("%s at %d is not a single finite value: %s" % (c, cut, vals[:5]))
+         frozen[c] = np.float32(vals[0])
+     return init, frozen, manifest["build_stamp"]
+ 
+@@ -336,12 +341,15 @@
+ # the run
+ # ==========================================================================
+ def run_config(models, args, n_loans, build_stamp):
+-    return {"models": {o: {"directory": models[o].directory.replace(os.sep, "/"), "sha256": models[o].sha256}
+-                       for o in TRANSIENT},
+-            "probability_dtype": "float32",
+-            "clamp_bounds": {o: {c: list(b) for c, b in models[o].clamp.items()} for o in TRANSIENT},
+-            "batch_size": args.batch_size, "horizon": HORIZON, "n_loans": n_loans, "cut": CUT_YYYYMM,
+-            "panel_build_stamp": build_stamp}
++    cfg = {"models": {o: {"directory": models[o].directory.replace(os.sep, "/"), "sha256": models[o].sha256}
++                      for o in TRANSIENT},
++           "probability_dtype": "float32",
++           "clamp_bounds": {o: {c: list(b) for c, b in models[o].clamp.items()} for o in TRANSIENT},
++           "batch_size": args.batch_size, "horizon": HORIZON, "n_loans": n_loans, "cut": args.cut,
++           "panel_build_stamp": build_stamp}
++    if args.cut_role != "condition":                  # only when non-default, so run.json files written before the option still match
++        cfg["cut_role"] = args.cut_role
++    return cfg
+ 
+ 
+ def dir_size(root):
+@@ -363,8 +371,8 @@
+         w("*** %s ***" % status)
+         w("=" * 112)
+     w("run: %s    output: %s" % (run, run_dir.replace(os.sep, "/")))
+-    w("panel build %s; cut %d; horizon h = 0..%d inclusive (h = 0 is the initial vector)" % (
+-        cfg["panel_build_stamp"], CUT_YYYYMM, HORIZON))
++    w("panel build %s; cut %d%s; horizon h = 0..%d inclusive (h = 0 is the initial vector)" % (
++        cfg["panel_build_stamp"], cfg["cut"], " (rows of role %s)" % cfg["cut_role"] if "cut_role" in cfg else "", HORIZON))
+     w("")
+     w("MODELS   (origin state -> model)")
+     for m in unique_models(models):
+@@ -438,7 +446,7 @@
+     if done:
+         tot = np.sum([np.array(markers[b]["state_sums"]) for b in done], axis=0) / loans_done
+         w("  %4s %s" % ("h", " ".join("%10s" % s for s in STATES)))
+-        for h in REPORT_H:
++        for h in sorted({h for h in REPORT_H if h <= HORIZON} | {HORIZON}):
+             w("  %4d %s   (sum %.9f)" % (h, " ".join("%10.6f" % x for x in tot[h]), tot[h].sum()))
+     w("")
+     over = done and max(markers[b]["checks"]["worst_sum_deviation_f32"] for b in done) > STORED_TOL
+@@ -449,6 +457,7 @@
+ 
+ 
+ def main(argv=None):
++    global HORIZON, OUT_ROOT, REPORT
+     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+     ap.add_argument("--run", required=True, help="output name: data/forecast/<run>/")
+     g = ap.add_mutually_exclusive_group(required=True)
+@@ -457,9 +466,19 @@
+     ap.add_argument("--batch-size", type=int, default=50_000)
+     ap.add_argument("--canary", action="store_true", help="write the first batch and stop")
+     ap.add_argument("--expect-loans", type=int, default=EXPECT_LOANS)
++    ap.add_argument("--cut", type=int, default=CUT_YYYYMM, metavar="YYYYMM",
++                    help="the month whose rows give the initial vector (default %(default)s)")
++    ap.add_argument("--cut-role", choices=panel.ROLES, default="condition",
++                    help="the role of the rows read at the cut (default %(default)s)")
++    ap.add_argument("--horizon", type=int, default=HORIZON, help="months forecast (default %(default)s)")
++    ap.add_argument("--out-root", default=OUT_ROOT, help="output root (default %(default)s)")
++    ap.add_argument("--report", default=REPORT, help="where the build report is written (default %(default)s)")
+     args = ap.parse_args(argv)
+     if args.batch_size < 1:
+         raise SystemExit("--batch-size must be positive")
++    if args.horizon < 1:
++        raise SystemExit("--horizon must be positive")
++    HORIZON, OUT_ROOT, REPORT = args.horizon, args.out_root, args.report
+ 
+     models = load_models(args)
+     run_dir = os.path.join(OUT_ROOT, args.run)
+@@ -474,7 +493,7 @@
+     watch.start()
+ 
+     say("loading the loans at the cut")
+-    init, frozen, build_stamp = load_initial(args.expect_loans)
++    init, frozen, build_stamp = load_initial(args.expect_loans, args.cut, args.cut_role)
+     n = len(init)
+     for m in unique_models(models):
+         m.bind(init["property_state"].to_numpy())
+--- before/src/horizon.py
++++ after/src/horizon.py
+@@ -104,12 +104,13 @@
+     return out
+ 
+ 
+-def _per_loan(df, horizons, cut):
+-    """Per-loan summary for one partition's test rows."""
++def _per_loan(df, horizons, cut, cut_role="condition"):
++    """Per-loan summary for one partition's rows. The cut month must be observed through rows of role `cut_role`
++    ("condition" for the production cut at 2008-12; "fit" when the cut is inside the fit window)."""
+     key, ids = pd.factorize(df["loan_id"].to_numpy())
+     t = month_index(df["from_period"].to_numpy())
+     o, d = _codes(df["from_state"]), _codes(df["to_state"])
+-    is_cond = (df["role"] == "condition").to_numpy()
++    is_cond = (df["role"] == cut_role).to_numpy()
+ 
+     # every month a row observes: its from month and the month after it
+     obs = pd.DataFrame({"key": np.concatenate([key, key]),
+@@ -117,7 +118,7 @@
+                         "state": np.concatenate([o, d]),
+                         "cond": np.concatenate([is_cond, is_cond])})
+     if not obs.loc[obs["month"] == cut, "cond"].all():
+-        raise HorizonError("the cut month is observed through a non-condition row")
++        raise HorizonError("the cut month is observed through a row whose role is not %r" % cut_role)
+     obs = obs.drop_duplicates(["key", "month", "state"])
+     clash = obs.duplicated(["key", "month"])
+     if clash.any():
+@@ -154,14 +155,23 @@
+     return L
+ 
+ 
+-def read_test_loans(horizons=HORIZONS, cut=CUT, progress=print):
+-    """One pass over the panel: a per-loan frame for every test-split loan."""
++def read_test_loans(horizons=HORIZONS, cut=CUT, progress=print, roles=None, cut_role="condition", period_min=None):
++    """One pass over the panel: a per-loan frame for every test-split loan.
++
++    roles       roles read (default TEST_ROLES = condition, evaluate)
++    cut_role    the role through which the cut month must be observed (default "condition")
++    period_min  YYYYMM; rows with an earlier from_period are dropped before the per-loan summary (default: none dropped).
++                Safe for loans that are transient at the cut (an absorbing state is never left, so nothing before cut - 1
++                can change their outcome); the eligibility reasons of loans that left earlier are then not meaningful.
++    """
+     manifest = read_manifest()
+     parts = []
+     for q in [p["quarter"] for p in manifest["partitions"]]:
+         t0 = time.time()
+-        df = load_panel(roles=TEST_ROLES, columns=COLUMNS, quarters=[q])
+-        parts.append(_per_loan(df, horizons, cut))
++        df = load_panel(roles=TEST_ROLES if roles is None else roles, columns=COLUMNS, quarters=[q])
++        if period_min is not None:
++            df = df[df["from_period"].to_numpy(dtype=np.int64, na_value=0) >= period_min].reset_index(drop=True)
++        parts.append(_per_loan(df, horizons, cut, cut_role))
+         progress("    %s  %s test rows  (%.1fs)" % (q, "{:,}".format(len(df)),
+                                                    time.time() - t0))
+         del df
+--- before/src/baseline.py
++++ after/src/baseline.py
+@@ -2,6 +2,7 @@
+ 
+     python -m src.baseline                      # writes artifacts/baseline/
+     python -m src.baseline --out-dir some/dir
++    python -m src.baseline --from-period-min 200601 --from-period-max 200806 --out-dir some/dir   # a window of the fit rows
+ 
+ Estimation only - no forecasting, no matrix powers, no lifetime PD.
+ 
+@@ -162,24 +163,37 @@
+     return remap[series.cat.codes.to_numpy()]      # code -1 indexes the -1 slot
+ 
+ 
+-def scan_panel():
+-    """One pass over every partition. Counts from fit rows only."""
++def scan_panel(period_min=None, period_max=None, fit_only=False):
++    """One pass over every partition. Counts from fit rows only; with a window, only fit rows whose from_period lies in it.
++
++    period_min / period_max are inclusive YYYYMM bounds, either may be None. With neither the estimate is the whole
++    fit window, exactly as before; fit rows outside a given window are counted in scan["fit_outside_window"].
++    fit_only=True loads only the fit rows (condition and evaluate rows are never read; the by-role table lists fit alone)."""
+     manifest = read_manifest()
+     quarters = [p["quarter"] for p in manifest["partitions"]]
+     scan = {"build_stamp": manifest["build_stamp"], "quarters": quarters,
+             "pooled": np.zeros((N_STATES, N_STATES), dtype=np.int64),
+             "by_year": {}, "role_rows": {}, "fit_rows": 0, "fit_null_state": 0,
+             "fit_after_cut": 0, "fit_period_range": [None, None],
+-            "total_rows": 0}
++            "total_rows": 0, "window": (period_min, period_max), "fit_outside_window": 0}
+     for q in quarters:
+         t0 = time.time()
+-        df = load_panel(columns=COLUMNS, quarters=[q])
++        df = load_panel(roles=[FIT_ROLE] if fit_only else None, columns=COLUMNS, quarters=[q])
+         scan["total_rows"] += len(df)
+         for r, n in df["role"].value_counts(dropna=False).items():
+             key = "(null)" if pd.isna(r) else str(r)
+             scan["role_rows"][key] = scan["role_rows"].get(key, 0) + int(n)
+ 
+         fit = (df["role"] == FIT_ROLE).to_numpy()
++        if period_min is not None or period_max is not None:
++            p_all = df["from_period"].to_numpy(dtype=np.int64, na_value=0)
++            inwin = np.ones(len(df), dtype=bool)
++            if period_min is not None:
++                inwin &= p_all >= period_min
++            if period_max is not None:
++                inwin &= p_all <= period_max
++            scan["fit_outside_window"] += int((fit & ~inwin).sum())
++            fit = fit & inwin
+         scan["fit_rows"] += int(fit.sum())
+         o = _codes(df["from_state"])[fit]
+         d = _codes(df["to_state"])[fit]
+@@ -269,10 +283,10 @@
+     raise SystemExit(1)
+ 
+ 
+-def run(out_dir=OUT_DIR):
++def run(out_dir=OUT_DIR, period_min=None, period_max=None, fit_only=False):
+     t_start = time.time()
+     rep = Report()
+-    scan = scan_panel()
++    scan = scan_panel(period_min, period_max, fit_only)
+     counts = scan["pooled"]
+     totals = counts.sum(axis=1)
+ 
+@@ -283,6 +297,12 @@
+     rep.emit("build stamp : %s" % scan["build_stamp"])
+     rep.emit("partitions  : %s" % ", ".join(scan["quarters"]))
+     rep.emit("columns     : %s" % ", ".join(COLUMNS))
++    if period_min is not None or period_max is not None:
++        rep.emit("WINDOW      : fit rows with from_period %s .. %s only (%s fit rows outside it, not counted)"
++                 % (period_min if period_min is not None else "(no lower bound)",
++                    period_max if period_max is not None else "(no upper bound)", fmt(scan["fit_outside_window"])))
++    if fit_only:
++        rep.emit("READ        : fit rows only (condition and evaluate rows were never loaded)")
+     rep.emit("state order : %s" % ", ".join(STATES))
+     rep.emit("estimated   : %s" % ", ".join(ESTIMATED))
+     rep.emit("by constr.  : %s (identity rows)" % ", ".join(ABSORBING))
+@@ -499,8 +519,14 @@
+         description="Estimate the homogeneous transition matrix from fit rows.")
+     parser.add_argument("--out-dir", default=OUT_DIR,
+                         help="output directory (default: %(default)s)")
++    parser.add_argument("--from-period-min", type=int, default=None, metavar="YYYYMM",
++                        help="first from_period counted, inclusive (default: no lower bound)")
++    parser.add_argument("--from-period-max", type=int, default=None, metavar="YYYYMM",
++                        help="last from_period counted, inclusive (default: no upper bound)")
++    parser.add_argument("--fit-only", action="store_true",
++                        help="load only the fit rows (the by-role table then shows the fit role alone); default: all roles are read for the by-role table")
+     args = parser.parse_args(argv)
+-    run(args.out_dir)
++    run(args.out_dir, args.from_period_min, args.from_period_max, args.fit_only)
+ 
+ 
+ if __name__ == "__main__":

@@ -1,0 +1,43 @@
+-m src.train_ml --name headline_pooled --min-sum-hessian-in-leaf 10 --lambda-l2 10
+
+model name:            headline_pooled
+origin states:         ['Current', 'DQ30', 'DQ60', 'DQ90+']
+from_state feature:    INCLUDED (several origin states)
+loan_age feature:      OMITTED (default)
+features, matrix order: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+categorical features:  ['property_state', 'from_state']
+class order:           ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+training window:       role == fit, from_period <= (whole fit window)
+  scan 2006Q1: 6,981,713 training rows
+  scan 2006Q2: 6,513,938 training rows
+  scan 2006Q3: 5,466,937 training rows
+  scan 2006Q4: 5,438,943 training rows
+  scan 2007Q1: 4,755,299 training rows
+  scan 2007Q2: 4,915,082 training rows
+  scan 2007Q3: 3,269,478 training rows
+  scan 2007Q4: 2,868,646 training rows
+training rows 40,210,036; null/unknown labels dropped 0; loan_age in the rows (provenance) -18 .. 36; from_period 200512 .. 200812
+  label Current      38,939,122
+  label DQ30            560,573
+  label DQ60            137,744
+  label DQ90+           233,923
+  label Prepaid         331,492
+  label Default           7,182
+  matrix 2006Q1: 6,981,713 rows
+  matrix 2006Q2: 6,513,938 rows
+  matrix 2006Q3: 5,466,937 rows
+  matrix 2006Q4: 5,438,943 rows
+  matrix 2007Q1: 4,755,299 rows
+  matrix 2007Q2: 4,915,082 rows
+  matrix 2007Q3: 3,269,478 rows
+  matrix 2007Q4: 2,868,646 rows
+matrix 40,210,036 x 9, 1.12 GB
+lightgbm params:       {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}
+Dataset constructed in 2.5 s
+
+training wall-clock:   170.7 s (2.8 min) for 100 rounds, 1.71 s/round;  Dataset construction 2.5 s
+total wall-clock:      183.4 s
+peak RSS:              6.54 GB   min system available 1.61 GB
+loan_age is not a feature: no clamp bound written (training rows span -18 .. 36, recorded as provenance)
+saved: artifacts/ml/headline_pooled/model.txt
+       artifacts/ml/headline_pooled/model.json

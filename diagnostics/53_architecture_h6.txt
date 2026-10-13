@@ -1,0 +1,248 @@
+MILESTONE: ARCHITECTURE COMPARISON  grouped (three models) vs pooled (one model), chained six months from 2008-06; homogeneous baseline alongside
+run date 2026-10-13   panel build 2026-10-08T09:41:19.866411   16 logical CPUs   partitions 2006Q1..2007Q4   DIAG53_REUSE=0
+
+============================================================================================================================
+0. DECISIONS (closed, implemented as given) AND WHAT WAS NEEDED TO IMPLEMENT THEM
+============================================================================================================================
+MILESTONE: ARCHITECTURE COMPARISON, grouped (three models) vs pooled (one model), chained six months from 2008-06, baseline alongside.
+
+    python diagnostics/53_architecture_h6.py   # from the repo root; DIAG53_REUSE=1 skips retraining models that already exist
+
+Everything below is a closed decision of the brief; nothing is tuned and no arm is added.
+
+WINDOW. Models train on role == 'fit', from_period <= 200806 (src.train_ml --from-period-max 200806; train_ml has no lower bound, so the observed lower edge is
+reported, not enforced). The forecast starts at the 2008-06 cut and is chained six months to 2008-12; it is checked against the realised states at 2008-12, read from
+fit rows. EVALUATION LOANS (answer given to the question asked before this run): every fit loan with a fit row at from_period == 200806 (all such rows start in a
+transient state, since an absorbing state emits no row). They are loans the models also trained on up to 200806: the 2008-12 outcome is out-of-time, the loans are
+not held out. Evaluate rows are never read by this script or by anything it launches (train_ml, forecast and horizon read roles=['fit']; baseline runs with
+--fit-only).
+FEATURES. fico ltv dti rate_spread property_state est_ltv unemp_level unemp_chg_12m for both arms; from_state as a native categorical wherever a model trains on
+more than one origin state (the pooled model and the DQ30+DQ60 model), as src.train_ml resolves it. No loan_age, no run_length.
+REGULARISATION. min_sum_hessian_in_leaf 10, lambda_l2 10 on every model; num_leaves 31, min_data_in_leaf 20, 100 rounds (train_ml's own).
+ARMS. GROUPED: Current / DQ30+DQ60 / DQ90+, forecast through src.forecast --model-map. POOLED: one model, src.forecast --model. BASELINE: the homogeneous matrix
+re-estimated by src.baseline on fit rows with from_period <= 200806, chained through src.horizon.chain / homogeneous_step. The baseline is context only and never
+enters the rule.
+
+THE CODE THIS RUN NEEDED CHANGED (done first, as a separate backward-compatible change; every default reproduces; see artifacts/arch6/src_changes.diff):
+  src/train_ml.py   --min-sum-hessian-in-leaf, --lambda-l2 (unset = not passed); recorded in the sidecar as lgb_params.
+  src/forecast.py   --cut, --cut-role, --horizon, --out-root, --report (defaults: 200812, condition, 60, data/forecast, diagnostics/37_forecaster_build.txt).
+  src/horizon.py    read_test_loans(roles=, cut_role=, period_min=); _per_loan(cut_role=).
+  src/baseline.py   --from-period-min, --from-period-max, --fit-only.
+
+PRE-REGISTERED RULE (fixed before any number was read; applied mechanically).
+  QUANTITY: for each of two columns (Default share, DQ90+ share), the absolute error in percentage points between an arm's predicted share of the book at h = 6
+  and the realised share at 2008-12. The cohort is the evaluation loans whose state at 2008-12 is OBSERVED (the harness's "varying" cohort: an absorbing state
+  reached by then, or a state seen in 2008-12); the predicted share is the mean predicted probability over the SAME loans. Censored loans (not absorbed, not observed
+  at 2008-12) are their own column in every table and are never redistributed. [Interpretation recorded here: the brief says "share of the book" without naming the
+  denominator; the harness's convention (score on the uncensored cohort) is used for the rule. The alternative - all evaluation loans in the denominator, censored a
+  column - is computed beside it as CONTEXT and does not enter the rule.]
+  NOISE: paired bootstrap, 500 draws (numpy default_rng(53)), resampling EVALUATION LOANS with replacement; every draw scores grouped, pooled (and the baseline, for
+  context) on the SAME resampled loans, and stores the difference error(pooled) - error(grouped) in pp (positive = grouped closer).
+  DECISION: grouped is adopted iff it is favoured (strictly smaller error) in >= 475 of 500 draws on EITHER column; otherwise pooled ships, reported as
+  "architecture made no measurable difference at h=6". If the columns disagree the split is reported; adoption follows the either-column rule.
+  CHANGE FROM 11 OCT, AND WHY: DQ90+ was promoted from "reported alongside" to a column that can trigger adoption, because diagnostic 51 measured the DQ90+-origin model
+  ordering loans on Default at AUC 0.713 [0.700, 0.726] - grouped has a real DQ90+ model, not a base rate.
+
+
+Source changes made before this run are in artifacts/arch6/src_changes.diff (plain diff against copies taken before the edits; no git). Regression of their defaults, run before this script:
+  src.forecast, defaults, canary on artifacts/ml/pooled vs the stored data/forecast/pooled_v1 batch 0: 18,300,000 probabilities bit-identical.
+  src.train_ml, defaults (DQ90+ origin, to 200706): model.txt identical to the one the pre-change file writes; the sidecar differs only by the new lgb_params key.
+  src.baseline --fit-only vs the default (all-roles) run on the current panel: counts.csv identical.
+  src.horizon_baseline with the ORIGINAL horizon.py vs the edited one: scores.csv, compounding.csv, predicted_by_start.csv identical. Both differ from the stored scores.csv (6 Oct) in the 17th
+  significant digit only (e.g. 0.34700932785642002 vs ...1997).
+  The stored artifacts/baseline differs from a fresh default estimate by real counts (about 0.4%) because it was estimated on the 2026-10-05 panel build and the panel was rebuilt on 2026-10-08;
+  that is a finding about the stored artifact, not about the edit (section 4 reports it).
+
+============================================================================================================================
+1. EVALUATION LOANS  (fit rows with from_period == 200806)
+============================================================================================================================
+evaluation loans 1,681,267; by start state: Current 1,637,228, DQ30 25,596, DQ60 6,298, DQ90+ 12,145
+
+============================================================================================================================
+2. TRAINING  (real src.train_ml in a subprocess per model; --from-period-max 200806; min_sum_hessian_in_leaf 10, lambda_l2 10; 100 rounds)
+============================================================================================================================
+model A (arch6_grouped_current): trained in 160 s wall-clock (subprocess, whole pipeline); log artifacts\arch6\logs\train_arch6_grouped_current.log
+model B (arch6_grouped_dq30_dq60): trained in 7 s wall-clock (subprocess, whole pipeline); log artifacts\arch6\logs\train_arch6_grouped_dq30_dq60.log
+model C (arch6_grouped_dq90plus): trained in 6 s wall-clock (subprocess, whole pipeline); log artifacts\arch6\logs\train_arch6_grouped_dq90plus.log
+model P (arch6_pooled): trained in 143 s wall-clock (subprocess, whole pipeline); log artifacts\arch6\logs\train_arch6_pooled.log
+
+============================================================================================================================
+3. BEFORE ANY SCORE: rows, loans, labels, window and classes learned, per arm and per model
+============================================================================================================================
+ARM GROUPED
+  model A (Current): origin states ['Current']; features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+      from_state is a feature: False (origin states 1); lgb_params {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}; rounds 100; sidecar artifacts\ml\arch6_grouped_current\model.json
+      training rows 29,861,069 (independent pass: 29,861,069: MATCH); distinct loans 1,925,870; from_period observed 200512..200806 (independent pass 200512..200806)
+      label counts: Current 29,392,048  DQ30 220,057  DQ60 1,844  DQ90+ 525  Prepaid 246,560  Default 35
+      classes learned (6 of 6): ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+  model B (DQ30+DQ60): origin states ['DQ30', 'DQ60']; features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+      from_state is a feature: True (origin states 2); lgb_params {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}; rounds 100; sidecar artifacts\ml\arch6_grouped_dq30_dq60\model.json
+      training rows 387,706 (independent pass: 387,706: MATCH); distinct loans 141,303; from_period observed 200602..200806 (independent pass 200602..200806)
+      label counts: Current 162,250  DQ30 127,459  DQ60 66,760  DQ90+ 26,326  Prepaid 4,875  Default 36
+      classes learned (6 of 6): ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+  model C (DQ90+): origin states ['DQ90+']; features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+      from_state is a feature: False (origin states 1); lgb_params {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}; rounds 100; sidecar artifacts\ml\arch6_grouped_dq90plus\model.json
+      training rows 85,201 (independent pass: 85,201: MATCH); distinct loans 21,288; from_period observed 200605..200806 (independent pass 200605..200806)
+      label counts: Current 5,368  DQ30 1,534  DQ60 2,061  DQ90+ 71,933  Prepaid 689  Default 3,616
+      classes learned (6 of 6): ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+  arm total: 30,333,976 training rows across 3 model(s)
+ARM POOLED
+  model P (pooled (all four)): origin states ['Current', 'DQ30', 'DQ60', 'DQ90+']; features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+      from_state is a feature: True (origin states 4); lgb_params {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}; rounds 100; sidecar artifacts\ml\arch6_pooled\model.json
+      training rows 30,333,976 (independent pass: 30,333,976: MATCH); distinct loans 1,925,998; from_period observed 200512..200806 (independent pass 200512..200806)
+      label counts: Current 29,559,666  DQ30 349,050  DQ60 70,665  DQ90+ 98,784  Prepaid 252,124  Default 3,687
+      classes learned (6 of 6): ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+  arm total: 30,333,976 training rows across 1 model(s)
+  grouped rows 30,333,976 vs pooled rows 30,333,976: EQUAL (the same rows, partitioned)
+  observed lower edge of from_period across models: 200512 (the brief's window starts 200601; train_ml has no lower bound and none was added)
+
+REALISED STATE at 2008-12 for the evaluation loans (harness semantics: an absorbing state reached by 2008-12 counts whether or not the loan is observed then; otherwise the state observed
+in 2008-12; otherwise CENSORED, its own column, never redistributed). Read from fit rows through src.horizon.
+cross-check: the harness's state at the cut equals the fit row's from_state for all 1,681,267 evaluation loans
+  start state          loans     Current        DQ30        DQ60       DQ90+     Prepaid     Default    CENSORED
+  Current          1,637,228   1,524,560      30,334       9,297      12,046      60,509         212         270
+  DQ30                25,596       9,835       6,386       2,810       5,639         736         168          22
+  DQ60                 6,298       1,224         761         669       3,159         170         289          26
+  DQ90+               12,145       1,256         587         384       6,545         253       2,966         154
+  ALL              1,681,267   1,536,875      38,068      13,160      27,389      61,668       3,635         472
+  share of all                  91.4117%     2.2642%     0.7827%     1.6291%     3.6679%     0.2162%     0.0281%
+  share, observed                91.4374%     2.2649%     0.7830%     1.6295%     3.6690%     0.2163%  (excluded)   cohort = 1,680,795 loans
+
+============================================================================================================================
+4. BASELINE: re-estimated on fit rows (real src.baseline, --fit-only) and compared with the stored matrix
+============================================================================================================================
+matched rows (from_period <= 200806: the rows the ML arms trained on): artifacts\baseline_to200806   (4 s)
+literal window (200601 .. 200806): artifacts\baseline_200601_200806   (4 s)
+HEADLINE baseline = the matched-rows estimate (identical rows to the ML arms). Why: train_ml has no lower from_period bound, so the ML arms' real window reaches back to 200512; the brief asks that all three arms see the same training window. The literal 200601..200806 estimate is chained too and reported (context only).
+  count matrix totals: matched 30,333,976; literal 200601..200806 30,333,975 (rows before 200601: 1); stored 40,385,650
+  max |p(matched) - p(literal)| = 5.260e-10;  max |p(matched) - p(stored)| = 5.961e-02
+  the stored artifacts/baseline carries 'build stamp : 2026-10-05T11:50:54.525429'; this run's panel build is 2026-10-08T09:41:19.866411.
+  matched estimate               Current        DQ30        DQ60       DQ90+     Prepaid     Default
+  from Current                  0.984293    0.007369    0.000062    0.000018    0.008257    0.000001
+  from DQ30                     0.466500    0.360098    0.159156    0.001466    0.012746    0.000034
+  from DQ60                     0.174232    0.169286    0.238511    0.405882    0.011697    0.000393
+  from DQ90+                    0.063004    0.018004    0.024190    0.844274    0.008087    0.042441
+  (matched - stored)                                                                                
+  from Current                 +0.001151   -0.001164   -0.000010   -0.000019   +0.000043   -0.000001
+  from DQ30                    +0.059607   -0.030148   -0.031862   -0.000137   +0.002602   -0.000061
+  from DQ60                    +0.038339   +0.020797   -0.011309   -0.051388   +0.003706   -0.000145
+  from DQ90+                   +0.001696   +0.004907   +0.004852   -0.022047   +0.002701   +0.007891
+
+============================================================================================================================
+5. FORECASTS  (real src.forecast, --cut 200806 --cut-role fit --horizon 6; the same expected loan count, derived independently above)
+============================================================================================================================
+grouped: forecast 254 s wall-clock; forecaster's own report artifacts\arch6\forecast_report_grouped.txt (peak RSS 1.95 GB)
+   model map: Current=artifacts/ml/arch6_grouped_current  DQ30=artifacts/ml/arch6_grouped_dq30_dq60  DQ60=artifacts/ml/arch6_grouped_dq30_dq60  DQ90+=artifacts/ml/arch6_grouped_dq90plus
+pooled: forecast 243 s wall-clock; forecaster's own report artifacts\arch6\forecast_report_pooled.txt (peak RSS 1.96 GB)
+   model: artifacts/ml/arch6_pooled
+
+============================================================================================================================
+6. CHECKS  (every ML forecast read back from the stored parquet; the baseline chained in float64 over the same loans)
+============================================================================================================================
+both ML arms forecast the SAME evaluation loans in the SAME order (stored loan ids == the independently loaded sorted list, 1,681,267 loans): grouped True, pooled True
+the baseline was chained over the same list (start states of those 1,681,267 loans via src.horizon.chain): True
+  arm                   worst |sum-1| float64 (computed)   worst |sum-1| float32 as stored    smallest probability   Prepaid/Default smallest step
+  grouped                                      3.553e-15                         5.290e-08               0.000e+00                       5.223e-08
+  pooled                                       3.553e-15                         5.041e-08               0.000e+00                       0.000e+00
+  baseline                                     2.220e-16   2.220e-16 (float64; not stored)               0.000e+00                       1.172e-06
+  baseline_literal                             4.441e-16   4.441e-16 (float64; not stored)               0.000e+00                       1.172e-06
+  grouped: sum-to-one float32 stored vs STORED_TOL 1e-05: within (tolerance not loosened); float64 computed vs SUM_TOL 1e-09: within; no negative probability: PASS; Prepaid and Default mass non-decreasing in h: PASS
+  pooled: sum-to-one float32 stored vs STORED_TOL 1e-05: within (tolerance not loosened); float64 computed vs SUM_TOL 1e-09: within; no negative probability: PASS; Prepaid and Default mass non-decreasing in h: PASS
+  baseline: sums within 1e-12 by construction of src.horizon.chain (asserted); no negative probability: PASS; Prepaid and Default mass non-decreasing: PASS
+
+============================================================================================================================
+7. PREDICTED SHARE OF THE BOOK BY HORIZON  (mean predicted probability over all 1,681,267 evaluation loans)
+============================================================================================================================
+GROUPED
+    h     Current        DQ30        DQ60       DQ90+     Prepaid     Default         sum
+    0    97.3806%     1.5224%     0.3746%     0.7224%     0.0000%     0.0000% 100.000000%
+    1    96.4936%     1.5494%     0.4152%     0.8032%     0.7047%     0.0340% 100.000000%
+    2    95.6421%     1.5576%     0.4328%     0.8927%     1.4035%     0.0712% 100.000000%
+    3    94.8162%     1.5554%     0.4408%     0.9790%     2.0965%     0.1121% 100.000000%
+    4    94.0099%     1.5478%     0.4440%     1.0582%     2.7836%     0.1565% 100.000000%
+    5    93.2199%     1.5374%     0.4446%     1.1293%     3.4649%     0.2040% 100.000000%
+    6    92.4439%     1.5255%     0.4438%     1.1924%     4.1402%     0.2541% 100.000000%
+POOLED
+    h     Current        DQ30        DQ60       DQ90+     Prepaid     Default         sum
+    0    97.3806%     1.5224%     0.3746%     0.7224%     0.0000%     0.0000% 100.000000%
+    1    96.4889%     1.5482%     0.4180%     0.8034%     0.7083%     0.0331% 100.000000%
+    2    95.6091%     1.5861%     0.4215%     0.9099%     1.4082%     0.0653% 100.000000%
+    3    94.7447%     1.6097%     0.4377%     1.0063%     2.1011%     0.1006% 100.000000%
+    4    93.8959%     1.6295%     0.4473%     1.1018%     2.7875%     0.1380% 100.000000%
+    5    93.0618%     1.6424%     0.4570%     1.1934%     3.4676%     0.1778% 100.000000%
+    6    92.2411%     1.6528%     0.4635%     1.2815%     4.1414%     0.2196% 100.000000%
+BASELINE  (matched-rows baseline)
+    h     Current        DQ30        DQ60       DQ90+     Prepaid     Default         sum
+    0    97.3806%     1.5224%     0.3746%     0.7224%     0.0000%     0.0000% 100.000000%
+    1    96.6721%     1.3423%     0.3551%     0.7659%     0.8337%     0.0310% 100.000000%
+    2    95.8900%     1.2697%     0.3228%     0.7944%     1.6594%     0.0638% 100.000000%
+    3    95.0824%     1.2328%     0.3042%     0.8053%     2.4775%     0.0978% 100.000000%
+    4    94.2678%     1.2106%     0.2941%     0.8068%     3.2884%     0.1322% 100.000000%
+    5    93.4540%     1.1950%     0.2882%     0.8040%     4.0921%     0.1667% 100.000000%
+    6    92.6445%     1.1823%     0.2841%     0.7991%     4.8889%     0.2011% 100.000000%
+
+============================================================================================================================
+8. h = 6: PREDICTED vs REALISED SHARE  (rule cohort: evaluation loans observed at 2008-12; 1,680,795 loans, 472 censored loans excluded and shown separately)
+============================================================================================================================
+  state        realised        grouped pred  |err| pp         pooled pred  |err| pp       baseline pred  |err| pp     closest
+  Current      91.4374%            92.4516%    1.0142            92.2497%    0.8124            92.6506%    1.2132      pooled
+  DQ30          2.2649%             1.5252%    0.7397             1.6525%    0.6124             1.1821%    1.0828      pooled
+  DQ60          0.7830%             0.4435%    0.3394             0.4632%    0.3198             0.2839%    0.4990      pooled
+  DQ90+         1.6295%             1.1872%    0.4423             1.2747%    0.3548             0.7951%    0.8344      pooled
+  Prepaid       3.6690%             4.1403%    0.4714             4.1416%    0.4727             4.8889%    1.2199     grouped
+  Default       0.2163%             0.2522%    0.0359             0.2182%    0.0020             0.1994%    0.0169      pooled
+  literal-window baseline (context): Current 92.6506%  DQ30 1.1821%  DQ60 0.2839%  DQ90+ 0.7951%  Prepaid 4.8889%  Default 0.1994%
+
+  CONTEXT, alternative denominator (all 1,681,267 evaluation loans; censored loans a column; predicted = mean over all loans):
+  state        realised        grouped pred  |err| pp         pooled pred  |err| pp       baseline pred  |err| pp     closest
+  Current      91.4117%            92.4439%    1.0322            92.2411%    0.8294            92.6445%    1.2328      pooled
+  DQ30          2.2642%             1.5255%    0.7387             1.6528%    0.6114             1.1823%    1.0820      pooled
+  DQ60          0.7827%             0.4438%    0.3390             0.4635%    0.3193             0.2841%    0.4986      pooled
+  DQ90+         1.6291%             1.1924%    0.4366             1.2815%    0.3475             0.7991%    0.8299      pooled
+  Prepaid       3.6679%             4.1402%    0.4723             4.1414%    0.4735             4.8889%    1.2209     grouped
+  Default       0.2162%             0.2541%    0.0379             0.2196%    0.0034             0.2011%    0.0151      pooled
+  CENSORED      0.0281%  (no prediction is made for it; not redistributed)
+
+============================================================================================================================
+9. THE PRE-REGISTERED RULE  (paired loan bootstrap, 500 draws, seed 53; error = |predicted share - realised share| in pp)
+============================================================================================================================
+bootstrap wall-clock 14 s
+
+  column       realised   grouped err   pooled err  baseline err   (point estimates, full evaluation cohort)
+  Default       0.2163%        0.0359       0.0020        0.0169
+  DQ90+         1.6295%        0.4423       0.3548        0.8344
+
+  Default: draws favouring GROUPED 0 / 500; favouring POOLED 500; ties 0.   difference error(pooled) - error(grouped), pp (positive = grouped closer): mean -0.0328, sd 0.0025, min -0.0376, 2.5% -0.0361, 25% -0.0343, median -0.0333, 75% -0.0321, 97.5% -0.0253, max -0.0177
+      (context only, not in the rule: baseline |err| over the draws: mean 0.0167, 2.5% 0.0109, 97.5% 0.0228; grouped mean 0.0360; pooled mean 0.0031)
+  DQ90+: draws favouring GROUPED 0 / 500; favouring POOLED 500; ties 0.   difference error(pooled) - error(grouped), pp (positive = grouped closer): mean -0.0874, sd 0.0029, min -0.0961, 2.5% -0.0928, 25% -0.0894, median -0.0876, 75% -0.0855, 97.5% -0.0815, max -0.0791
+      (context only, not in the rule: baseline |err| over the draws: mean 0.8350, 2.5% 0.8179, 97.5% 0.8534; grouped mean 0.4429; pooled mean 0.3555)
+
+  point-estimate direction by column: {'Default': 'pooled', 'DQ90+': 'pooled'}
+  MECHANICAL OUTCOME: POOLED SHIPS: grouped was favoured in 0 (Default) and 0 (DQ90+) of 500 draws, neither reaching 475. Reported as: architecture made no measurable difference at h=6.
+  columns disagree (grouped reaches 475 on one, pooled reaches 475 on the other): no; point-estimate directions differ: no
+  THE BASELINE DID NOT ENTER THE RULE: the decision above uses only the grouped and pooled draws.
+
+  CONTEXT, alternative denominator (all evaluation loans, censored a column), not part of the rule - draws favouring grouped: Default 0, DQ90+ 0; point errors grouped/pooled/baseline (pp): Default 0.0379/0.0034/0.0151; DQ90+ 0.4366/0.3475/0.8299
+
+============================================================================================================================
+10. COST  (wall-clock per arm; peak RSS from src.memwatch inside each launched module)
+============================================================================================================================
+  arm          train s   train peak RSS GB  forecast s  forecast peak RSS GB
+  grouped          173                5.26         254                  1.95
+  pooled           143                5.38         243                  1.96
+  baseline: estimation baseline_to200806 4 s, baseline_200601_200806 4 s; chained in seconds inside this process
+  this driver (reads, checks, bootstrap): process peak RSS 2.53 GB; lowest system-available memory seen 1.72 GB; total wall-clock 879 s
+
+============================================================================================================================
+FINDINGS  (measured only)
+============================================================================================================================
+- RULE OUTCOME: POOLED SHIPS: grouped was favoured in 0 (Default) and 0 (DQ90+) of 500 draws, neither reaching 475. Reported as: architecture made no measurable difference at h=6.
+- Draws favouring grouped: Default 0/500, DQ90+ 0/500  (favouring pooled: Default 500, DQ90+ 500; ties 0, 0).
+- Evaluation loans 1,681,267; observed at 2008-12 1,680,795; censored 472 (0.0281%). All checks: PASS.
+- h = 6 shares on the rule's cohort (percent of the book):
+                 Current        DQ30        DQ60       DQ90+     Prepaid     Default
+  realised      91.4374%     2.2649%     0.7830%     1.6295%     3.6690%     0.2163%
+  grouped       92.4516%     1.5252%     0.4435%     1.1872%     4.1403%     0.2522%
+  pooled        92.2497%     1.6525%     0.4632%     1.2747%     4.1416%     0.2182%
+  baseline      92.6506%     1.1821%     0.2839%     0.7951%     4.8889%     0.1994%
+- Absolute error in pp, Default / DQ90+: grouped 0.0359 / 0.4423; pooled 0.0020 / 0.3548; baseline 0.0169 / 0.8344 (the baseline is context only).

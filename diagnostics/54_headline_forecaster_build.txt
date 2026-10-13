@@ -1,0 +1,39 @@
+FORECASTER BUILD   (propagation of a one-month multiclass model over 60 months; no predictive metric)
+================================================================================================================
+run: headline_pooled    output: data/forecast/headline_pooled
+panel build 2026-10-08T09:41:19.866411; cut 200812; horizon h = 0..60 inclusive (h = 0 is the initial vector)
+
+MODELS   (origin state -> model)
+  Current/DQ30/DQ60/DQ90+ -> artifacts/ml/headline_pooled   sha256 360761955780a5da
+      trained on origin states ['Current', 'DQ30', 'DQ60', 'DQ90+'], 40,210,036 rows, window {'role': 'fit', 'from_period_max_arg': None, 'from_period_min_observed': 200512, 'from_period_max_observed': 200812}, features ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state']
+      clamped features: none (the model reads no feature the forecaster advances; loan_age is not a feature)
+      loan_age in the training rows (provenance only, not a bound): -18 .. 36
+
+SCOPE
+  loans in the forecast population: 405,672;  batch size 50,000;  batches done 9 of 9   (complete)
+  loans in the batches done: 405,672;  batch indices run in this invocation (0-based): 0,1,2,3,4,5,6,7,8
+
+CLAMP   (a feature the forecaster advances monthly is clipped to the model's trained [min, max])
+  INERT: no model in this run reads a clamped feature (loan_age), so nothing was advanced or clamped.
+  The machinery is in place for the models that do (loan_age with --with-loan-age; run_length later); it has no counts to report here, and zero would be misleading.
+
+CHECKS   (asserted per batch; a failure stops the run before the batch is written)
+  every loan's vector sums to 1 at every h:   PASS   worst |sum - 1| = 2.598e-14 in float64 as computed (tolerance 1e-09)
+      as stored (float32 values, summed in float64):    worst |sum - 1| = 5.242e-08   within 1e-05
+  no negative probability:                    PASS   smallest probability = 0.000e+00 (float64), 0.000e+00 as stored
+  Prepaid, Default mass non-decreasing in h:  PASS   smallest one-month change = 0.000e+00 (Prepaid+Default 0.000e+00)
+
+RESOURCES   (this invocation)
+  wall clock 593.8 s (9.9 min);  peak RSS 1.50 GB;  min system available 7.26 GB
+  seconds per batch (all done batches): 72, 71, 74, 72, 74, 73, 72, 74, 9
+  output: data/forecast/headline_pooled, 19 files, 630.9 MB (0.62 GB); rows written 148,475,952
+
+PORTFOLIO STATE DISTRIBUTION   (mean probability over the 405,672 loans in the batches done; a sanity read)
+     h    Current       DQ30       DQ60      DQ90+    Prepaid    Default
+     0   0.951498   0.023115   0.008300   0.017088   0.000000   0.000000   (sum 1.000000000)
+     6   0.830011   0.022113   0.009937   0.038138   0.099047   0.000754   (sum 1.000000000)
+    12   0.728071   0.019811   0.009891   0.058883   0.181927   0.001415   (sum 1.000000000)
+    24   0.568559   0.016011   0.009196   0.092490   0.311231   0.002512   (sum 1.000000000)
+    60   0.295690   0.009194   0.007128   0.152625   0.530775   0.004589   (sum 1.000000000)
+
+VERDICT: all 9 batches written and checked.

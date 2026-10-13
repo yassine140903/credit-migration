@@ -2,6 +2,7 @@
 
     python -m src.baseline                      # writes artifacts/baseline/
     python -m src.baseline --out-dir some/dir
+    python -m src.baseline --from-period-min 200601 --from-period-max 200806 --out-dir some/dir   # a window of the fit rows
 
 Estimation only - no forecasting, no matrix powers, no lifetime PD.
 
@@ -162,24 +163,37 @@ def _codes(series):
     return remap[series.cat.codes.to_numpy()]      # code -1 indexes the -1 slot
 
 
-def scan_panel():
-    """One pass over every partition. Counts from fit rows only."""
+def scan_panel(period_min=None, period_max=None, fit_only=False):
+    """One pass over every partition. Counts from fit rows only; with a window, only fit rows whose from_period lies in it.
+
+    period_min / period_max are inclusive YYYYMM bounds, either may be None. With neither the estimate is the whole
+    fit window, exactly as before; fit rows outside a given window are counted in scan["fit_outside_window"].
+    fit_only=True loads only the fit rows (condition and evaluate rows are never read; the by-role table lists fit alone)."""
     manifest = read_manifest()
     quarters = [p["quarter"] for p in manifest["partitions"]]
     scan = {"build_stamp": manifest["build_stamp"], "quarters": quarters,
             "pooled": np.zeros((N_STATES, N_STATES), dtype=np.int64),
             "by_year": {}, "role_rows": {}, "fit_rows": 0, "fit_null_state": 0,
             "fit_after_cut": 0, "fit_period_range": [None, None],
-            "total_rows": 0}
+            "total_rows": 0, "window": (period_min, period_max), "fit_outside_window": 0}
     for q in quarters:
         t0 = time.time()
-        df = load_panel(columns=COLUMNS, quarters=[q])
+        df = load_panel(roles=[FIT_ROLE] if fit_only else None, columns=COLUMNS, quarters=[q])
         scan["total_rows"] += len(df)
         for r, n in df["role"].value_counts(dropna=False).items():
             key = "(null)" if pd.isna(r) else str(r)
             scan["role_rows"][key] = scan["role_rows"].get(key, 0) + int(n)
 
         fit = (df["role"] == FIT_ROLE).to_numpy()
+        if period_min is not None or period_max is not None:
+            p_all = df["from_period"].to_numpy(dtype=np.int64, na_value=0)
+            inwin = np.ones(len(df), dtype=bool)
+            if period_min is not None:
+                inwin &= p_all >= period_min
+            if period_max is not None:
+                inwin &= p_all <= period_max
+            scan["fit_outside_window"] += int((fit & ~inwin).sum())
+            fit = fit & inwin
         scan["fit_rows"] += int(fit.sum())
         o = _codes(df["from_state"])[fit]
         d = _codes(df["to_state"])[fit]
@@ -269,10 +283,10 @@ def fail(rep, out_dir, message):
     raise SystemExit(1)
 
 
-def run(out_dir=OUT_DIR):
+def run(out_dir=OUT_DIR, period_min=None, period_max=None, fit_only=False):
     t_start = time.time()
     rep = Report()
-    scan = scan_panel()
+    scan = scan_panel(period_min, period_max, fit_only)
     counts = scan["pooled"]
     totals = counts.sum(axis=1)
 
@@ -283,6 +297,12 @@ def run(out_dir=OUT_DIR):
     rep.emit("build stamp : %s" % scan["build_stamp"])
     rep.emit("partitions  : %s" % ", ".join(scan["quarters"]))
     rep.emit("columns     : %s" % ", ".join(COLUMNS))
+    if period_min is not None or period_max is not None:
+        rep.emit("WINDOW      : fit rows with from_period %s .. %s only (%s fit rows outside it, not counted)"
+                 % (period_min if period_min is not None else "(no lower bound)",
+                    period_max if period_max is not None else "(no upper bound)", fmt(scan["fit_outside_window"])))
+    if fit_only:
+        rep.emit("READ        : fit rows only (condition and evaluate rows were never loaded)")
     rep.emit("state order : %s" % ", ".join(STATES))
     rep.emit("estimated   : %s" % ", ".join(ESTIMATED))
     rep.emit("by constr.  : %s (identity rows)" % ", ".join(ABSORBING))
@@ -499,8 +519,14 @@ def main(argv=None):
         description="Estimate the homogeneous transition matrix from fit rows.")
     parser.add_argument("--out-dir", default=OUT_DIR,
                         help="output directory (default: %(default)s)")
+    parser.add_argument("--from-period-min", type=int, default=None, metavar="YYYYMM",
+                        help="first from_period counted, inclusive (default: no lower bound)")
+    parser.add_argument("--from-period-max", type=int, default=None, metavar="YYYYMM",
+                        help="last from_period counted, inclusive (default: no upper bound)")
+    parser.add_argument("--fit-only", action="store_true",
+                        help="load only the fit rows (the by-role table then shows the fit role alone); default: all roles are read for the by-role table")
     args = parser.parse_args(argv)
-    run(args.out_dir)
+    run(args.out_dir, args.from_period_min, args.from_period_max, args.fit_only)
 
 
 if __name__ == "__main__":

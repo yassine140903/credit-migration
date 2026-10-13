@@ -16,7 +16,10 @@ months and the forecast 60, so a forecaster would hold almost every loan at the 
 run_length_censored. property_state and from_state are native LightGBM categoricals with a fixed, stated category list
 (no integer or FIPS encoding). Nulls are left as-is, numerics are float32.
 
-LightGBM: multiclass, CPU, 100 rounds, library defaults, no tuning, no early stopping, no validation set.
+LightGBM: multiclass, CPU, 100 rounds, library defaults, no tuning, no early stopping, no validation set. The only
+parameters that can be changed from the command line are the two leaf-value bounds of diagnostic 49,
+--min-sum-hessian-in-leaf and --lambda-l2; left unset (the default) they are not passed and the library defaults apply,
+so every earlier invocation trains exactly as before. When set they are written to the sidecar ("lgb_params").
 
 Two passes, as in diagnostics/34_thinned_training.py: a label scan that reads only the state columns, then the feature
 read that builds the matrix one partition at a time; the matrix is handed to a Dataset whose raw reference is dropped
@@ -151,6 +154,10 @@ def main(argv=None):
                     help="from_state values to train on (default: all four transient states)")
     ap.add_argument("--from-period-max", type=int, default=None, metavar="YYYYMM",
                     help="last from_period to train on, inclusive (default: the whole fit window)")
+    ap.add_argument("--min-sum-hessian-in-leaf", type=float, default=None, metavar="X",
+                    help="LightGBM min_sum_hessian_in_leaf (default: not passed, library default 1e-3)")
+    ap.add_argument("--lambda-l2", type=float, default=None, metavar="X",
+                    help="LightGBM lambda_l2 (default: not passed, library default 0)")
     ap.add_argument("--overwrite", action="store_true", help="replace an existing artifacts/ml/<name>/")
     args = ap.parse_args(argv)
 
@@ -195,7 +202,13 @@ def main(argv=None):
 
     watch.phase = "Dataset construction"
     params = {"objective": "multiclass", "num_class": len(STATES), "device_type": "cpu", "verbosity": -1}
-    ds = lgb.Dataset(X, label=y, categorical_feature=categorical, free_raw_data=True)
+    if args.min_sum_hessian_in_leaf is not None:
+        params["min_sum_hessian_in_leaf"] = args.min_sum_hessian_in_leaf
+    if args.lambda_l2 is not None:
+        params["lambda_l2"] = args.lambda_l2
+    say("lightgbm params:       %s" % params)
+    ds = lgb.Dataset(X, label=y, categorical_feature=categorical, free_raw_data=True,
+                     params=params if len(params) > 4 else None)
     del X, y
     gc.collect()
     t0 = time.perf_counter()
@@ -230,7 +243,7 @@ def main(argv=None):
                                           "note": "PROVENANCE ONLY: the loan_age range present in the training rows; "
                                                   "not a clamp bound unless loan_age is a feature"},
             "clamp_bounds": ({"loan_age": [S["age_min"], S["age_max"]]} if args.with_loan_age else {}),
-            "n_rounds": N_ROUNDS, "objective": "multiclass", "lightgbm_version": lgb.__version__,
+            "n_rounds": N_ROUNDS, "objective": "multiclass", "lgb_params": params, "lightgbm_version": lgb.__version__,
             "panel_build_stamp": manifest["build_stamp"], "matrix_bytes": matrix_bytes,
             "dataset_construct_seconds": round(construct_s, 2), "train_seconds": round(train_s, 2),
             "peak_rss_bytes": int(watch.peak_rss())}

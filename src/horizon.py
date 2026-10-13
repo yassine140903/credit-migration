@@ -104,12 +104,13 @@ def _codes(series):
     return out
 
 
-def _per_loan(df, horizons, cut):
-    """Per-loan summary for one partition's test rows."""
+def _per_loan(df, horizons, cut, cut_role="condition"):
+    """Per-loan summary for one partition's rows. The cut month must be observed through rows of role `cut_role`
+    ("condition" for the production cut at 2008-12; "fit" when the cut is inside the fit window)."""
     key, ids = pd.factorize(df["loan_id"].to_numpy())
     t = month_index(df["from_period"].to_numpy())
     o, d = _codes(df["from_state"]), _codes(df["to_state"])
-    is_cond = (df["role"] == "condition").to_numpy()
+    is_cond = (df["role"] == cut_role).to_numpy()
 
     # every month a row observes: its from month and the month after it
     obs = pd.DataFrame({"key": np.concatenate([key, key]),
@@ -117,7 +118,7 @@ def _per_loan(df, horizons, cut):
                         "state": np.concatenate([o, d]),
                         "cond": np.concatenate([is_cond, is_cond])})
     if not obs.loc[obs["month"] == cut, "cond"].all():
-        raise HorizonError("the cut month is observed through a non-condition row")
+        raise HorizonError("the cut month is observed through a row whose role is not %r" % cut_role)
     obs = obs.drop_duplicates(["key", "month", "state"])
     clash = obs.duplicated(["key", "month"])
     if clash.any():
@@ -154,14 +155,23 @@ def _per_loan(df, horizons, cut):
     return L
 
 
-def read_test_loans(horizons=HORIZONS, cut=CUT, progress=print):
-    """One pass over the panel: a per-loan frame for every test-split loan."""
+def read_test_loans(horizons=HORIZONS, cut=CUT, progress=print, roles=None, cut_role="condition", period_min=None):
+    """One pass over the panel: a per-loan frame for every test-split loan.
+
+    roles       roles read (default TEST_ROLES = condition, evaluate)
+    cut_role    the role through which the cut month must be observed (default "condition")
+    period_min  YYYYMM; rows with an earlier from_period are dropped before the per-loan summary (default: none dropped).
+                Safe for loans that are transient at the cut (an absorbing state is never left, so nothing before cut - 1
+                can change their outcome); the eligibility reasons of loans that left earlier are then not meaningful.
+    """
     manifest = read_manifest()
     parts = []
     for q in [p["quarter"] for p in manifest["partitions"]]:
         t0 = time.time()
-        df = load_panel(roles=TEST_ROLES, columns=COLUMNS, quarters=[q])
-        parts.append(_per_loan(df, horizons, cut))
+        df = load_panel(roles=TEST_ROLES if roles is None else roles, columns=COLUMNS, quarters=[q])
+        if period_min is not None:
+            df = df[df["from_period"].to_numpy(dtype=np.int64, na_value=0) >= period_min].reset_index(drop=True)
+        parts.append(_per_loan(df, horizons, cut, cut_role))
         progress("    %s  %s test rows  (%.1fs)" % (q, "{:,}".format(len(df)),
                                                    time.time() - t0))
         del df

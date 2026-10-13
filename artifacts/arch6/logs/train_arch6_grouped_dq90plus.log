@@ -1,0 +1,45 @@
+-m src.train_ml --origin-states DQ90+ --from-period-max 200806 --name arch6_grouped_dq90plus --overwrite --min-sum-hessian-in-leaf 10 --lambda-l2 10
+
+model name:            arch6_grouped_dq90plus
+origin states:         ['DQ90+']
+from_state feature:    OMITTED (single origin state: it is constant)
+loan_age feature:      OMITTED (default)
+features, matrix order: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+categorical features:  ['property_state']
+class order:           ['Current', 'DQ30', 'DQ60', 'DQ90+', 'Prepaid', 'Default']
+training window:       role == fit, from_period <= 200806
+  scan 2006Q1: 18,997 training rows
+  scan 2006Q2: 17,268 training rows
+  scan 2006Q3: 14,262 training rows
+  scan 2006Q4: 11,970 training rows
+  scan 2007Q1: 7,554 training rows
+  scan 2007Q2: 8,162 training rows
+  scan 2007Q3: 4,593 training rows
+  scan 2007Q4: 2,395 training rows
+training rows 85,201; null/unknown labels dropped 0; loan_age in the rows (provenance) 0 .. 29; from_period 200605 .. 200806
+  label Current           5,368
+  label DQ30              1,534
+  label DQ60              2,061
+  label DQ90+            71,933
+  label Prepaid             689
+  label Default           3,616
+  matrix 2006Q1: 18,997 rows
+  matrix 2006Q2: 17,268 rows
+  matrix 2006Q3: 14,262 rows
+  matrix 2006Q4: 11,970 rows
+  matrix 2007Q1: 7,554 rows
+  matrix 2007Q2: 8,162 rows
+  matrix 2007Q3: 4,593 rows
+  matrix 2007Q4: 2,395 rows
+matrix 85,201 x 8, 0.00 GB
+lightgbm params:       {'objective': 'multiclass', 'num_class': 6, 'device_type': 'cpu', 'verbosity': -1, 'min_sum_hessian_in_leaf': 10.0, 'lambda_l2': 10.0}
+Dataset constructed in 0.0 s
+
+training wall-clock:   1.2 s (0.0 min) for 100 rounds, 0.01 s/round;  Dataset construction 0.0 s
+total wall-clock:      4.5 s
+peak RSS:              1.36 GB   min system available 5.83 GB
+loan_age is not a feature: no clamp bound written (training rows span 0 .. 29, recorded as provenance)
+saved: artifacts/ml/arch6_grouped_dq90plus/model.txt
+       artifacts/ml/arch6_grouped_dq90plus/model.json
+
+--- stderr ---

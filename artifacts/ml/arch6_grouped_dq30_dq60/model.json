@@ -1,0 +1,135 @@
+{
+  "name": "arch6_grouped_dq30_dq60",
+  "features": [
+    "fico",
+    "ltv",
+    "dti",
+    "rate_spread",
+    "property_state",
+    "est_ltv",
+    "unemp_level",
+    "unemp_chg_12m",
+    "from_state"
+  ],
+  "categorical_features": [
+    "property_state",
+    "from_state"
+  ],
+  "categories": {
+    "property_state": [
+      "AK",
+      "AL",
+      "AR",
+      "AZ",
+      "CA",
+      "CO",
+      "CT",
+      "DC",
+      "DE",
+      "FL",
+      "GA",
+      "GU",
+      "HI",
+      "IA",
+      "ID",
+      "IL",
+      "IN",
+      "KS",
+      "KY",
+      "LA",
+      "MA",
+      "MD",
+      "ME",
+      "MI",
+      "MN",
+      "MO",
+      "MS",
+      "MT",
+      "NC",
+      "ND",
+      "NE",
+      "NH",
+      "NJ",
+      "NM",
+      "NV",
+      "NY",
+      "OH",
+      "OK",
+      "OR",
+      "PA",
+      "PR",
+      "RI",
+      "SC",
+      "SD",
+      "TN",
+      "TX",
+      "UT",
+      "VA",
+      "VI",
+      "VT",
+      "WA",
+      "WI",
+      "WV",
+      "WY"
+    ],
+    "from_state": [
+      "DQ30",
+      "DQ60"
+    ]
+  },
+  "class_order": [
+    "Current",
+    "DQ30",
+    "DQ60",
+    "DQ90+",
+    "Prepaid",
+    "Default"
+  ],
+  "origin_states": [
+    "DQ30",
+    "DQ60"
+  ],
+  "from_state_is_feature": true,
+  "training_window": {
+    "role": "fit",
+    "from_period_max_arg": 200806,
+    "from_period_min_observed": 200602,
+    "from_period_max_observed": 200806
+  },
+  "n_rows": 387706,
+  "label_counts": {
+    "Current": 162250,
+    "DQ30": 127459,
+    "DQ60": 66760,
+    "DQ90+": 26326,
+    "Prepaid": 4875,
+    "Default": 36
+  },
+  "from_state_counts": {
+    "DQ30": 324015,
+    "DQ60": 63691
+  },
+  "loan_age_is_feature": false,
+  "loan_age_in_training_rows": {
+    "min": 0,
+    "max": 29,
+    "note": "PROVENANCE ONLY: the loan_age range present in the training rows; not a clamp bound unless loan_age is a feature"
+  },
+  "clamp_bounds": {},
+  "n_rounds": 100,
+  "objective": "multiclass",
+  "lgb_params": {
+    "objective": "multiclass",
+    "num_class": 6,
+    "device_type": "cpu",
+    "verbosity": -1,
+    "min_sum_hessian_in_leaf": 10.0,
+    "lambda_l2": 10.0
+  },
+  "lightgbm_version": "4.7.0",
+  "panel_build_stamp": "2026-10-08T09:41:19.866411",
+  "matrix_bytes": 11636832,
+  "dataset_construct_seconds": 0.11,
+  "train_seconds": 2.59,
+  "peak_rss_bytes": 1569406976
+}
