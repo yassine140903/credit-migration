@@ -1,0 +1,271 @@
+WHAT DOES RUN LENGTH MEAN INSIDE EACH ORIGIN STATE?   (diagnostic 55; write-up evidence only: no model is shipped, no forecaster, no chaining, no evaluate rows)
+Population and split: diagnostic 54's (role == 'fit', transient origins, 200601..200812, by-loan 80/20 at seed 40 over the pooled loan list), then subset by origin state. All tables use HELD-OUT rows of the group only.
+Capacity choices and sources:
+  Current    LightGBM defaults (num_leaves 31, min_data_in_leaf 20), source: diagnostic 44
+  DQ30+DQ60  BOTH defaults (31 / 20) and reduced (8 / 100); source: none, nothing has measured this group
+  DQ90+      reduced (num_leaves 8, min_data_in_leaf 100), source: diagnostic 41
+
+======================================================================================================================
+BUCKET COUNTS  (rows per run_length bucket, by origin state; reported before any score)
+======================================================================================================================
+origin Current: train rows 31,488,837, held-out rows 7,872,036
+  bucket      train rows  % of train   held-out rows  % of held-out
+  1            1,726,325       5.48%         431,684          5.48%
+  2-3          3,272,443      10.39%         818,087         10.39%
+  4-6          4,651,358      14.77%       1,162,385         14.77%
+  7+          21,838,711      69.35%       5,459,880         69.36%
+  total       31,488,837     100.00%       7,872,036        100.00%
+
+origin DQ30: train rows 419,226, held-out rows 104,138
+  bucket      train rows  % of train   held-out rows  % of held-out
+  1              268,815      64.12%          67,163         64.49%
+  2-3            108,078      25.78%          26,698         25.64%
+  4-6             32,242       7.69%           7,880          7.57%
+  7+              10,091       2.41%           2,397          2.30%
+  total          419,226     100.00%         104,138        100.00%
+
+origin DQ60: train rows 99,528, held-out rows 24,478
+  bucket      train rows  % of train   held-out rows  % of held-out
+  1               77,257      77.62%          19,154         78.25%
+  2-3             18,570      18.66%           4,489         18.34%
+  4-6              3,246       3.26%             733          2.99%
+  7+                 455       0.46%             102          0.42%
+  total           99,528     100.00%          24,478        100.00%
+
+origin DQ90+: train rows 161,489, held-out rows 40,303
+  bucket      train rows  % of train   held-out rows  % of held-out
+  1               41,540      25.72%          10,333         25.64%
+  2-3             52,364      32.43%          12,926         32.07%
+  4-6             39,761      24.62%           9,983         24.77%
+  7+              27,824      17.23%           7,061         17.52%
+  total          161,489     100.00%          40,303        100.00%
+
+
+======================================================================================================================
+T1  PER-CLASS BRIER on the group's held-out rows, both arms, against the group's conditional prior (lower is better)
+======================================================================================================================
+Brier per class j = mean_i (p_ij - o_ij)^2 over the rows scored, where p_ij is the predicted probability of class j and o_ij is 1 if the row's actual next state is j, else 0; the total is the sum over the six classes
+
+--- Current: 7,872,036 held-out rows, 31,488,837 train rows; prior = this group's train class frequencies
+  class        prior-grp          noRL            RL   noRL - prior     RL - prior
+  Current     0.01654892    0.02020372    0.03322249    +0.00365480    +0.01667357
+  DQ30        0.00844320    0.00994245    0.02078359    +0.00149925    +0.01234040
+  DQ60        0.00007050    0.00020958    0.00020764    +0.00013908    +0.00013714
+  DQ90+       0.00003481    0.00043730    0.00270076    +0.00040250    +0.00266595
+  Prepaid     0.00814217    0.00946373    0.00963913    +0.00132156    +0.00149696
+  Default     0.00000165    0.00003812    0.00010830    +0.00003647    +0.00010665
+  TOTAL       0.03324124    0.04029490    0.06666190    +0.00705366    +0.03342067
+
+--- DQ30+DQ60: 128,616 held-out rows, 518,754 train rows; prior = this group's train class frequencies
+  class        prior-grp        D-noRL          D-RL        R-noRL          R-RL D-noRL - prior   D-RL - prior R-noRL - prior   R-RL - prior
+  Current     0.22975926    0.20297692    0.19311813    0.20212272    0.19343920    -0.02678233    -0.03664113    -0.02763654    -0.03632006
+  DQ30        0.22503948    0.20978262    0.19839772    0.20904180    0.19915553    -0.01525686    -0.02664176    -0.01599768    -0.02588394
+  DQ60        0.16075988    0.15566325    0.15299203    0.15483782    0.15387930    -0.00509664    -0.00776785    -0.00592206    -0.00688058
+  DQ90+       0.08129102    0.04584896    0.04506512    0.04542521    0.04509378    -0.03544206    -0.03622590    -0.03586581    -0.03619724
+  Prepaid     0.00951005    0.00962843    0.00952353    0.00947343    0.00946720    +0.00011838    +0.00001348    -0.00003662    -0.00004285
+  Default     0.00019434    0.00107845    0.00107835    0.00026595    0.00041727    +0.00088411    +0.00088401    +0.00007161    +0.00022293
+  TOTAL       0.70655403    0.62497863    0.60017489    0.62116693    0.60145230    -0.08157540    -0.10637915    -0.08538710    -0.10510174
+  Total Brier by origin, against the origin-conditional prior (the stricter reference for this two-origin group)
+  origin         rows  prior-origin        D-noRL          D-RL        R-noRL          R-RL D-noRL - prior   D-RL - prior R-noRL - prior   R-RL - prior
+  DQ30        104,138    0.64511417    0.61580248    0.58862227    0.61232207    0.58958547    -0.02931169    -0.05649190    -0.03279210    -0.05552870
+  DQ60         24,478    0.68571179    0.66401719    0.64932376    0.65879611    0.65193793    -0.02169460    -0.03638803    -0.02691568    -0.03377386
+
+--- DQ90+: 40,303 held-out rows, 161,489 train rows; prior = this group's train class frequencies
+  class        prior-grp          noRL            RL   noRL - prior     RL - prior
+  Current     0.05827045    0.05740661    0.05688043    -0.00086384    -0.00139002
+  DQ30        0.01227692    0.01223647    0.01204595    -0.00004044    -0.00023096
+  DQ60        0.01971888    0.01958707    0.01922129    -0.00013180    -0.00049759
+  DQ90+       0.11670700    0.11329956    0.11053527    -0.00340744    -0.00617173
+  Prepaid     0.00589541    0.00587180    0.00585013    -0.00002360    -0.00004528
+  Default     0.03311463    0.03219617    0.03008805    -0.00091845    -0.00302658
+  TOTAL       0.24598328    0.24059769    0.23462113    -0.00538559    -0.01136215
+
+======================================================================================================================
+T2  THE MECHANISM TABLE: per run-length bucket and origin, mean predicted vs realised probability of each next state (with-run-length models only)
+======================================================================================================================
+The origin's own state is STAY. Realised = share of the bucket's held-out rows that went to the state; predicted = the model's mean probability for it.
+
+=== origin Current (Current group), held-out rows by run-length bucket; predicted columns: RL
+  STAY in Current
+  bucket             n    realised          RL
+  1            431,684    96.5521%    96.9853%
+  2-3          818,087    98.0141%    98.0672%
+  4-6        1,162,385    98.3729%    97.1284%
+  7+         5,459,880    98.4897%    97.1308%
+  to DQ30
+  bucket             n    realised          RL
+  1            431,684     2.9915%     2.0138%
+  2-3          818,087     1.4495%     1.2726%
+  4-6        1,162,385     0.8433%     1.4744%
+  7+         5,459,880     0.5946%     1.8504%
+  to DQ60
+  bucket             n    realised          RL
+  1            431,684     0.0500%     0.0857%
+  2-3          818,087     0.0138%     0.0603%
+  4-6        1,162,385     0.0071%     0.0333%
+  7+         5,459,880     0.0026%     0.0168%
+  to DQ90+
+  bucket             n    realised          RL
+  1            431,684     0.0547%     0.6099%
+  2-3          818,087     0.0009%     0.1782%
+  4-6        1,162,385     0.0012%     0.7546%
+  7+         5,459,880     0.0003%     0.2889%
+  to Prepaid
+  bucket             n    realised          RL
+  1            431,684     0.3514%     0.3052%
+  2-3          818,087     0.5216%     0.3862%
+  4-6        1,162,385     0.7755%     0.5783%
+  7+         5,459,880     0.9126%     0.7083%
+  to Default
+  bucket             n    realised          RL
+  1            431,684     0.0002%     0.0000%
+  2-3          818,087     0.0001%     0.0355%
+  4-6        1,162,385     0.0001%     0.0310%
+  7+         5,459,880     0.0002%     0.0048%
+
+=== origin DQ30 (DQ30+DQ60 group), held-out rows by run-length bucket; predicted columns: D-RL, R-RL
+  to Current
+  bucket             n    realised        D-RL        R-RL
+  1             67,163    49.6747%    49.2091%    49.0303%
+  2-3           26,698    28.6314%    28.7231%    28.4907%
+  4-6            7,880    18.0457%    18.0531%    17.9196%
+  7+             2,397    12.0567%    12.9820%    12.7525%
+  STAY in DQ30
+  bucket             n    realised        D-RL        R-RL
+  1             67,163    29.6651%    29.9533%    30.0756%
+  2-3           26,698    51.0862%    50.7877%    51.0510%
+  4-6            7,880    63.4264%    62.8076%    63.3666%
+  7+             2,397    74.5515%    72.7427%    73.0448%
+  to DQ60
+  bucket             n    realised        D-RL        R-RL
+  1             67,163    19.3202%    19.3511%    19.4561%
+  2-3           26,698    19.3985%    19.4556%    19.5343%
+  4-6            7,880    17.8680%    18.4095%    18.0508%
+  7+             2,397    13.0997%    13.6303%    13.6889%
+  to DQ90+
+  bucket             n    realised        D-RL        R-RL
+  1             67,163     0.1027%     0.1281%     0.1494%
+  2-3           26,698     0.2472%     0.2833%     0.2716%
+  4-6            7,880     0.2792%     0.2742%     0.2362%
+  7+             2,397     0.0834%     0.1854%     0.1672%
+  to Prepaid
+  bucket             n    realised        D-RL        R-RL
+  1             67,163     1.2269%     1.2751%     1.2601%
+  2-3           26,698     0.6330%     0.6457%     0.6455%
+  4-6            7,880     0.3807%     0.4406%     0.4105%
+  7+             2,397     0.2086%     0.4461%     0.3037%
+  to Default
+  bucket             n    realised        D-RL        R-RL
+  1             67,163     0.0104%     0.0833%     0.0284%
+  2-3           26,698     0.0037%     0.1045%     0.0070%
+  4-6            7,880     0.0000%     0.0151%     0.0163%
+  7+             2,397     0.0000%     0.0136%     0.0429%
+
+=== origin DQ60 (DQ30+DQ60 group), held-out rows by run-length bucket; predicted columns: D-RL, R-RL
+  to Current
+  bucket             n    realised        D-RL        R-RL
+  1             19,154    15.0569%    15.5698%    15.4202%
+  2-3            4,489     8.3092%     8.3607%     8.8565%
+  4-6              733     3.1378%     5.8852%     6.3602%
+  7+               102     5.8824%     5.9501%     6.2410%
+  to DQ30
+  bucket             n    realised        D-RL        R-RL
+  1             19,154    14.9995%    14.9834%    15.0818%
+  2-3            4,489    14.5467%    14.7699%    14.7798%
+  4-6              733    14.0518%    14.6212%    14.5956%
+  7+               102     8.8235%    13.4407%    16.2831%
+  STAY in DQ60
+  bucket             n    realised        D-RL        R-RL
+  1             19,154    19.8705%    19.8279%    20.0870%
+  2-3            4,489    39.3406%    38.8751%    39.0482%
+  4-6              733    50.4775%    48.8085%    50.0267%
+  7+               102    65.6863%    56.6935%    53.5883%
+  to DQ90+
+  bucket             n    realised        D-RL        R-RL
+  1             19,154    49.0446%    48.4785%    48.2909%
+  2-3            4,489    37.3134%    37.2958%    36.7802%
+  4-6              733    31.6508%    29.9499%    28.6318%
+  7+               102    19.6078%    23.0400%    23.5320%
+  to Prepaid
+  bucket             n    realised        D-RL        R-RL
+  1             19,154     0.9450%     0.9553%     0.9561%
+  2-3            4,489     0.4678%     0.4998%     0.4732%
+  4-6              733     0.6821%     0.4087%     0.3648%
+  7+               102     0.0000%     0.8733%     0.3530%
+  to Default
+  bucket             n    realised        D-RL        R-RL
+  1             19,154     0.0835%     0.1851%     0.1640%
+  2-3            4,489     0.0223%     0.1987%     0.0621%
+  4-6              733     0.0000%     0.3264%     0.0208%
+  7+               102     0.0000%     0.0025%     0.0025%
+
+=== origin DQ90+ (DQ90+ group), held-out rows by run-length bucket; predicted columns: RL
+  to Current
+  bucket             n    realised          RL
+  1             10,333     8.7971%     8.4291%
+  2-3           12,926     7.1948%     6.8693%
+  4-6            9,983     4.4976%     4.8366%
+  7+             7,061     3.0591%     3.2753%
+  to DQ30
+  bucket             n    realised          RL
+  1             10,333     3.3195%     3.4251%
+  2-3           12,926     0.8587%     0.9623%
+  4-6            9,983     0.3506%     0.4077%
+  7+             7,061     0.1699%     0.1986%
+  to DQ60
+  bucket             n    realised          RL
+  1             10,333     5.1389%     4.6661%
+  2-3           12,926     1.3693%     1.4177%
+  4-6            9,983     0.6211%     0.6132%
+  7+             7,061     0.5807%     0.5621%
+  STAY in DQ90+
+  bucket             n    realised          RL
+  1             10,333    81.7284%    82.4423%
+  2-3           12,926    87.2505%    87.3786%
+  4-6            9,983    88.4003%    88.1969%
+  7+             7,061    89.4774%    89.1229%
+  to Prepaid
+  bucket             n    realised          RL
+  1             10,333     0.7258%     0.6255%
+  2-3           12,926     0.6189%     0.5827%
+  4-6            9,983     0.6611%     0.5340%
+  7+             7,061     0.2549%     0.3850%
+  to Default
+  bucket             n    realised          RL
+  1             10,333     0.2903%     0.4119%
+  2-3           12,926     2.7077%     2.7894%
+  4-6            9,983     5.4693%     5.4116%
+  7+             7,061     6.4580%     6.4561%
+
+======================================================================================================================
+T3  DIRECTION OF TRAVEL: predicted probability of STAYING in the origin state at run-length bucket 1 and at 7+, next to the realised
+======================================================================================================================
+direction = rising if the 7+ value exceeds the bucket-1 value by more than 0.5 percentage point, falling if it is lower by more than that, else flat
+Current    origin Current  model RL      predicted stay  96.99% ->  97.13% (+0.15 pp, flat   ) | realised stay  96.55% ->  98.49% (+1.94 pp, rising ) | DIFFERENT direction
+DQ30+DQ60  origin DQ30     model D-RL    predicted stay  29.95% ->  72.74% (+42.79 pp, rising ) | realised stay  29.67% ->  74.55% (+44.89 pp, rising ) | SAME direction
+DQ30+DQ60  origin DQ30     model R-RL    predicted stay  30.08% ->  73.04% (+42.97 pp, rising ) | realised stay  29.67% ->  74.55% (+44.89 pp, rising ) | SAME direction
+DQ30+DQ60  origin DQ60     model D-RL    predicted stay  19.83% ->  56.69% (+36.87 pp, rising ) | realised stay  19.87% ->  65.69% (+45.82 pp, rising ) | SAME direction
+DQ30+DQ60  origin DQ60     model R-RL    predicted stay  20.09% ->  53.59% (+33.50 pp, rising ) | realised stay  19.87% ->  65.69% (+45.82 pp, rising ) | SAME direction
+DQ90+      origin DQ90+    model RL      predicted stay  82.44% ->  89.12% (+6.68 pp, rising ) | realised stay  81.73% ->  89.48% (+7.75 pp, rising ) | SAME direction
+
+======================================================================================================================
+NOTES AND CHECKS
+======================================================================================================================
+panel build 2026-10-08T09:41:19.866411; role == 'fit', from_state in ['Current', 'DQ30', 'DQ60', 'DQ90+'], 200601 <= from_period <= 200812 (observed 200601..200812); null labels dropped 0; pooled split by loan: seed 40, 1,544,846 of 1,931,057 loans to train, 386,211 held out; no loan on both sides (asserted)
+common params: objective='multiclass', num_class=6, device_type='cpu', verbosity=0, seed=40, deterministic=True, force_row_wise=True; num_boost_round=100; native categoricals: property_state (and from_state in the DQ30+DQ60 models)
+  group     model   capacity  run length   train rows  held-out rows  trees  construct s  train + predict s   library messages
+  Current   noRL    defaults  no           31,488,837      7,872,036    600          1.4              158.0   none
+  Current   RL      defaults  with         31,488,837      7,872,036    600          1.5              165.1   none
+  DQ30+DQ60 D-noRL  defaults  no              518,754        128,616    600          0.1                3.6   none
+  DQ30+DQ60 D-RL    defaults  with            518,754        128,616    600          0.1                3.9   none
+  DQ30+DQ60 R-noRL  reduced   no              518,754        128,616    600          0.1                2.8   none
+  DQ30+DQ60 R-RL    reduced   with            518,754        128,616    600          0.1                3.0   none
+  DQ90+     noRL    reduced   no              161,489         40,303    600          0.1                1.0   none
+  DQ90+     RL      reduced   with            161,489         40,303    600          0.1                1.1   none
+features: Current: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'run_length', 'run_length_censored']; DQ30+DQ60: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'from_state', 'run_length', 'run_length_censored']; DQ90+: ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'run_length', 'run_length_censored']
+conditional prior, origin Current: Current 0.983127, DQ30 0.008521, DQ60 0.000072, DQ90+ 0.000037, Prepaid 0.008241, Default 0.000002
+conditional prior, origin DQ30   : Current 0.405943, DQ30 0.390875, DQ60 0.191255, DQ90+ 0.001622, Prepaid 0.010205, Default 0.000100
+conditional prior, origin DQ60   : Current 0.135731, DQ30 0.147908, DQ60 0.250834, DQ90+ 0.457128, Prepaid 0.007897, Default 0.000502
+conditional prior, origin DQ90+  : Current 0.061063, DQ30 0.013208, DQ60 0.019017, DQ90+ 0.866753, Prepaid 0.005226, Default 0.034733
+lightgbm 4.7.0; total wall-clock 6.4 min
+PEAK RSS (src.memwatch): process peak 6.88 GB; lowest system-available memory seen 1.72 GB

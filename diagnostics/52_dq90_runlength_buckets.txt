@@ -1,0 +1,141 @@
+DQ90+-ORIGIN MODEL: DOES RUN LENGTH FIX EXIT BEHAVIOUR WITHIN RUN-LENGTH BUCKETS?   (diagnostic 52; measurement only)
+
+======================================================================================================================
+BUCKET COUNTS  (rows per run_length bucket; reported before any score)
+======================================================================================================================
+HELD-OUT rows: 40,520
+  bucket      all rows   % of rows    censored   uncensored   % censored
+  1             10,362      25.57%           8       10,354        0.08%
+  2-3           13,148      32.45%          12       13,136        0.09%
+  4-6           10,007      24.70%          16        9,991        0.16%
+  7+             7,003      17.28%           6        6,997        0.09%
+  total         40,520     100.00%          42       40,478        0.10%
+
+TRAIN rows: 161,272
+  bucket      all rows   % of rows    censored   uncensored   % censored
+  1             41,511      25.74%          19       41,492        0.05%
+  2-3           52,142      32.33%          12       52,130        0.02%
+  4-6           39,737      24.64%          11       39,726        0.03%
+  7+            27,882      17.29%           0       27,882        0.00%
+  total        161,272     100.00%          42      161,230        0.03%
+
+
+======================================================================================================================
+T1  PER BUCKET: mean predicted probability of LEAVING DQ90+ (1 - predicted DQ90+ self-transition) vs realised share that left
+======================================================================================================================
+--- (i) ALL HELD-OUT ROWS
+  bucket            n    realised           A           B  prior-only
+  1            10,362     17.130%     14.520%     17.567%     13.367%
+  2-3          13,148     12.625%     13.931%     12.573%     13.367%
+  4-6          10,007     11.902%     12.869%     11.938%     13.367%
+  7+            7,003     11.024%     11.926%     10.768%     13.367%
+
+--- (ii) UNCENSORED ROWS ONLY (run_length_censored == False)
+  bucket            n    realised           A           B  prior-only
+  1            10,354     17.124%     14.518%     17.569%     13.367%
+  2-3          13,136     12.637%     13.930%     12.572%     13.367%
+  4-6           9,991     11.911%     12.871%     11.939%     13.367%
+  7+            6,997     11.033%     11.924%     10.766%     13.367%
+
+
+======================================================================================================================
+T2  PER BUCKET: destination split of leaving DQ90+, as shares of ALL rows in the bucket (realised vs mean predicted)
+======================================================================================================================
+Default and Current are the two named destinations; 'other leave' is the rest of the leave (DQ30, DQ60, Prepaid), so that the three tables sum to T1.
+--- (i) ALL HELD-OUT ROWS
+  to Default
+  bucket            n    realised           A           B  prior-only
+  1            10,362      0.280%      3.699%      0.396%      3.476%
+  2-3          13,148      2.632%      3.744%      2.796%      3.476%
+  4-6          10,007      5.406%      3.417%      5.654%      3.476%
+  7+            7,003      6.697%      2.840%      6.488%      3.476%
+  to Current
+  bucket            n    realised           A           B  prior-only
+  1            10,362      8.454%      6.607%      8.400%      6.108%
+  2-3          13,148      6.868%      6.250%      6.924%      6.108%
+  4-6          10,007      4.937%      5.847%      4.745%      6.108%
+  7+            7,003      3.441%      5.733%      3.142%      6.108%
+  other leave (DQ30 + DQ60 + Prepaid)
+  bucket            n    realised           A           B  prior-only
+  1            10,362      8.396%      4.214%      8.771%      3.782%
+  2-3          13,148      3.126%      3.937%      2.854%      3.782%
+  4-6          10,007      1.559%      3.605%      1.539%      3.782%
+  7+            7,003      0.885%      3.353%      1.138%      3.782%
+
+--- (ii) UNCENSORED ROWS ONLY (run_length_censored == False)
+  to Default
+  bucket            n    realised           A           B  prior-only
+  1            10,354      0.270%      3.696%      0.396%      3.476%
+  2-3          13,136      2.634%      3.741%      2.791%      3.476%
+  4-6           9,991      5.405%      3.416%      5.653%      3.476%
+  7+            6,997      6.703%      2.840%      6.487%      3.476%
+  to Current
+  bucket            n    realised           A           B  prior-only
+  1            10,354      8.460%      6.608%      8.402%      6.108%
+  2-3          13,136      6.874%      6.251%      6.926%      6.108%
+  4-6           9,991      4.944%      5.849%      4.746%      6.108%
+  7+            6,997      3.444%      5.731%      3.141%      6.108%
+  other leave (DQ30 + DQ60 + Prepaid)
+  bucket            n    realised           A           B  prior-only
+  1            10,354      8.393%      4.214%      8.771%      3.782%
+  2-3          13,136      3.129%      3.938%      2.855%      3.782%
+  4-6           9,991      1.561%      3.606%      1.540%      3.782%
+  7+            6,997      0.886%      3.352%      1.138%      3.782%
+
+
+======================================================================================================================
+T3  POOLED across all DQ90+ held-out rows, same quantities as T1.   *** NOT THE JUDGE: pooling hides within-bucket error ***
+======================================================================================================================
+--- (i) ALL HELD-OUT ROWS
+  pooled                  n    realised           A           B  prior-only
+  all buckets        40,520     13.322%     13.473%     13.381%     13.367%
+
+--- (ii) UNCENSORED ROWS ONLY (run_length_censored == False)
+  pooled                  n    realised           A           B  prior-only
+  all buckets        40,478     13.328%     13.472%     13.382%     13.367%
+
+
+======================================================================================================================
+T4  PER-CLASS BRIER on held-out rows, pooled (lower is better)
+======================================================================================================================
+Brier per class j = mean_i (p_ij - o_ij)^2 over the held-out rows, where p_ij is the predicted probability of class j and o_ij is 1 if the row's actual next state is j, else 0; the total is the sum over the six classes
+--- (i) ALL HELD-OUT ROWS   (40,520 rows)
+  class       prior-only             A             B     A - prior     B - prior
+  Current     0.05819497    0.05716694    0.05681716   -0.00102803   -0.00137781
+  DQ30        0.01226016    0.01220483    0.01202630   -0.00005534   -0.00023386
+  DQ60        0.01852333    0.01843920    0.01813367   -0.00008413   -0.00038966
+  DQ90+       0.11547129    0.11225357    0.10977805   -0.00321772   -0.00569323
+  Prepaid     0.00566856    0.00566717    0.00566641   -0.00000139   -0.00000216
+  Default     0.03301267    0.03219414    0.03016619   -0.00081853   -0.00284648
+  TOTAL       0.24313099    0.23792584    0.23258778   -0.00520514   -0.01054321
+
+--- (ii) UNCENSORED ROWS ONLY (run_length_censored == False)   (40,478 rows)
+  class       prior-only             A             B     A - prior     B - prior
+  Current     0.05825148    0.05722299    0.05687370   -0.00102849   -0.00137779
+  DQ30        0.01227270    0.01221734    0.01203851   -0.00005536   -0.00023420
+  DQ60        0.01854216    0.01845787    0.01815186   -0.00008429   -0.00039030
+  DQ90+       0.11551826    0.11229338    0.10981674   -0.00322488   -0.00570152
+  Prepaid     0.00564997    0.00564867    0.00564804   -0.00000130   -0.00000194
+  Default     0.03299970    0.03218005    0.03014321   -0.00081965   -0.00285649
+  TOTAL       0.24323428    0.23802031    0.23267205   -0.00521397   -0.01056223
+
+
+======================================================================================================================
+NOTES AND CHECKS
+======================================================================================================================
+panel build 2026-10-08T09:41:19.866411; role == 'fit', from_state == 'DQ90+'; DQ90+-origin fit rows 201,792; null labels dropped 0; rows used 201,792 (diagnostic 51: 201,792: MATCH); null run_length / run_length_censored values in used rows 0; from_period range 200605..200812
+split by loan: seed 40, 36,108 of 45,135 loans to train, 9,027 held out; train rows 161,272, held-out rows 40,520; no loan on both sides (asserted)
+  class         TRAIN rows     diag 51   HELD-OUT rows     diag 51
+  Current            9,851       9,851           2,514       2,514
+  DQ30               2,131       2,131             503         503
+  DQ60               3,117       3,117             765         765
+  DQ90+            139,715     139,715          35,122      35,122
+  Prepaid              852         852             231         231
+  Default            5,606       5,606           1,385       1,385
+per-class counts vs diagnostic 51's table: IDENTICAL
+prior-only (train class frequencies, all train rows): Current 0.061083, DQ30 0.013214, DQ60 0.019328, DQ90+ 0.866331, Prepaid 0.005283, Default 0.034761
+arm A features (8): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m']
+arm B features (10): ['fico', 'ltv', 'dti', 'rate_spread', 'property_state', 'est_ltv', 'unemp_level', 'unemp_chg_12m', 'run_length', 'run_length_censored']
+params (both arms): objective='multiclass', num_class=6, device_type='cpu', verbosity=0, num_leaves=8, min_data_in_leaf=100, seed=40, deterministic=True, force_row_wise=True; num_boost_round=100; property_state native categorical
+lightgbm 4.7.0; train+predict wall-clock A 1.0 s, B 1.0 s; total 182.9 s
+PEAK RSS (src.memwatch): process peak 2.31 GB; lowest system-available memory seen 6.02 GB
