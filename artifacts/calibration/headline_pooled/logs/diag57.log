@@ -1,0 +1,21 @@
+building the feature matrix ...
+  scan 2006Q1: 6,981,713 training rows
+  scan 2006Q2: 6,513,938 training rows
+  scan 2006Q3: 5,466,937 training rows
+  scan 2006Q4: 5,438,943 training rows
+  scan 2007Q1: 4,755,299 training rows
+  scan 2007Q2: 4,915,082 training rows
+  scan 2007Q3: 3,269,478 training rows
+  scan 2007Q4: 2,868,646 training rows
+  inputs 2006Q1: 6,981,713 rows
+  inputs 2006Q2: 6,513,938 rows
+  inputs 2006Q3: 5,466,937 rows
+  inputs 2006Q4: 5,438,943 rows
+  inputs 2007Q1: 4,755,299 rows
+  inputs 2007Q2: 4,915,082 rows
+  inputs 2007Q3: 3,269,478 rows
+  inputs 2007Q4: 2,868,646 rows
+scored model A; softmax vs LightGBM predict on the first 200,000 rows: max |diff| 0.00e+00
+scored model B; softmax vs LightGBM predict on the first 200,000 rows: max |diff| 0.00e+00
+wrote diagnostics\57_saturation_check.txt
+peak RSS 7.11 GB, min system available 1.59 GB

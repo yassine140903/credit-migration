@@ -1,0 +1,13 @@
+{
+  "fold": 0,
+  "model": "artifacts/calibration/headline_pooled/oof/fold0_model.txt",
+  "model_sha256": "59233e42c1dcb6eb40c3198082fa7aabca3b7f0220e2250e8b3a83b3d9b87d6e",
+  "train_seconds": 143.0,
+  "heldout_rows": 8029511,
+  "compared_cells": 48177066,
+  "max_abs_diff_vs_stored_proba": 0.0,
+  "cells_differing_at_all": 0,
+  "peak_rss_bytes": 7710220288,
+  "min_system_available_bytes": 1475624960,
+  "note": "retrained for diagnostic 57 by instruction; the original fold booster was not persisted"
+}

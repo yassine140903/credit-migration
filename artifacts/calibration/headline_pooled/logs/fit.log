@@ -1,0 +1,59 @@
+Current: 39,360,874 rows, 663,812 leavers, destinations {'DQ30': 335367, 'DQ60': 2832, 'DQ90+': 1429, 'Prepaid': 324110, 'Default': 74}
+  step one: isotonic, 553 thresholds, stay 0.983135 -> fitted mean 0.983135
+  step two: DQ30     events   335,367  a 1.0600  b 0.0019  iters 4  converged True
+  step two: DQ60     events     2,832  a 1.1042  b 0.5285  iters 4  converged True
+  step two: DQ90+    events     1,429  a 1.1475  b 0.6924  iters 4  converged True
+  step two: Prepaid  events   324,110  a 1.0698  b 0.0021  iters 4  converged True
+  step two: Default  events        74  a 0.0010  b -9.0914  iters 7  converged True
+  naive Current  events 38,697,062  isotonic 553 thresholds, Platt a 1.0163 b -0.0625 converged True
+  naive DQ30     events    335,367  isotonic 509 thresholds, Platt a 1.0130 b 0.0554 converged True
+  naive DQ60     events      2,832  isotonic 112 thresholds, Platt a 1.1169 b 1.0153 converged True
+  naive DQ90+    events      1,429  isotonic 120 thresholds, Platt a 1.2050 b 1.7321 converged True
+  naive Prepaid  events    324,110  isotonic 495 thresholds, Platt a 1.0517 b 0.2346 converged True
+  naive Default  events         74  isotonic 24 thresholds, Platt a 0.0539 b -12.4359 converged True
+  Current done in 147 s
+DQ30: 523,364 rows, 319,151 leavers, destinations {'Current': 212900, 'DQ60': 100056, 'DQ90+': 839, 'Prepaid': 5306, 'Default': 50}
+  step one: isotonic, 180 thresholds, stay 0.390193 -> fitted mean 0.390193
+  step two: Current  events   212,900  a 0.9510  b 0.0380  iters 3  converged True
+  step two: DQ60     events   100,056  a 0.9502  b -0.0353  iters 4  converged True
+  step two: DQ90+    events       839  a 0.1078  b -5.2935  iters 6  converged True
+  step two: Prepaid  events     5,306  a 0.7244  b -1.0855  iters 4  converged True
+  step two: Default  events        50  a 0.2091  b -6.8903  iters 7  converged True
+  naive Current  events    212,900  isotonic 232 thresholds, Platt a 0.9306 b -0.0283 converged True
+  naive DQ30     events    204,213  isotonic 180 thresholds, Platt a 0.8617 b -0.0524 converged True
+  naive DQ60     events    100,056  isotonic 222 thresholds, Platt a 0.9544 b -0.0617 converged True
+  naive DQ90+    events        839  isotonic 14 thresholds, Platt a 0.0119 b -6.3565 converged True
+  naive Prepaid  events      5,306  isotonic 97 thresholds, Platt a 0.7650 b -1.0375 converged True
+  naive Default  events         50  isotonic 16 thresholds, Platt a 0.2057 b -7.3200 converged True
+  DQ30 done in 2 s
+DQ60: 124,006 rows, 93,032 leavers, destinations {'Current': 16795, 'DQ30': 18359, 'DQ90+': 56818, 'Prepaid': 993, 'Default': 67}
+  step one: isotonic, 62 thresholds, stay 0.249778 -> fitted mean 0.249778
+  step two: Current  events    16,795  a 0.1145  b -1.3454  iters 5  converged True
+  step two: DQ30     events    18,359  a 0.1510  b -1.1327  iters 6  converged True
+  step two: DQ90+    events    56,818  a 0.2691  b 0.3702  iters 6  converged True
+  step two: Prepaid  events       993  a 0.1981  b -3.3403  iters 6  converged True
+  step two: Default  events        67  a 0.0177  b -6.9965  iters 8  converged True
+  naive Current  events     16,795  isotonic 76 thresholds, Platt a 0.1108 b -1.6541 converged True
+  naive DQ30     events     18,359  isotonic 67 thresholds, Platt a 0.1039 b -1.5306 converged True
+  naive DQ60     events     30,974  isotonic 62 thresholds, Platt a 0.0787 b -0.9927 converged True
+  naive DQ90+    events     56,818  isotonic 101 thresholds, Platt a 0.2310 b -0.1053 converged True
+  naive Prepaid  events        993  isotonic 52 thresholds, Platt a 0.2046 b -3.5392 converged True
+  naive Default  events         67  isotonic 8 thresholds, Platt a 0.0188 b -7.2652 converged True
+  DQ60 done in 1 s
+DQ90+: 201,792 rows, 26,955 leavers, destinations {'Current': 12365, 'DQ30': 2634, 'DQ60': 3882, 'Prepaid': 1083, 'Default': 6991}
+  step one: isotonic, 44 thresholds, stay 0.866422 -> fitted mean 0.866422
+  step two: Current  events    12,365  a 0.0024  b -0.1099  iters 9  converged True
+  step two: DQ30     events     2,634  a 0.0001  b -2.2222  iters 8  converged True
+  step two: DQ60     events     3,882  a 0.0103  b -1.7576  iters 8  converged True
+  step two: Prepaid  events     1,083  a 0.0798  b -2.7622  iters 8  converged True
+  step two: Default  events     6,991  a 0.0220  b -0.8585  iters 7  converged True
+  naive Current  events     12,365  isotonic 12 thresholds, Platt a 0.0037 b -2.6398 converged True
+  naive DQ30     events      2,634  isotonic 26 thresholds, Platt a 0.0114 b -4.2094 converged True
+  naive DQ60     events      3,882  isotonic 27 thresholds, Platt a 0.0246 b -3.7292 converged True
+  naive DQ90+    events    174,837  isotonic 44 thresholds, Platt a 0.0154 b 1.7879 converged True
+  naive Prepaid  events      1,083  isotonic 34 thresholds, Platt a 0.0818 b -4.4100 converged True
+  naive Default  events      6,991  isotonic 47 thresholds, Platt a 0.0190 b -3.0717 converged True
+  DQ90+ done in 1 s
+saved the corrections to artifacts/calibration/headline_pooled
+peak RSS 7.48 GB, min system available 0.80 GB
+exit 0

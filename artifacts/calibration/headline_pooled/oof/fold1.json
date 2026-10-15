@@ -1,0 +1,10 @@
+{
+  "fold": 1,
+  "train_rows": 32154969,
+  "heldout_rows": 8055067,
+  "construct_seconds": 2.7,
+  "train_seconds": 141.6,
+  "predict_seconds": 36.7,
+  "peak_rss_bytes_so_far": 7695020032,
+  "min_system_available_bytes_so_far": 968351744
+}

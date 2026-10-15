@@ -1,0 +1,23 @@
+model headline_pooled   sha256 360761955780a5da
+folds: 5, by loan: fold = pandas.util.hash_array(loan_id, hash_key='0000000000000056') % 5 (keyed 64-bit siphash of the loan_id string; independent of row order and of the other loans)
+  scan 2006Q1: 6,981,713 training rows
+  scan 2006Q2: 6,513,938 training rows
+  scan 2006Q3: 5,466,937 training rows
+  scan 2006Q4: 5,438,943 training rows
+  scan 2007Q1: 4,755,299 training rows
+  scan 2007Q2: 4,915,082 training rows
+  scan 2007Q3: 3,269,478 training rows
+  scan 2007Q4: 2,868,646 training rows
+population matches the sidecar: 40,210,036 rows, label counts and from_state counts identical
+  inputs 2006Q1: 6,981,713 rows
+  inputs 2006Q2: 6,513,938 rows
+  inputs 2006Q3: 5,466,937 rows
+  inputs 2006Q4: 5,438,943 rows
+  inputs 2007Q1: 4,755,299 rows
+  inputs 2007Q2: 4,915,082 rows
+  inputs 2007Q3: 3,269,478 rows
+  inputs 2007Q4: 2,868,646 rows
+matrix 40,210,036 x 9, 1.12 GB
+fold 0: train 32,180,525 rows, hold out 8,029,511 rows
+fold 0: construct 3 s, train 142 s (2.4 min), predict 75 s; peak RSS so far 7.14 GB, min available 0.64 GB
+fold 1: train 32,154,969 rows, hold out 8,055,067 rows

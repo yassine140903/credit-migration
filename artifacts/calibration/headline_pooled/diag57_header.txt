@@ -1,0 +1,20 @@
+========================================================================================================================
+DIAGNOSTIC 57 - IS THE SHIPPED MODEL SATURATING WHERE THE FOLD MODELS ARE NOT?   (read-only on models)
+========================================================================================================================
+
+PRE-REGISTRATION (written before any measurement was computed)
+------------------------------------------------------------------------------------------------------------------------
+"Prediction recorded before the numbers exist: the shipped model shows materially larger raw-score spread than the fold models at DQ60 and DQ90+, and roughly equal spread at Current. If spreads are similar across all four origin states, the saturation hypothesis is dead, section 5 of diagnostic 56 remains unexplained, and no further explanation is pursued in this milestone."
+
+WHAT IS COMPARED
+------------------------------------------------------------------------------------------------------------------------
+Model A : artifacts/ml/headline_pooled/model.txt   sha256 360761955780a5daaafd08db9c181e05a76b7902651d9d56f9e0038a24fc0095   (prefix 360761955780a5da asserted)
+Model B : fold 0's model from diagnostic 56 (trained on the 80% of loans not in fold 0).
+          Diagnostic 56 did not persist its fold boosters. On explicit instruction, `python -m src.calibrate refold` retrained fold 0 once,
+          with the same code, features, categories, lgb_params and 100 rounds, and saved it. Section A says how closely it reproduces
+          diagnostic 56's stored fold-0 predictions. This is the only retrain; it is a stand-in for the original booster and is labelled as such.
+Rows    : fold 0's held-out fit rows (Current 7,859,371 / DQ30 104,104 / DQ60 25,000 / DQ90+ 41,036). Both models score the identical rows.
+Measure : LightGBM raw_score=True (six margins per row, before the softmax); softmax taken here in float64.
+Not done: no retraining with other parameters, no fix, no evaluate rows, no chained forecast, no change to the calibration correction.
+Order   : this header; A) sha256 and regularisation actually in the model files; B) reference scale; C) spread tables; D) leaf statistics;
+          E) one loan by hand.

@@ -1,0 +1,81 @@
+{
+  "n_rows": 40210036,
+  "n_loans": 1931057,
+  "loan_pairs_with_a_second_fold": 0,
+  "rows_by_fold": [
+    8029511,
+    8055067,
+    8028746,
+    8043042,
+    8053670
+  ],
+  "loans_by_fold": [
+    385899,
+    386343,
+    385624,
+    386319,
+    386872
+  ],
+  "seed": 56,
+  "method": "by loan: fold = pandas.util.hash_array(loan_id, hash_key='0000000000000056') % 5 (keyed 64-bit siphash of the loan_id string; independent of row order and of the other loans)",
+  "rows_with_exactly_one_oof_prediction": 40210036,
+  "rows_with_none": 0,
+  "rows_with_more_than_one": 0,
+  "oof_worst_row_sum_error": 7.771561172376096e-16,
+  "oof_nonfinite_or_negative_cells": 0,
+  "folds": [
+    {
+      "fold": 0,
+      "train_rows": 32180525,
+      "heldout_rows": 8029511,
+      "construct_seconds": 2.8,
+      "train_seconds": 142.4,
+      "predict_seconds": 75.1,
+      "peak_rss_bytes_so_far": 7668297728,
+      "min_system_available_bytes_so_far": 690315264
+    },
+    {
+      "fold": 1,
+      "train_rows": 32154969,
+      "heldout_rows": 8055067,
+      "construct_seconds": 2.7,
+      "train_seconds": 141.6,
+      "predict_seconds": 36.7,
+      "peak_rss_bytes_so_far": 7695020032,
+      "min_system_available_bytes_so_far": 968351744
+    },
+    {
+      "fold": 2,
+      "train_rows": 32181290,
+      "heldout_rows": 8028746,
+      "construct_seconds": 2.8,
+      "train_seconds": 141.3,
+      "predict_seconds": 35.3,
+      "peak_rss_bytes_so_far": 7699886080,
+      "min_system_available_bytes_so_far": 968351744
+    },
+    {
+      "fold": 3,
+      "train_rows": 32166994,
+      "heldout_rows": 8043042,
+      "construct_seconds": 2.7,
+      "train_seconds": 137.4,
+      "predict_seconds": 33.4,
+      "peak_rss_bytes_so_far": 7699886080,
+      "min_system_available_bytes_so_far": 968351744
+    },
+    {
+      "fold": 4,
+      "train_rows": 32156366,
+      "heldout_rows": 8053670,
+      "construct_seconds": 2.7,
+      "train_seconds": 133.4,
+      "predict_seconds": 74.7,
+      "peak_rss_bytes_so_far": 7699886080,
+      "min_system_available_bytes_so_far": 968351744
+    }
+  ],
+  "peak_rss_bytes": 7699886080,
+  "min_system_available_bytes": 968351744,
+  "total_seconds": 1145.8
+}

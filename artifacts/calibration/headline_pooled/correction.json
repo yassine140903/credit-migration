@@ -1,0 +1,380 @@
+{
+  "model": "headline_pooled",
+  "model_sha256": "360761955780a5daaafd08db9c181e05a76b7902651d9d56f9e0038a24fc0095",
+  "classes": [
+    "Current",
+    "DQ30",
+    "DQ60",
+    "DQ90+",
+    "Prepaid",
+    "Default"
+  ],
+  "origin_states": [
+    "Current",
+    "DQ30",
+    "DQ60",
+    "DQ90+"
+  ],
+  "fold_seed": 56,
+  "n_folds": 5,
+  "logit_eps": 1e-12,
+  "sum_tol": 1e-09,
+  "step_one": "isotonic (stay vs leave)",
+  "step_two": "Platt one-vs-rest on leavers, renormalised",
+  "origins": {
+    "Current": {
+      "n_rows": 39360874,
+      "n_leavers": 663812,
+      "dest_counts": {
+        "DQ30": 335367,
+        "DQ60": 2832,
+        "DQ90+": 1429,
+        "Prepaid": 324110,
+        "Default": 74
+      },
+      "thin_destinations_under_100_events": [
+        "Default"
+      ],
+      "isotonic_thresholds": 553,
+      "platt": {
+        "DQ30": {
+          "a": 1.0600471437715988,
+          "b": 0.0019145511773955121,
+          "n": 663812,
+          "positives": 335367,
+          "nll_identity": 342527.32962021587,
+          "nll_fit": 342276.0981147208,
+          "iterations": 4,
+          "converged": true
+        },
+        "DQ60": {
+          "a": 1.1042445170556856,
+          "b": 0.5284704524128088,
+          "n": 663812,
+          "positives": 2832,
+          "nll_identity": 17445.672406321417,
+          "nll_fit": 17439.0673210897,
+          "iterations": 4,
+          "converged": true
+        },
+        "DQ90+": {
+          "a": 1.147480432299646,
+          "b": 0.692379278500492,
+          "n": 663812,
+          "positives": 1429,
+          "nll_identity": 9442.970152584765,
+          "nll_fit": 9414.884588877356,
+          "iterations": 4,
+          "converged": true
+        },
+        "Prepaid": {
+          "a": 1.0697860670438155,
+          "b": 0.0020570403311237885,
+          "n": 663812,
+          "positives": 324110,
+          "nll_identity": 337267.95419670554,
+          "nll_fit": 336929.8133404599,
+          "iterations": 4,
+          "converged": true
+        },
+        "Default": {
+          "a": 0.0010292153587759167,
+          "b": -9.091351493418177,
+          "n": 663812,
+          "positives": 74,
+          "nll_identity": 915.255183590891,
+          "nll_fit": 747.5206588790187,
+          "iterations": 7,
+          "converged": true
+        }
+      },
+      "logit_clipped_counts": {
+        "DQ30": {
+          "below_eps": 0,
+          "above_1_minus_eps": 0
+        },
+        "DQ60": {
+          "below_eps": 0,
+          "above_1_minus_eps": 0
+        },
+        "DQ90+": {
+          "below_eps": 0,
+          "above_1_minus_eps": 0
+        },
+        "Prepaid": {
+          "below_eps": 0,
+          "above_1_minus_eps": 0
+        },
+        "Default": {
+          "below_eps": 3061,
+          "above_1_minus_eps": 0
+        }
+      }
+    },
+    "DQ30": {
+      "n_rows": 523364,
+      "n_leavers": 319151,
+      "dest_counts": {
+        "Current": 212900,
+        "DQ60": 100056,
+        "DQ90+": 839,
+        "Prepaid": 5306,
+        "Default": 50
+      },
+      "thin_destinations_under_100_events": [
+        "Default"
+      ],
+      "isotonic_thresholds": 180,
+      "platt": {
+        "Current": {
+          "a": 0.9509816339202896,
+          "b": 0.03798200115971536,
+          "n": 319151,
+          "positives": 212900,
+          "nll_identity": 189617.594008592,
+          "nll_fit": 189585.29955619122,
+          "iterations": 3,
+          "converged": true
+        },
+        "DQ60": {
+          "a": 0.9502489607056928,
+          "b": -0.03533523912994876,
+          "n": 319151,
+          "positives": 100056,
+          "nll_identity": 183565.51641908544,
+          "nll_fit": 183530.94094425443,
+          "iterations": 4,
+          "converged": true
+        },
+        "DQ90+": {
+          "a": 0.1078403075039545,
+          "b": -5.293519768583186,
+          "n": 319151,
+          "positives": 839,
+          "nll_identity": 6047.4776309970575,
+          "nll_fit": 5819.444018718196,
+          "iterations": 6,
+          "converged": true
+        },
+        "Prepaid": {
+          "a": 0.7244046976238964,
+          "b": -1.085464649018919,
+          "n": 319151,
+          "positives": 5306,
+          "nll_identity": 26367.691624640996,
+          "nll_fit": 26290.451431208705,
+          "iterations": 4,
+          "converged": true
+        },
+        "Default": {
+          "a": 0.2091311213686252,
+          "b": -6.890312397892487,
+          "n": 319151,
+          "positives": 50,
+          "nll_identity": 641.2812368614718,
+          "nll_fit": 479.8211930801276,
+          "iterations": 7,
+          "converged": true
+        }
+      },
+      "logit_clipped_counts": {
+        "Current": {
+          "below_eps": 0,
+          "above_1_minus_eps": 0
+        },
+        "DQ60": {
+          "below_eps": 0,
+          "above_1_minus_eps": 0
+        },
+        "DQ90+": {
+          "below_eps": 0,
+          "above_1_minus_eps": 0
+        },
+        "Prepaid": {
+          "below_eps": 0,
+          "above_1_minus_eps": 0
+        },
+        "Default": {
+          "below_eps": 1654,
+          "above_1_minus_eps": 0
+        }
+      }
+    },
+    "DQ60": {
+      "n_rows": 124006,
+      "n_leavers": 93032,
+      "dest_counts": {
+        "Current": 16795,
+        "DQ30": 18359,
+        "DQ90+": 56818,
+        "Prepaid": 993,
+        "Default": 67
+      },
+      "thin_destinations_under_100_events": [
+        "Default"
+      ],
+      "isotonic_thresholds": 62,
+      "platt": {
+        "Current": {
+          "a": 0.1145370519934596,
+          "b": -1.3454399117936333,
+          "n": 93032,
+          "positives": 16795,
+          "nll_identity": 52554.19736377501,
+          "nll_fit": 43585.312730336875,
+          "iterations": 5,
+          "converged": true
+        },
+        "DQ30": {
+          "a": 0.1509745016386459,
+          "b": -1.1326912486843161,
+          "n": 93032,
+          "positives": 18359,
+          "nll_identity": 49378.99155743036,
+          "nll_fit": 45916.85376641971,
+          "iterations": 6,
+          "converged": true
+        },
+        "DQ90+": {
+          "a": 0.2691398480362061,
+          "b": 0.37024850247316504,
+          "n": 93032,
+          "positives": 56818,
+          "nll_identity": 66048.44671733066,
+          "nll_fit": 61075.030094392496,
+          "iterations": 6,
+          "converged": true
+        },
+        "Prepaid": {
+          "a": 0.1981181193655675,
+          "b": -3.340296722016527,
+          "n": 93032,
+          "positives": 993,
+          "nll_identity": 5905.949008138756,
+          "nll_fit": 5358.385350063539,
+          "iterations": 6,
+          "converged": true
+        },
+        "Default": {
+          "a": 0.01767758203111755,
+          "b": -6.996459887333519,
+          "n": 93032,
+          "positives": 67,
+          "nll_identity": 1341.2544104688102,
+          "nll_fit": 550.9081906462353,
+          "iterations": 8,
+          "converged": true
+        }
+      },
+      "logit_clipped_counts": {
+        "Current": {
+          "below_eps": 89,
+          "above_1_minus_eps": 0
+        },
+        "DQ30": {
+          "below_eps": 78,
+          "above_1_minus_eps": 0
+        },
+        "DQ90+": {
+          "below_eps": 0,
+          "above_1_minus_eps": 76
+        },
+        "Prepaid": {
+          "below_eps": 2224,
+          "above_1_minus_eps": 0
+        },
+        "Default": {
+          "below_eps": 25016,
+          "above_1_minus_eps": 0
+        }
+      }
+    },
+    "DQ90+": {
+      "n_rows": 201792,
+      "n_leavers": 26955,
+      "dest_counts": {
+        "Current": 12365,
+        "DQ30": 2634,
+        "DQ60": 3882,
+        "Prepaid": 1083,
+        "Default": 6991
+      },
+      "thin_destinations_under_100_events": [],
+      "isotonic_thresholds": 44,
+      "platt": {
+        "Current": {
+          "a": 0.0023859010889301204,
+          "b": -0.10989093868732487,
+          "n": 26955,
+          "positives": 12365,
+          "nll_identity": 294839.9495928155,
+          "nll_fit": 18589.849144986383,
+          "iterations": 9,
+          "converged": true
+        },
+        "DQ30": {
+          "a": 0.0001261060094743783,
+          "b": -2.222183874576696,
+          "n": 26955,
+          "positives": 2634,
+          "nll_identity": 25493.75383194615,
+          "nll_fit": 8626.696090533596,
+          "iterations": 8,
+          "converged": true
+        },
+        "DQ60": {
+          "a": 0.01033693871233672,
+          "b": -1.7575635200568416,
+          "n": 26955,
+          "positives": 3882,
+          "nll_identity": 33619.66654687489,
+          "nll_fit": 11103.48716544238,
+          "iterations": 8,
+          "converged": true
+        },
+        "Prepaid": {
+          "a": 0.079758248468183,
+          "b": -2.762215512493355,
+          "n": 26955,
+          "positives": 1083,
+          "nll_identity": 8826.159382734484,
+          "nll_fit": 4449.7238756557545,
+          "iterations": 8,
+          "converged": true
+        },
+        "Default": {
+          "a": 0.02199084424872884,
+          "b": -0.8585260295938096,
+          "n": 26955,
+          "positives": 6991,
+          "nll_identity": 83838.6163381024,
+          "nll_fit": 15211.033967866884,
+          "iterations": 7,
+          "converged": true
+        }
+      },
+      "logit_clipped_counts": {
+        "Current": {
+          "below_eps": 22403,
+          "above_1_minus_eps": 70
+        },
+        "DQ30": {
+          "below_eps": 2218,
+          "above_1_minus_eps": 3
+        },
+        "DQ60": {
+          "below_eps": 718,
+          "above_1_minus_eps": 0
+        },
+        "Prepaid": {
+          "below_eps": 903,
+          "above_1_minus_eps": 0
+        },
+        "Default": {
+          "below_eps": 7194,
+          "above_1_minus_eps": 316
+        }
+      }
+    }
+  }
+}

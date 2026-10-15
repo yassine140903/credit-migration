@@ -16,3 +16,8 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Large numpy arrays and test cache
+*.npy
+*.npz
+.pytest_cache/

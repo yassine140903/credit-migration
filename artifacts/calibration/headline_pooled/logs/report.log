@@ -1,0 +1,12 @@
+measuring the OOF stack ...
+  measured Current (39,360,874 rows)
+  measured DQ30 (523,364 rows)
+  measured DQ60 (124,006 rows)
+  measured DQ90+ (201,792 rows)
+measuring the shipped model's predictions ...
+  measured Current (39,360,874 rows)
+  measured DQ30 (523,364 rows)
+  measured DQ60 (124,006 rows)
+  measured DQ90+ (201,792 rows)
+wrote diagnostics\56_calibration_report.txt
+peak RSS 5.63 GB, min system available 3.13 GB

@@ -1,0 +1,232 @@
+========================================================================================================================
+DIAGNOSTIC 57 - IS THE SHIPPED MODEL SATURATING WHERE THE FOLD MODELS ARE NOT?   (read-only on models)
+========================================================================================================================
+
+PRE-REGISTRATION (written before any measurement was computed)
+------------------------------------------------------------------------------------------------------------------------
+"Prediction recorded before the numbers exist: the shipped model shows materially larger raw-score spread than the fold models at DQ60 and DQ90+, and roughly equal spread at Current. If spreads are similar across all four origin states, the saturation hypothesis is dead, section 5 of diagnostic 56 remains unexplained, and no further explanation is pursued in this milestone."
+
+WHAT IS COMPARED
+------------------------------------------------------------------------------------------------------------------------
+Model A : artifacts/ml/headline_pooled/model.txt   sha256 360761955780a5daaafd08db9c181e05a76b7902651d9d56f9e0038a24fc0095   (prefix 360761955780a5da asserted)
+Model B : fold 0's model from diagnostic 56 (trained on the 80% of loans not in fold 0).
+          Diagnostic 56 did not persist its fold boosters. On explicit instruction, `python -m src.calibrate refold` retrained fold 0 once,
+          with the same code, features, categories, lgb_params and 100 rounds, and saved it. Section A says how closely it reproduces
+          diagnostic 56's stored fold-0 predictions. This is the only retrain; it is a stand-in for the original booster and is labelled as such.
+Rows    : fold 0's held-out fit rows (Current 7,859,371 / DQ30 104,104 / DQ60 25,000 / DQ90+ 41,036). Both models score the identical rows.
+Measure : LightGBM raw_score=True (six margins per row, before the softmax); softmax taken here in float64.
+Not done: no retraining with other parameters, no fix, no evaluate rows, no chained forecast, no change to the calibration correction.
+Order   : this header; A) sha256 and regularisation actually in the model files; B) reference scale; C) spread tables; D) leaf statistics;
+          E) one loan by hand.
+
+========================================================================================================================
+A. SHA256 AND THE REGULARISATION ACTUALLY IN EFFECT   (read out of each model.txt, not the sidecar)
+========================================================================================================================
+Model A sha256 360761955780a5daaafd08db9c181e05a76b7902651d9d56f9e0038a24fc0095   (prefix 360761955780a5da: MATCH)
+Model B sha256 59233e42c1dcb6eb40c3198082fa7aabca3b7f0220e2250e8b3a83b3d9b87d6e   (artifacts/calibration/headline_pooled/oof/fold0_model.txt)
+Model B is a RETRAIN of fold 0 (diagnostic 56 did not save its booster), trained in 143 s. Against diagnostic 56's stored fold-0 held-out
+predictions: max |difference| = 0.000e+00 over 48,177,066 cells; cells differing at all = 0.
+
+parameter (from model.txt)               model A               model B   sidecar of A (lgb_params)
+------------------------------------------------------------------------------------------------------------------------
+min_sum_hessian_in_leaf                       10                    10   10.0
+lambda_l2                                     10                    10   10.0
+lambda_l1                                      0                     0   -
+min_data_in_leaf                              20                    20   -
+num_leaves                                    31                    31   -
+learning_rate                                0.1                   0.1   -
+max_depth                                     -1                    -1   -
+max_bin                                      255                   255   -
+min_gain_to_split                              0                     0   -
+boosting                                    gbdt                  gbdt   -
+objective                             multiclass            multiclass   multiclass
+num_class                                      6                     6   6
+num_iterations                               100                   100   -
+feature_fraction                               1                     1   -
+bagging_fraction                               1                     1   -
+seed                                           0                     0   -
+deterministic                                  0                     0   -
+------------------------------------------------------------------------------------------------------------------------
+Every parameter in the two files' parameter blocks that differs between A and B: NONE
+Model A's file AGREES WITH its own sidecar on min_sum_hessian_in_leaf and lambda_l2 (file: 10 and 10; sidecar: 10.0 and 10.0).
+
+booster structure (from the files)                   model A         model B
+------------------------------------------------------------------------------------------------------------------------
+trees (100 rounds x 6 classes)                           600             600
+leaves per tree, min / median / max              7 / 31 / 31     5 / 31 / 31
+leaves in total                                       18,420          18,515
+leaves holding fewer than 20 training rows                 0               0
+(the files record leaf_count per leaf, so this is the training-row count of each leaf, not an estimate)
+
+========================================================================================================================
+B. REFERENCE SCALE   (how wide a raw-score spread is ordinary?)
+========================================================================================================================
+Six class frequencies of the fit rows (all origins pooled), recomputed from the sidecar's label counts:
+   Current      38,939,122   freq 96.839311%   ln(freq)   -0.0321
+   DQ30            560,573   freq 1.394112%   ln(freq)   -4.2729
+   DQ60            137,744   freq 0.342561%   ln(freq)   -5.6765
+   DQ90+           233,923   freq 0.581753%   ln(freq)   -5.1469
+   Prepaid         331,492   freq 0.824401%   ln(freq)   -4.7983
+   Default           7,182   freq 0.017861%   ln(freq)   -8.6303
+Span of the six log class frequencies, pooled: ln(max) - ln(min) = 8.5982
+The brief's figure (12-13 Oct) is 13.24. The pooled recomputation above does NOT reproduce it. Spans of the same quantity within each origin
+state's rows (counts from artifacts/baseline_headline/counts.csv, verified against the panel in diagnostic 56):
+   origin Current  ln(max/min) = 13.1672   (largest class Current 38,697,062, smallest class Default 74)
+   origin DQ30     ln(max/min) = 8.3566   (largest class Current 212,900, smallest class Default 50)
+   origin DQ60     ln(max/min) = 6.7429   (largest class DQ90+ 56,818, smallest class Default 67)
+   origin DQ90+    ln(max/min) = 5.0841   (largest class DQ90+ 174,837, smallest class Prepaid 1,083)
+None of these is exactly 13.24 (Current origin, 13.17, is the nearest); the source of 13.24 is not known here. Both are reported; a spread far
+above these (tens, hundreds) is not ordinary variation. An intercept-only softmax model would have a spread equal to the pooled span.
+
+========================================================================================================================
+C. RAW-SCORE SPREAD   (raw_score=True, six margins per row; spread = max - min across the six classes; rows are fold 0's held-out fit rows)
+========================================================================================================================
+Model A saw these loans in training (in-sample); model B did not. Counts beside shares; THIN = a nonzero count under 100.
+
+C1. Per-row spread, by origin state
+------------------------------------------------------------------------------------------------------------------------
+origin  model         rows |       min       p50       p90       p99     p99.9       max
+------------------------------------------------------------------------------------------------------------------------
+Current A        7,859,371 |     6.878    16.291    18.047    41.985    48.117    51.163
+Current B        7,859,371 |     6.814    13.213    15.269    18.912    23.914    26.107
+DQ30    A          104,104 |     3.897    13.551    43.913    64.710    75.456    79.703
+DQ30    B          104,104 |     4.537     7.841    10.750    13.054    16.913    20.457
+DQ60    A           25,000 |     2.606    52.049   321.469   357.855   371.963   386.767
+DQ60    B           25,000 |     5.187   122.640   158.274   160.704   179.802   182.402
+DQ90+   A           41,036 |    12.394   217.714   301.801   351.964   418.307   536.168
+DQ90+   B           41,036 |   598.809   631.339   642.376   691.615   749.817   758.586
+------------------------------------------------------------------------------------------------------------------------
+
+C2. Per-class raw score (min / p50 / max over the origin state's rows)
+------------------------------------------------------------------------------------------------------------------------
+origin  model   Current                       DQ30                          DQ60                          DQ90+                         Prepaid                       Default                       
+------------------------------------------------------------------------------------------------------------------------
+Current A       -0.59 / 0.42 / 0.79           -6.69 / -4.89 / -2.31         -11.67 / -9.74 / -5.73        -13.52 / -10.12 / -4.46       -6.76 / -4.63 / -1.28         -50.98 / -15.73 / -5.46       
+Current B       -0.82 / 0.41 / 1.08           -6.77 / -4.91 / -2.41         -11.12 / -9.86 / -6.34        -11.15 / -10.52 / -6.49       -6.86 / -4.63 / -1.53         -25.66 / -12.78 / -6.55       
+DQ30    A       -1.81 / -1.16 / 5.40          -2.87 / -1.07 / 5.57          -3.79 / -1.76 / 4.01          -11.58 / -7.52 / 2.07         -6.48 / -4.81 / -1.81         -80.75 / -14.56 / 0.26        
+DQ30    B       -1.90 / -0.97 / 0.40          -2.78 / -1.04 / 0.79          -3.49 / -1.75 / 0.93          -8.57 / -7.00 / -2.32         -6.77 / -4.83 / -1.73         -21.60 / -8.57 / -3.81        
+DQ60    A       -297.83 / -0.79 / 312.92      -53.74 / 9.50 / 82.16         -36.94 / 17.50 / 118.41       -10.69 / 20.30 / 138.79       -7.41 / 2.93 / 19.07          -319.48 / -8.50 / 59.49       
+DQ60    B       -15.19 / 1.90 / 29.20         -1.46 / 1.89 / 27.41          -1.05 / 2.20 / 26.81          0.16 / 3.24 / 30.66           -6.16 / -2.17 / 1.85          -160.14 / -96.19 / -0.90      
+DQ90+   A       -181.27 / 245.51 / 578.05     -36.19 / 208.38 / 349.59      -33.21 / 212.17 / 359.83      -182.72 / 252.75 / 504.75     -3.12 / 38.41 / 56.31         -87.51 / 229.28 / 359.34      
+DQ90+   B       -635.50 / -614.67 / -588.67   -6.89 / 5.06 / 52.60          -11.99 / 5.82 / 51.36         -84.11 / 18.66 / 140.84       -4.24 / 2.19 / 26.64          -98.92 / 6.12 / 95.90         
+------------------------------------------------------------------------------------------------------------------------
+
+C3. Rows whose spread exceeds 20, 50, 100, 1000
+------------------------------------------------------------------------------------------------------------------------
+origin  model         rows | > 20                      > 50                      > 100                     > 1000                    
+------------------------------------------------------------------------------------------------------------------------
+Current A        7,859,371 | 364,120 (4.6329%)         971 (0.0124%)             0 (0.0000%)               0 (0.0000%)               
+Current B        7,859,371 | 41,958 (0.5339%)          0 (0.0000%)               0 (0.0000%)               0 (0.0000%)               
+DQ30    A          104,104 | 12,558 (12.0629%)         3,824 (3.6732%)           0 (0.0000%)               0 (0.0000%)               
+DQ30    B          104,104 | 7 (0.0067%) THIN          0 (0.0000%)               0 (0.0000%)               0 (0.0000%)               
+DQ60    A           25,000 | 17,703 (70.8120%)         13,131 (52.5240%)         9,158 (36.6320%)          0 (0.0000%)               
+DQ60    B           25,000 | 19,818 (79.2720%)         17,359 (69.4360%)         14,418 (57.6720%)         0 (0.0000%)               
+DQ90+   A           41,036 | 41,027 (99.9781%)         40,545 (98.8035%)         37,991 (92.5797%)         0 (0.0000%)               
+DQ90+   B           41,036 | 41,036 (100.0000%)        41,036 (100.0000%)        41,036 (100.0000%)        0 (0.0000%)               
+------------------------------------------------------------------------------------------------------------------------
+
+C4/C5. Full saturation and floor hits
+  exact zero = the float64 softmax returns exactly 0.0 on at least one class (exp(raw - max) underflows; raw gap > about 745).
+  floor hit  = probability on the TRUE class below 1e-15. 'diag 56' = the same count from diagnostic 56's stored probabilities (the tie-back).
+------------------------------------------------------------------------------------------------------------------------
+origin  model         rows | exactly 0.0 on >=1 class     floor hit (this script)      diag 56 count 
+------------------------------------------------------------------------------------------------------------------------
+Current A        7,859,371 | 0 (0.0000%)                  1 (0.0000%) THIN             1             
+Current B        7,859,371 | 0 (0.0000%)                  0 (0.0000%)                  0             
+DQ30    A          104,104 | 0 (0.0000%)                  1 (0.0010%) THIN             1             
+DQ30    B          104,104 | 0 (0.0000%)                  0 (0.0000%)                  0             
+DQ60    A           25,000 | 0 (0.0000%)                  1,832 (7.3280%)              1,832         
+DQ60    B           25,000 | 0 (0.0000%)                  6 (0.0240%) THIN             6             
+DQ90+   A           41,036 | 0 (0.0000%)                  1,886 (4.5960%)              1,886         
+DQ90+   B           41,036 | 81 (0.1974%) THIN            2,635 (6.4212%)              2,635         
+------------------------------------------------------------------------------------------------------------------------
+Softmax built here vs LightGBM predict() on the first 200,000 rows: max |difference| A 0.00e+00, B 0.00e+00.
+
+========================================================================================================================
+D. WHERE THE SPREAD COMES FROM   (leaf values, A and B side by side; numbers only)
+========================================================================================================================
+Rule fixed here: the 'larger-spread' model is the one with the larger p99.9 spread in any single origin state; its worst origin state is that state.
+Model A's largest p99.9 spread: 357.855 at DQ60.   Model B's: 691.615 at DQ90+.   => larger spread: model B, worst origin state DQ90+.
+
+D1. Trees and leaves (whole booster; leaf values in the files already include the learning rate and, in the first round, the class bias)
+------------------------------------------------------------------------------------------------------------------------
+                                                             model A         model B
+trees with a leaf of |value| > 1                          487 of 600      236 of 600
+trees with a leaf of |value| > 5                          186 of 600       55 of 600
+trees with a leaf of |value| > 10                          99 of 600       27 of 600
+leaves with |value| > 1                              2,309 of 18,420   824 of 18,515
+leaves with |value| > 5                                372 of 18,420   145 of 18,515
+leaves with |value| > 10                               143 of 18,420    53 of 18,515
+median over trees of the largest |leaf|                        2.310           0.724
+
+D2. The ten largest |leaf value| in each booster (tree index; class of the tree = index mod 6; boosting round = index // 6; training rows in the leaf)
+------------------------------------------------------------------------------------------------------------------------
+#   | model A: tree  class  round   value   rows   | model B: tree  class  round   value   rows  
+1   |   21  DQ90+     3   +683.176  175,728        |   18  Current   3   -659.873  160,756       
+2   |   23  Default   3   -425.141  119,979        |   39  DQ90+     6   +190.346  55,093        
+3   |   18  Current   3   -237.708  242,915        |   29  Default   4   -150.960  95,062        
+4   |   23  Default   3   -100.371  93,490         |   35  Default   5   -110.483  25,211        
+5   |   93  DQ90+    15    -97.828  175,728        |   33  DQ90+     5   +100.539  25,178        
+6   |   21  DQ90+     3    +93.131  26,064         |   29  Default   4    -99.055  34,773        
+7   |   69  DQ90+    11    -89.624  165,429        |   29  Default   4    -55.448  21,745        
+8   |  102  Current  17    -80.599  32,834         |   29  Default   4    -47.323  12,368        
+9   |   25  DQ30      4    -80.487  52,280         |    6  Current   1    +45.916  160,756       
+10  |   75  DQ90+    12    -80.131  119,995        |   51  DQ90+     8    +41.554  21,647        
+
+D3. How the margin is built, rows of origin DQ90+ (n = 41,036), for BOTH models. Per row: (top class - bottom class) margin = sum over the 100 boosting rounds of
+    (that round's leaf for the top class - its leaf for the bottom class). 'push' = one round's contribution. Quantiles over rows.
+    'share' = that many rounds' pushes divided by the net margin; it exceeds 1 when those rounds push harder than the net margin and other rounds cancel part of it.
+------------------------------------------------------------------------------------------------------------------------
+per-row statistic                                   model          p50        p90        max
+------------------------------------------------------------------------------------------------------------------------
+margin (top - bottom class)                         A          217.714    301.801    536.168
+largest single-round push                           A          683.175    683.203    920.884
+share of the margin from the largest 1 round        A            2.934      4.125     21.772
+share from the largest 5 rounds                     A            3.233      4.494     28.895
+share from the largest 10 rounds                    A            3.241      4.518     30.435
+rounds with a push > 1 (of 100)                     A            6.000     20.000     75.000
+rounds pushing the margin up (of 100)               A           30.000     54.000     88.000
+margin (top - bottom class)                         B          631.339    642.376    758.586
+largest single-round push                           B          660.393    661.557    684.368
+share of the margin from the largest 1 round        B            1.047      1.065      1.117
+share from the largest 5 rounds                     B            1.195      1.358      1.402
+share from the largest 10 rounds                    B            1.202      1.358      1.403
+rounds with a push > 1 (of 100)                     B            5.000      6.000     48.000
+rounds pushing the margin up (of 100)               B           12.000     27.000     93.000
+------------------------------------------------------------------------------------------------------------------------
+Check: the leaf values reached by each row sum to the raw score within 0.0e+00 (A), 0.0e+00 (B).
+
+========================================================================================================================
+E. ONE LOAN, BY HAND
+========================================================================================================================
+DQ60-origin rows in fold 0 where the shipped model's true-class probability is below 1e-15 and the fold model's is not: 1,827 of 25,000 DQ60 rows.
+Chosen: the FIRST such row in panel order (not selected for how it looks).
+Panel position: partition 2006Q1, row 38674 of that partition's training rows; global row 38,674; loan_id F06Q10001832; from_period 200608.
+
+Feature values (the nine features the models read):
+   fico           699.0
+   ltv            80.0
+   dti            54.0
+   rate_spread    -0.0025000572204589844
+   property_state MI
+   est_ltv        81.60910034179688
+   unemp_level    4.699999809265137
+   unemp_chg_12m  -0.20000000298023224
+   from_state     DQ60
+
+Realised next state: Current
+
+class     |        raw A        raw B |    probability A    probability B
+------------------------------------------------------------------------------------------------------------------------
+Current   |     -98.0997      -2.1495 |     5.261848e-73     2.491948e-02   <- realised
+DQ30      |     -22.8655      -0.4920 |     2.482681e-40     1.307262e-01
+DQ60      |     +63.7404      +0.0993 |     1.017160e-02     2.361441e-01
+DQ90+     |     +68.3184      +1.0387 |     9.898284e-01     6.041276e-01
+Prepaid   |     +10.7900      -3.9584 |     1.026362e-25     4.082611e-03
+Default   |      +7.2849    -155.2418 |     3.083819e-27     8.116636e-69
+------------------------------------------------------------------------------------------------------------------------
+spread (max - min raw): A 166.418   B 156.280
+
+The five largest single-round leaf values this row falls into, per model (round, class, value):
+   model A: (round 3, Current, -237.708)   (round 4, DQ30, -80.487)   (round 10, Current, +73.935)   (round 4, DQ60, +66.446)   (round 5, DQ90+, +42.533)
+   model B: (round 4, Default, -150.960)   (round 0, Default, -8.625)   (round 0, Prepaid, -4.739)   (round 0, DQ30, -3.598)   (round 0, Current, -2.297)
