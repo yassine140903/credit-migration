@@ -46,7 +46,6 @@ at DQ90+.
 | `src/memwatch.py` | Background memory watch for long runs: peak RSS, minimum available memory, hard floor |
 | `src/diagnostics/cell_counts.py` | Cell-count diagnostic for the conditional oracle |
 | `tests/` | Unit tests for the panel reader, HPI join, run-length censoring and calibration |
-| `writing/` | LaTeX source of the paper |
 
 `diagnostics/` holds numbered one-off measurement scripts, each with a committed `.txt` report.
 Diagnostic numbers are not unique (53 and 54, among others, are each used by two different
